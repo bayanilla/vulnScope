@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+.pnpm-store/
+vulnflow.log
+server.log
+vulnflow_runs/
+vulnflow_out/
+# separate git repository (github.com/bayanilla/vulnpath)
+vulnpath/

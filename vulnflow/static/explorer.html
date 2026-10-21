@@ -1,0 +1,21 @@
+<canvas id="stage" aria-label="Network graph of scanned hosts"></canvas>
+<div id="vignette"></div>
+<header id="hud">
+  <div class="brand"><span class="dot"></span>vulnflow <b>EXPLORER</b></div>
+  <div id="subtitle" class="mono"></div>
+</header>
+<div id="controls">
+  <button id="btn-overview" title="Back to the whole network (Esc)">Overview</button>
+  <button id="btn-tour" title="Fly to the next highest-priority host (Shift+click: previous)">Fly-Through</button>
+  <button id="btn-labels" aria-pressed="true" title="Show or hide labels (L)">Labels</button>
+  <button id="btn-motion" aria-pressed="true" title="Animated traffic (M)">Motion</button>
+</div>
+<aside id="rail">
+  <input id="search" type="search" placeholder="Find host, IP, CVE  ( / )" aria-label="Find a host" autocomplete="off">
+  <div id="hostlist" role="list"></div>
+</aside>
+<aside id="panel" aria-live="polite" hidden></aside>
+<div id="legend"></div>
+<div id="tip" role="tooltip" hidden></div>
+<div id="hint">Click a host to see who is targeting it and how far a compromise could reach.</div>
+<div id="intro"><div class="mono" id="intro-text"></div></div>

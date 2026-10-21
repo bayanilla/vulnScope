@@ -1,0 +1,2283 @@
+{
+  "generated": "2026-10-21T21:02:38Z",
+  "config": {
+    "internal_nets": [
+      "10.0.0.0/8",
+      "172.16.0.0/12",
+      "192.168.0.0/16",
+      "100.64.0.0/10",
+      "127.0.0.0/8",
+      "169.254.0.0/16",
+      "fc00::/7",
+      "fe80::/10",
+      "::1/128"
+    ],
+    "hops": 2,
+    "min_severity": "Low"
+  },
+  "inputs": [
+    {
+      "file": "netflow_segment6.csv",
+      "format": "generic",
+      "read": 112,
+      "kept": 112,
+      "dropped": {},
+      "notes": []
+    },
+    {
+      "file": "paloalto_traffic.csv",
+      "format": "paloalto",
+      "read": 465,
+      "kept": 465,
+      "dropped": {},
+      "notes": [
+        "firewall timestamps are assumed to be UTC",
+        "4 IPS/IDS alert(s) used as exploitation evidence"
+      ]
+    },
+    {
+      "file": "quarterly_scan.nessus",
+      "format": "nessus",
+      "read": 33,
+      "kept": 33,
+      "dropped": {},
+      "notes": []
+    },
+    {
+      "file": "zeek_conn.log",
+      "format": "zeek",
+      "read": 781,
+      "kept": 780,
+      "dropped": {
+        "missing or invalid IP": 1
+      },
+      "notes": []
+    }
+  ],
+  "summary": {
+    "flows": 1352,
+    "findings_total": 33,
+    "findings_scored": 17,
+    "hosts_with_findings": 16,
+    "priority_counts": {
+      "P1": 4,
+      "P2": 8,
+      "P3": 2,
+      "P4": 3
+    },
+    "internet_exposed_findings": 1,
+    "exploitable_and_exposed": 4,
+    "hosts_with_indicators": [
+      "10.10.1.10",
+      "10.10.2.25",
+      "10.10.3.31"
+    ],
+    "hosts_corroborated": [
+      "10.10.1.10"
+    ],
+    "hosts_to_investigate": [],
+    "hosts_possible_spread": [
+      "10.10.2.25",
+      "10.10.3.31"
+    ],
+    "threat_alerts": 4,
+    "zeek_event_counts": {},
+    "ot_protocol_counts": {},
+    "hosts_internet_exposed": 1,
+    "window_start": "2026-10-12T00:02:03Z",
+    "window_end": "2026-10-18T03:11:38Z",
+    "duplicate_flows_removed": 1,
+    "duplicate_findings_merged": 0
+  },
+  "coverage": {
+    "scanned_hosts": 16,
+    "telemetry_internal_hosts": 19,
+    "scanned_and_seen": 15,
+    "scanned_not_seen": [
+      "10.10.5.60"
+    ],
+    "active_servers_not_scanned": [
+      {
+        "ip": "10.10.0.10",
+        "services": [
+          "389/tcp",
+          "88/tcp"
+        ],
+        "sessions": 160
+      },
+      {
+        "ip": "10.10.0.53",
+        "services": [
+          "53/udp"
+        ],
+        "sessions": 88
+      },
+      {
+        "ip": "10.10.6.70",
+        "services": [
+          "3389/tcp",
+          "445/tcp"
+        ],
+        "sessions": 81
+      },
+      {
+        "ip": "10.10.6.71",
+        "services": [
+          "8443/tcp"
+        ],
+        "sessions": 31
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "host": "10.10.1.10",
+      "hostname": "web01.corp.example",
+      "os": "Linux Kernel 5.4 on Ubuntu 20.04",
+      "findings": 2,
+      "by_severity": {
+        "Critical": 1,
+        "Medium": 1
+      },
+      "max_score": 100,
+      "priority": "P1",
+      "internet_exposed": true,
+      "indicators": 5,
+      "blast": {
+        "reachable_count": 6,
+        "direct_count": 5,
+        "reachable": [
+          {
+            "ip": "10.10.1.20",
+            "hop": 1,
+            "ports": [
+              "8009/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.2.25",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.3.31",
+            "hop": 1,
+            "ports": [
+              "3389/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.0.53",
+            "hop": 1,
+            "ports": [
+              "53/udp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.70",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.2.20",
+            "hop": 2,
+            "ports": [],
+            "max_severity": "High"
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.1.20",
+          "10.10.2.25",
+          "10.10.3.31",
+          "10.10.2.20"
+        ],
+        "lateral_protocols": {
+          "SMB": 2,
+          "RDP": 1
+        },
+        "external_destinations": 1,
+        "top_external_destinations": [
+          [
+            "203.0.113.45",
+            2
+          ]
+        ],
+        "factor": 1.5
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 249,
+      "outbound_flows": 165
+    },
+    {
+      "host": "10.10.1.20",
+      "hostname": "app01.corp.example",
+      "os": "Linux Kernel 5.15 on Ubuntu 22.04",
+      "findings": 1,
+      "by_severity": {
+        "Critical": 1
+      },
+      "max_score": 100,
+      "priority": "P1",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 2,
+        "direct_count": 1,
+        "reachable": [
+          {
+            "ip": "10.10.2.20",
+            "hop": 1,
+            "ports": [
+              "5432/tcp"
+            ],
+            "max_severity": "High"
+          },
+          {
+            "ip": "10.10.6.71",
+            "hop": 2,
+            "ports": [],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.2.20"
+        ],
+        "lateral_protocols": {
+          "PostgreSQL": 140
+        },
+        "external_destinations": 0,
+        "top_external_destinations": [],
+        "factor": 1.24
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 120,
+      "outbound_flows": 140
+    },
+    {
+      "host": "10.10.3.31",
+      "hostname": "ws-031.corp.example",
+      "os": "Microsoft Windows 7 Professional",
+      "findings": 1,
+      "by_severity": {
+        "Critical": 1
+      },
+      "max_score": 89,
+      "priority": "P1",
+      "internet_exposed": false,
+      "indicators": 1,
+      "blast": {
+        "reachable_count": 0,
+        "direct_count": 0,
+        "reachable": [],
+        "vulnerable_pivots": [],
+        "lateral_protocols": {},
+        "external_destinations": 0,
+        "top_external_destinations": [],
+        "factor": 1.0
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 92,
+      "outbound_flows": 0
+    },
+    {
+      "host": "10.10.2.25",
+      "hostname": "fs01.corp.example",
+      "os": "Microsoft Windows Server 2012 R2",
+      "findings": 1,
+      "by_severity": {
+        "Critical": 1
+      },
+      "max_score": 83,
+      "priority": "P1",
+      "internet_exposed": false,
+      "indicators": 1,
+      "blast": {
+        "reachable_count": 0,
+        "direct_count": 0,
+        "reachable": [],
+        "vulnerable_pivots": [],
+        "lateral_protocols": {},
+        "external_destinations": 0,
+        "top_external_destinations": [],
+        "factor": 1.0
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 201,
+      "outbound_flows": 0
+    },
+    {
+      "host": "10.10.3.40",
+      "hostname": "ws-040.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 61,
+      "priority": "P2",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 5,
+        "direct_count": 5,
+        "reachable": [
+          {
+            "ip": "10.10.2.25",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.0.10",
+            "hop": 1,
+            "ports": [
+              "389/tcp",
+              "88/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.0.53",
+            "hop": 1,
+            "ports": [
+              "53/udp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.70",
+            "hop": 1,
+            "ports": [
+              "3389/tcp",
+              "445/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.71",
+            "hop": 1,
+            "ports": [
+              "8443/tcp"
+            ],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.2.25"
+        ],
+        "lateral_protocols": {
+          "SMB": 29,
+          "Kerberos": 10,
+          "LDAP": 10,
+          "RDP": 9
+        },
+        "external_destinations": 23,
+        "top_external_destinations": [
+          [
+            "93.184.254.146",
+            1
+          ],
+          [
+            "93.184.34.189",
+            1
+          ],
+          [
+            "93.184.24.67",
+            1
+          ],
+          [
+            "93.184.108.144",
+            1
+          ],
+          [
+            "93.184.146.48",
+            1
+          ]
+        ],
+        "factor": 1.38
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 0,
+      "outbound_flows": 88
+    },
+    {
+      "host": "10.10.3.41",
+      "hostname": "ws-041.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 59,
+      "priority": "P2",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 4,
+        "direct_count": 4,
+        "reachable": [
+          {
+            "ip": "10.10.2.25",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.0.10",
+            "hop": 1,
+            "ports": [
+              "389/tcp",
+              "88/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.0.53",
+            "hop": 1,
+            "ports": [
+              "53/udp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.70",
+            "hop": 1,
+            "ports": [
+              "3389/tcp",
+              "445/tcp"
+            ],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.2.25"
+        ],
+        "lateral_protocols": {
+          "SMB": 27,
+          "LDAP": 10,
+          "Kerberos": 10,
+          "RDP": 7
+        },
+        "external_destinations": 20,
+        "top_external_destinations": [
+          [
+            "93.184.150.65",
+            1
+          ],
+          [
+            "93.184.177.121",
+            1
+          ],
+          [
+            "93.184.251.202",
+            1
+          ],
+          [
+            "93.184.143.53",
+            1
+          ],
+          [
+            "93.184.92.207",
+            1
+          ]
+        ],
+        "factor": 1.34
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 0,
+      "outbound_flows": 81
+    },
+    {
+      "host": "10.10.3.42",
+      "hostname": "ws-042.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 59,
+      "priority": "P2",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 4,
+        "direct_count": 4,
+        "reachable": [
+          {
+            "ip": "10.10.2.25",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.0.10",
+            "hop": 1,
+            "ports": [
+              "389/tcp",
+              "88/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.0.53",
+            "hop": 1,
+            "ports": [
+              "53/udp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.70",
+            "hop": 1,
+            "ports": [
+              "3389/tcp",
+              "445/tcp"
+            ],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.2.25"
+        ],
+        "lateral_protocols": {
+          "SMB": 35,
+          "Kerberos": 10,
+          "LDAP": 10,
+          "RDP": 5
+        },
+        "external_destinations": 24,
+        "top_external_destinations": [
+          [
+            "93.184.29.234",
+            1
+          ],
+          [
+            "93.184.193.22",
+            1
+          ],
+          [
+            "93.184.242.127",
+            1
+          ],
+          [
+            "93.184.42.55",
+            1
+          ],
+          [
+            "93.184.154.188",
+            1
+          ]
+        ],
+        "factor": 1.34
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 0,
+      "outbound_flows": 98
+    },
+    {
+      "host": "10.10.3.43",
+      "hostname": "ws-043.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 59,
+      "priority": "P2",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 4,
+        "direct_count": 4,
+        "reachable": [
+          {
+            "ip": "10.10.2.25",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.0.10",
+            "hop": 1,
+            "ports": [
+              "389/tcp",
+              "88/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.0.53",
+            "hop": 1,
+            "ports": [
+              "53/udp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.70",
+            "hop": 1,
+            "ports": [
+              "3389/tcp",
+              "445/tcp"
+            ],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.2.25"
+        ],
+        "lateral_protocols": {
+          "SMB": 28,
+          "Kerberos": 10,
+          "LDAP": 10,
+          "RDP": 4
+        },
+        "external_destinations": 15,
+        "top_external_destinations": [
+          [
+            "93.184.95.199",
+            1
+          ],
+          [
+            "93.184.73.235",
+            1
+          ],
+          [
+            "93.184.57.9",
+            1
+          ],
+          [
+            "93.184.186.111",
+            1
+          ],
+          [
+            "93.184.157.203",
+            1
+          ]
+        ],
+        "factor": 1.34
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 0,
+      "outbound_flows": 73
+    },
+    {
+      "host": "10.10.3.44",
+      "hostname": "ws-044.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 59,
+      "priority": "P2",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 4,
+        "direct_count": 4,
+        "reachable": [
+          {
+            "ip": "10.10.2.25",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.0.10",
+            "hop": 1,
+            "ports": [
+              "389/tcp",
+              "88/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.0.53",
+            "hop": 1,
+            "ports": [
+              "53/udp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.70",
+            "hop": 1,
+            "ports": [
+              "3389/tcp",
+              "445/tcp"
+            ],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.2.25"
+        ],
+        "lateral_protocols": {
+          "SMB": 32,
+          "LDAP": 10,
+          "Kerberos": 10,
+          "RDP": 3
+        },
+        "external_destinations": 15,
+        "top_external_destinations": [
+          [
+            "93.184.212.230",
+            1
+          ],
+          [
+            "93.184.79.186",
+            1
+          ],
+          [
+            "93.184.24.184",
+            1
+          ],
+          [
+            "93.184.199.32",
+            1
+          ],
+          [
+            "93.184.176.250",
+            1
+          ]
+        ],
+        "factor": 1.34
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 0,
+      "outbound_flows": 76
+    },
+    {
+      "host": "10.10.3.45",
+      "hostname": "ws-045.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 59,
+      "priority": "P2",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 4,
+        "direct_count": 4,
+        "reachable": [
+          {
+            "ip": "10.10.2.25",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.0.10",
+            "hop": 1,
+            "ports": [
+              "389/tcp",
+              "88/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.0.53",
+            "hop": 1,
+            "ports": [
+              "53/udp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.70",
+            "hop": 1,
+            "ports": [
+              "3389/tcp",
+              "445/tcp"
+            ],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.2.25"
+        ],
+        "lateral_protocols": {
+          "SMB": 30,
+          "Kerberos": 10,
+          "LDAP": 10,
+          "RDP": 6
+        },
+        "external_destinations": 19,
+        "top_external_destinations": [
+          [
+            "93.184.224.121",
+            1
+          ],
+          [
+            "93.184.243.41",
+            1
+          ],
+          [
+            "93.184.14.6",
+            1
+          ],
+          [
+            "93.184.172.109",
+            1
+          ],
+          [
+            "93.184.74.93",
+            1
+          ]
+        ],
+        "factor": 1.34
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 0,
+      "outbound_flows": 81
+    },
+    {
+      "host": "10.10.3.46",
+      "hostname": "ws-046.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 59,
+      "priority": "P2",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 4,
+        "direct_count": 4,
+        "reachable": [
+          {
+            "ip": "10.10.2.25",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.0.10",
+            "hop": 1,
+            "ports": [
+              "389/tcp",
+              "88/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.0.53",
+            "hop": 1,
+            "ports": [
+              "53/udp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.70",
+            "hop": 1,
+            "ports": [
+              "3389/tcp"
+            ],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.2.25"
+        ],
+        "lateral_protocols": {
+          "SMB": 25,
+          "Kerberos": 10,
+          "LDAP": 10,
+          "RDP": 8
+        },
+        "external_destinations": 17,
+        "top_external_destinations": [
+          [
+            "93.184.223.178",
+            1
+          ],
+          [
+            "93.184.85.157",
+            1
+          ],
+          [
+            "93.184.64.87",
+            1
+          ],
+          [
+            "93.184.247.117",
+            1
+          ],
+          [
+            "93.184.80.151",
+            1
+          ]
+        ],
+        "factor": 1.34
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 0,
+      "outbound_flows": 76
+    },
+    {
+      "host": "10.10.3.47",
+      "hostname": "ws-047.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 59,
+      "priority": "P2",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 4,
+        "direct_count": 4,
+        "reachable": [
+          {
+            "ip": "10.10.2.25",
+            "hop": 1,
+            "ports": [
+              "445/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.0.10",
+            "hop": 1,
+            "ports": [
+              "389/tcp",
+              "88/tcp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.0.53",
+            "hop": 1,
+            "ports": [
+              "53/udp"
+            ],
+            "max_severity": ""
+          },
+          {
+            "ip": "10.10.6.70",
+            "hop": 1,
+            "ports": [
+              "3389/tcp",
+              "445/tcp"
+            ],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.2.25"
+        ],
+        "lateral_protocols": {
+          "SMB": 30,
+          "LDAP": 10,
+          "Kerberos": 10,
+          "RDP": 2
+        },
+        "external_destinations": 17,
+        "top_external_destinations": [
+          [
+            "93.184.191.222",
+            1
+          ],
+          [
+            "93.184.59.143",
+            1
+          ],
+          [
+            "93.184.89.58",
+            1
+          ],
+          [
+            "93.184.108.230",
+            1
+          ],
+          [
+            "93.184.67.66",
+            1
+          ]
+        ],
+        "factor": 1.34
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 0,
+      "outbound_flows": 75
+    },
+    {
+      "host": "10.10.2.20",
+      "hostname": "db01.corp.example",
+      "os": "Linux Kernel 5.15 on Ubuntu 22.04",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 45,
+      "priority": "P3",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 1,
+        "direct_count": 1,
+        "reachable": [
+          {
+            "ip": "10.10.6.71",
+            "hop": 1,
+            "ports": [
+              "8443/tcp"
+            ],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [],
+        "lateral_protocols": {},
+        "external_destinations": 0,
+        "top_external_destinations": [],
+        "factor": 1.04
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 170,
+      "outbound_flows": 30
+    },
+    {
+      "host": "10.10.5.60",
+      "hostname": "ups-mgmt.corp.example",
+      "os": "Embedded Linux",
+      "findings": 1,
+      "by_severity": {
+        "High": 1
+      },
+      "max_score": 38,
+      "priority": "P3",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 0,
+        "direct_count": 0,
+        "reachable": [],
+        "vulnerable_pivots": [],
+        "lateral_protocols": {},
+        "external_destinations": 0,
+        "top_external_destinations": [],
+        "factor": 1.0
+      },
+      "telemetry_seen": false,
+      "inbound_flows": 0,
+      "outbound_flows": 0
+    },
+    {
+      "host": "10.10.4.50",
+      "hostname": "prn-4f.corp.example",
+      "os": "HP LaserJet",
+      "findings": 1,
+      "by_severity": {
+        "Medium": 1
+      },
+      "max_score": 13,
+      "priority": "P4",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 0,
+        "direct_count": 0,
+        "reachable": [],
+        "vulnerable_pivots": [],
+        "lateral_protocols": {},
+        "external_destinations": 0,
+        "top_external_destinations": [],
+        "factor": 1.0
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 8,
+      "outbound_flows": 0
+    },
+    {
+      "host": "10.10.3.5",
+      "hostname": "jump01.corp.example",
+      "os": "Microsoft Windows Server 2019",
+      "findings": 1,
+      "by_severity": {
+        "Medium": 1
+      },
+      "max_score": 11,
+      "priority": "P4",
+      "internet_exposed": false,
+      "indicators": 0,
+      "blast": {
+        "reachable_count": 3,
+        "direct_count": 2,
+        "reachable": [
+          {
+            "ip": "10.10.3.31",
+            "hop": 1,
+            "ports": [
+              "3389/tcp"
+            ],
+            "max_severity": "Critical"
+          },
+          {
+            "ip": "10.10.2.20",
+            "hop": 1,
+            "ports": [
+              "22/tcp"
+            ],
+            "max_severity": "High"
+          },
+          {
+            "ip": "10.10.6.71",
+            "hop": 2,
+            "ports": [],
+            "max_severity": ""
+          }
+        ],
+        "vulnerable_pivots": [
+          "10.10.3.31",
+          "10.10.2.20"
+        ],
+        "lateral_protocols": {
+          "SSH": 30,
+          "RDP": 30
+        },
+        "external_destinations": 0,
+        "top_external_destinations": [],
+        "factor": 1.36
+      },
+      "telemetry_seen": true,
+      "inbound_flows": 0,
+      "outbound_flows": 60
+    }
+  ],
+  "findings": [
+    {
+      "host": "10.10.1.10",
+      "hostname": "web01.corp.example",
+      "os": "Linux Kernel 5.4 on Ubuntu 20.04",
+      "plugin_id": "153884",
+      "plugin_name": "Apache 2.4.49 < 2.4.51 Path Traversal and RCE",
+      "severity": 4,
+      "severity_name": "Critical",
+      "port": 443,
+      "proto": "tcp",
+      "service": "www",
+      "cvss": 9.8,
+      "cves": [
+        "CVE-2021-41773",
+        "CVE-2021-42013"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [
+        "Metasploit"
+      ],
+      "synopsis": "The remote web server is affected by a path traversal vulnerability that can lead to remote code execution.",
+      "solution": "Upgrade to Apache version 2.4.51 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Vulnerable service reached from the internet",
+        "factor": 1.0,
+        "scope": "port",
+        "telemetry_seen": true,
+        "inbound_total": 224,
+        "established": 224,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 154,
+        "top_sources": [
+          [
+            "198.51.100.65",
+            6,
+            true
+          ],
+          [
+            "198.51.100.38",
+            5,
+            true
+          ],
+          [
+            "198.51.100.176",
+            4,
+            true
+          ],
+          [
+            "198.51.100.102",
+            4,
+            true
+          ],
+          [
+            "198.51.100.20",
+            4,
+            true
+          ],
+          [
+            "203.0.113.45",
+            4,
+            true
+          ],
+          [
+            "198.51.100.131",
+            3,
+            true
+          ],
+          [
+            "198.51.100.10",
+            3,
+            true
+          ]
+        ],
+        "first_seen": "2026-10-12T00:02:03Z",
+        "last_seen": "2026-10-18T02:50:10Z",
+        "bytes": 10620043,
+        "threat_alerts": 1,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.5,
+      "exploit_factor": 1.1,
+      "likelihood": "High",
+      "score": 100,
+      "priority": "P1",
+      "indicators": [
+        {
+          "type": "threat_alert",
+          "confidence": "lead",
+          "sources": [
+            [
+              "203.0.113.45",
+              1
+            ]
+          ],
+          "text": "IPS/IDS alerted 1 time(s) on traffic to this service and did not block it: Apache HTTP Server Path Traversal Vulnerability CVE-2021-41773(91694) (from 203.0.113.45), matching CVE-2021-41773. An alert shows an attempt, not that it succeeded."
+        },
+        {
+          "type": "return_connection",
+          "confidence": "lead",
+          "at": "2026-10-16T03:12:00Z",
+          "peer": "203.0.113.45",
+          "ports": [
+            443,
+            4444
+          ],
+          "text": "10.10.1.10 opened 2 outbound connection(s) to 203.0.113.45 (port 443, 4444) after 203.0.113.45 connected to the vulnerable service. This is consistent with an exploit callback, but on its own it can also be legitimate traffic; confirm with IPS/threat logs, payload or application logs, or host evidence."
+        },
+        {
+          "type": "new_lateral",
+          "confidence": "lead",
+          "at": "2026-10-16T03:12:00Z",
+          "targets": [
+            {
+              "ip": "10.10.2.25",
+              "ports": [
+                445
+              ]
+            },
+            {
+              "ip": "10.10.3.31",
+              "ports": [
+                3389
+              ]
+            },
+            {
+              "ip": "10.10.6.70",
+              "ports": [
+                445
+              ]
+            }
+          ],
+          "text": "After the flagged inbound contact at 2026-10-16T03:12:00Z, 10.10.1.10 began connecting to 3 internal host(s) it had not talked to before, over RDP, SMB."
+        },
+        {
+          "type": "exfil",
+          "confidence": "lead",
+          "at": "2026-10-16T03:12:00Z",
+          "peer": "203.0.113.45",
+          "bytes": 62002996,
+          "text": "10.10.1.10 sent 59.1 MB to external address 203.0.113.45 after the flagged inbound contact at 2026-10-16T03:12:00Z."
+        },
+        {
+          "type": "corroborated",
+          "confidence": "corroborated",
+          "at": "2026-10-16T03:12:00Z",
+          "text": "Independent signals agree: the IPS/IDS alerted on traffic to this vulnerable service from 203.0.113.45, the same address the host then connected back to, and the host then showed exfil, new lateral, return connection. Treat this as likely exploitation and start incident response; host forensics is still needed to confirm a compromise."
+        }
+      ],
+      "rationale": [
+        "Base severity: CVSS v3 9.8 (Critical).",
+        "A public exploit is available (Metasploit).",
+        "Exposure: vulnerable service reached from the internet - 224 completed sessions from 154 external and 0 internal sources.",
+        "Blast radius: the host talks to 5 internal host(s) directly and 6 within 2 hops, including 4 with High/Critical findings.",
+        "Corroborated exploitation evidence (IPS alert plus host behaviour); see indicators."
+      ]
+    },
+    {
+      "host": "10.10.1.20",
+      "hostname": "app01.corp.example",
+      "os": "Linux Kernel 5.15 on Ubuntu 22.04",
+      "plugin_id": "134862",
+      "plugin_name": "Apache Tomcat AJP Connector Request Injection (Ghostcat)",
+      "severity": 4,
+      "severity_name": "Critical",
+      "port": 8009,
+      "proto": "tcp",
+      "service": "ajp13",
+      "cvss": 9.8,
+      "cves": [
+        "CVE-2020-1938"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [
+        "Metasploit"
+      ],
+      "synopsis": "An AJP connector is listening and is affected by a file read/inclusion vulnerability.",
+      "solution": "Update Tomcat to 9.0.31 / 8.5.51 / 7.0.100 or later, or disable the AJP connector.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Vulnerable service reached internally",
+        "factor": 0.75,
+        "scope": "port",
+        "telemetry_seen": true,
+        "inbound_total": 120,
+        "established": 120,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 1,
+        "external_sources": 0,
+        "top_sources": [
+          [
+            "10.10.1.10",
+            120,
+            false
+          ]
+        ],
+        "first_seen": "2026-10-12T00:38:11Z",
+        "last_seen": "2026-10-18T02:46:28Z",
+        "bytes": 2712574,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.24,
+      "exploit_factor": 1.1,
+      "likelihood": "High",
+      "score": 100,
+      "priority": "P1",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 9.8 (Critical).",
+        "A public exploit is available (Metasploit).",
+        "Exposure: vulnerable service reached internally - 120 completed sessions from 0 external and 1 internal sources.",
+        "Blast radius: the host talks to 1 internal host(s) directly and 2 within 2 hops, including 1 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.3.31",
+      "hostname": "ws-031.corp.example",
+      "os": "Microsoft Windows 7 Professional",
+      "plugin_id": "125313",
+      "plugin_name": "Microsoft RDP RCE (CVE-2019-0708) (BlueKeep)",
+      "severity": 4,
+      "severity_name": "Critical",
+      "port": 3389,
+      "proto": "tcp",
+      "service": "msrdp",
+      "cvss": 9.8,
+      "cves": [
+        "CVE-2019-0708"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [
+        "Metasploit"
+      ],
+      "synopsis": "The remote host is affected by a remote code execution vulnerability in Remote Desktop Services.",
+      "solution": "Apply the May 2019 security update and enable Network Level Authentication.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Vulnerable service reached internally",
+        "factor": 0.75,
+        "scope": "port",
+        "telemetry_seen": true,
+        "inbound_total": 91,
+        "established": 31,
+        "denied": 60,
+        "attempts": 0,
+        "internal_sources": 2,
+        "external_sources": 0,
+        "top_sources": [
+          [
+            "10.10.3.5",
+            30,
+            false
+          ],
+          [
+            "10.10.1.10",
+            1,
+            false
+          ]
+        ],
+        "first_seen": "2026-10-12T05:08:06Z",
+        "last_seen": "2026-10-18T03:11:38Z",
+        "bytes": 727269,
+        "threat_alerts": 0,
+        "threat_blocked": 3,
+        "threat_blocked_sources": [
+          [
+            "192.0.2.216",
+            1
+          ],
+          [
+            "192.0.2.145",
+            1
+          ],
+          [
+            "192.0.2.174",
+            1
+          ]
+        ]
+      },
+      "blast_factor": 1.0,
+      "exploit_factor": 1.1,
+      "likelihood": "High",
+      "score": 89,
+      "priority": "P1",
+      "indicators": [
+        {
+          "type": "lateral_spread",
+          "confidence": "lead",
+          "peer": "10.10.1.10",
+          "port": 3389,
+          "proto": "tcp",
+          "text": "10.10.1.10, which is flagged for investigation, newly connected to this vulnerable service at 2026-10-16T04:08:00Z. Check this host for signs of lateral movement."
+        }
+      ],
+      "rationale": [
+        "Base severity: CVSS v3 9.8 (Critical).",
+        "A public exploit is available (Metasploit).",
+        "Exposure: vulnerable service reached internally - 31 completed sessions from 0 external and 2 internal sources.",
+        "60 connection(s) to it were blocked by a firewall.",
+        "The IPS/IDS blocked 3 alerted attempt(s) against it.",
+        "Traffic gives leads worth investigating; nothing in the logs confirms exploitation."
+      ]
+    },
+    {
+      "host": "10.10.2.25",
+      "hostname": "fs01.corp.example",
+      "os": "Microsoft Windows Server 2012 R2",
+      "plugin_id": "97833",
+      "plugin_name": "MS17-010: Security Update for Microsoft Windows SMB Server (ETERNALBLUE)",
+      "severity": 4,
+      "severity_name": "Critical",
+      "port": 445,
+      "proto": "tcp",
+      "service": "cifs",
+      "cvss": 8.1,
+      "cves": [
+        "CVE-2017-0143",
+        "CVE-2017-0144",
+        "CVE-2017-0145"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [
+        "Metasploit"
+      ],
+      "synopsis": "The remote Windows host is affected by multiple remote code execution vulnerabilities in SMBv1.",
+      "solution": "Apply MS17-010 and disable SMBv1.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Vulnerable service reached internally by many hosts",
+        "factor": 0.85,
+        "scope": "port",
+        "telemetry_seen": true,
+        "inbound_total": 201,
+        "established": 201,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 9,
+        "external_sources": 0,
+        "top_sources": [
+          [
+            "10.10.3.44",
+            25,
+            false
+          ],
+          [
+            "10.10.3.45",
+            25,
+            false
+          ],
+          [
+            "10.10.3.41",
+            25,
+            false
+          ],
+          [
+            "10.10.3.47",
+            25,
+            false
+          ],
+          [
+            "10.10.3.40",
+            25,
+            false
+          ],
+          [
+            "10.10.3.46",
+            25,
+            false
+          ],
+          [
+            "10.10.3.43",
+            25,
+            false
+          ],
+          [
+            "10.10.3.42",
+            25,
+            false
+          ]
+        ],
+        "first_seen": "2026-10-12T01:53:43Z",
+        "last_seen": "2026-10-18T02:55:10Z",
+        "bytes": 4566257,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.0,
+      "exploit_factor": 1.1,
+      "likelihood": "High",
+      "score": 83,
+      "priority": "P1",
+      "indicators": [
+        {
+          "type": "lateral_spread",
+          "confidence": "lead",
+          "peer": "10.10.1.10",
+          "port": 445,
+          "proto": "tcp",
+          "text": "10.10.1.10, which is flagged for investigation, newly connected to this vulnerable service at 2026-10-16T04:07:00Z. Check this host for signs of lateral movement."
+        }
+      ],
+      "rationale": [
+        "Base severity: CVSS v3 8.1 (Critical).",
+        "A public exploit is available (Metasploit).",
+        "Exposure: vulnerable service reached internally by many hosts - 201 completed sessions from 0 external and 9 internal sources.",
+        "Traffic gives leads worth investigating; nothing in the logs confirms exploitation."
+      ]
+    },
+    {
+      "host": "10.10.3.40",
+      "hostname": "ws-040.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "plugin_id": "207053",
+      "plugin_name": "Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 0,
+      "proto": "tcp",
+      "service": "general",
+      "cvss": 8.8,
+      "cves": [
+        "CVE-2024-7965",
+        "CVE-2024-7971"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [],
+      "synopsis": "The browser installed on the remote host is affected by multiple vulnerabilities.",
+      "solution": "Upgrade to Microsoft Edge version 129.0.2792.52 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Host is active on the network",
+        "factor": 0.5,
+        "scope": "host",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.38,
+      "exploit_factor": 1.0,
+      "likelihood": "Medium",
+      "score": 61,
+      "priority": "P2",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 8.8 (High).",
+        "A public exploit is available.",
+        "Exposure: host is active on the network.",
+        "Blast radius: the host talks to 5 internal host(s) directly and 5 within 2 hops, including 1 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.3.41",
+      "hostname": "ws-041.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "plugin_id": "207053",
+      "plugin_name": "Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 0,
+      "proto": "tcp",
+      "service": "general",
+      "cvss": 8.8,
+      "cves": [
+        "CVE-2024-7965",
+        "CVE-2024-7971"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [],
+      "synopsis": "The browser installed on the remote host is affected by multiple vulnerabilities.",
+      "solution": "Upgrade to Microsoft Edge version 129.0.2792.52 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Host is active on the network",
+        "factor": 0.5,
+        "scope": "host",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.34,
+      "exploit_factor": 1.0,
+      "likelihood": "Medium",
+      "score": 59,
+      "priority": "P2",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 8.8 (High).",
+        "A public exploit is available.",
+        "Exposure: host is active on the network.",
+        "Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.3.42",
+      "hostname": "ws-042.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "plugin_id": "207053",
+      "plugin_name": "Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 0,
+      "proto": "tcp",
+      "service": "general",
+      "cvss": 8.8,
+      "cves": [
+        "CVE-2024-7965",
+        "CVE-2024-7971"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [],
+      "synopsis": "The browser installed on the remote host is affected by multiple vulnerabilities.",
+      "solution": "Upgrade to Microsoft Edge version 129.0.2792.52 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Host is active on the network",
+        "factor": 0.5,
+        "scope": "host",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.34,
+      "exploit_factor": 1.0,
+      "likelihood": "Medium",
+      "score": 59,
+      "priority": "P2",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 8.8 (High).",
+        "A public exploit is available.",
+        "Exposure: host is active on the network.",
+        "Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.3.43",
+      "hostname": "ws-043.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "plugin_id": "207053",
+      "plugin_name": "Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 0,
+      "proto": "tcp",
+      "service": "general",
+      "cvss": 8.8,
+      "cves": [
+        "CVE-2024-7965",
+        "CVE-2024-7971"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [],
+      "synopsis": "The browser installed on the remote host is affected by multiple vulnerabilities.",
+      "solution": "Upgrade to Microsoft Edge version 129.0.2792.52 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Host is active on the network",
+        "factor": 0.5,
+        "scope": "host",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.34,
+      "exploit_factor": 1.0,
+      "likelihood": "Medium",
+      "score": 59,
+      "priority": "P2",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 8.8 (High).",
+        "A public exploit is available.",
+        "Exposure: host is active on the network.",
+        "Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.3.44",
+      "hostname": "ws-044.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "plugin_id": "207053",
+      "plugin_name": "Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 0,
+      "proto": "tcp",
+      "service": "general",
+      "cvss": 8.8,
+      "cves": [
+        "CVE-2024-7965",
+        "CVE-2024-7971"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [],
+      "synopsis": "The browser installed on the remote host is affected by multiple vulnerabilities.",
+      "solution": "Upgrade to Microsoft Edge version 129.0.2792.52 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Host is active on the network",
+        "factor": 0.5,
+        "scope": "host",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.34,
+      "exploit_factor": 1.0,
+      "likelihood": "Medium",
+      "score": 59,
+      "priority": "P2",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 8.8 (High).",
+        "A public exploit is available.",
+        "Exposure: host is active on the network.",
+        "Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.3.45",
+      "hostname": "ws-045.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "plugin_id": "207053",
+      "plugin_name": "Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 0,
+      "proto": "tcp",
+      "service": "general",
+      "cvss": 8.8,
+      "cves": [
+        "CVE-2024-7965",
+        "CVE-2024-7971"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [],
+      "synopsis": "The browser installed on the remote host is affected by multiple vulnerabilities.",
+      "solution": "Upgrade to Microsoft Edge version 129.0.2792.52 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Host is active on the network",
+        "factor": 0.5,
+        "scope": "host",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.34,
+      "exploit_factor": 1.0,
+      "likelihood": "Medium",
+      "score": 59,
+      "priority": "P2",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 8.8 (High).",
+        "A public exploit is available.",
+        "Exposure: host is active on the network.",
+        "Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.3.46",
+      "hostname": "ws-046.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "plugin_id": "207053",
+      "plugin_name": "Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 0,
+      "proto": "tcp",
+      "service": "general",
+      "cvss": 8.8,
+      "cves": [
+        "CVE-2024-7965",
+        "CVE-2024-7971"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [],
+      "synopsis": "The browser installed on the remote host is affected by multiple vulnerabilities.",
+      "solution": "Upgrade to Microsoft Edge version 129.0.2792.52 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Host is active on the network",
+        "factor": 0.5,
+        "scope": "host",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.34,
+      "exploit_factor": 1.0,
+      "likelihood": "Medium",
+      "score": 59,
+      "priority": "P2",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 8.8 (High).",
+        "A public exploit is available.",
+        "Exposure: host is active on the network.",
+        "Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.3.47",
+      "hostname": "ws-047.corp.example",
+      "os": "Microsoft Windows 10 Enterprise",
+      "plugin_id": "207053",
+      "plugin_name": "Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 0,
+      "proto": "tcp",
+      "service": "general",
+      "cvss": 8.8,
+      "cves": [
+        "CVE-2024-7965",
+        "CVE-2024-7971"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [],
+      "synopsis": "The browser installed on the remote host is affected by multiple vulnerabilities.",
+      "solution": "Upgrade to Microsoft Edge version 129.0.2792.52 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Host is active on the network",
+        "factor": 0.5,
+        "scope": "host",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.34,
+      "exploit_factor": 1.0,
+      "likelihood": "Medium",
+      "score": 59,
+      "priority": "P2",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 8.8 (High).",
+        "A public exploit is available.",
+        "Exposure: host is active on the network.",
+        "Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.2.20",
+      "hostname": "db01.corp.example",
+      "os": "Linux Kernel 5.15 on Ubuntu 22.04",
+      "plugin_id": "183965",
+      "plugin_name": "PostgreSQL 13.x < 13.13 Multiple Vulnerabilities",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 5432,
+      "proto": "tcp",
+      "service": "postgresql",
+      "cvss": 8.8,
+      "cves": [
+        "CVE-2023-5868",
+        "CVE-2023-5869",
+        "CVE-2023-5870"
+      ],
+      "exploit_available": false,
+      "exploit_frameworks": [],
+      "synopsis": "The database server is affected by multiple vulnerabilities including an integer overflow.",
+      "solution": "Upgrade to PostgreSQL 13.13 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Vulnerable service reached internally",
+        "factor": 0.75,
+        "scope": "port",
+        "telemetry_seen": true,
+        "inbound_total": 140,
+        "established": 140,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 1,
+        "external_sources": 0,
+        "top_sources": [
+          [
+            "10.10.1.20",
+            140,
+            false
+          ]
+        ],
+        "first_seen": "2026-10-12T00:34:43Z",
+        "last_seen": "2026-10-18T02:23:17Z",
+        "bytes": 3077243,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.04,
+      "exploit_factor": 0.65,
+      "likelihood": "Medium",
+      "score": 45,
+      "priority": "P3",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 8.8 (High).",
+        "No public exploit is known to the scanner.",
+        "Exposure: vulnerable service reached internally - 140 completed sessions from 0 external and 1 internal sources.",
+        "Blast radius: the host talks to 1 internal host(s) directly and 1 within 2 hops."
+      ]
+    },
+    {
+      "host": "10.10.5.60",
+      "hostname": "ups-mgmt.corp.example",
+      "os": "Embedded Linux",
+      "plugin_id": "41028",
+      "plugin_name": "SNMP Agent Default Community Name (public)",
+      "severity": 3,
+      "severity_name": "High",
+      "port": 161,
+      "proto": "udp",
+      "service": "snmp",
+      "cvss": 7.5,
+      "cves": [
+        "CVE-1999-0517"
+      ],
+      "exploit_available": true,
+      "exploit_frameworks": [],
+      "synopsis": "The community name of the remote SNMP server can be guessed.",
+      "solution": "Disable SNMP or change the default community string.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "No telemetry for this host (unknown)",
+        "factor": 0.5,
+        "scope": "port",
+        "telemetry_seen": false,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.0,
+      "exploit_factor": 1.0,
+      "likelihood": "Medium",
+      "score": 38,
+      "priority": "P3",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 7.5 (High).",
+        "A public exploit is available.",
+        "Exposure: no telemetry for this host (unknown)."
+      ]
+    },
+    {
+      "host": "10.10.1.10",
+      "hostname": "web01.corp.example",
+      "os": "Linux Kernel 5.4 on Ubuntu 20.04",
+      "plugin_id": "187201",
+      "plugin_name": "OpenSSH < 9.6 Multiple Vulnerabilities (Terrapin)",
+      "severity": 2,
+      "severity_name": "Medium",
+      "port": 22,
+      "proto": "tcp",
+      "service": "ssh",
+      "cvss": 5.9,
+      "cves": [
+        "CVE-2023-48795"
+      ],
+      "exploit_available": false,
+      "exploit_frameworks": [],
+      "synopsis": "The SSH server is affected by a prefix truncation weakness.",
+      "solution": "Upgrade to OpenSSH 9.6 or later.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Connections to service blocked by firewall",
+        "factor": 0.35,
+        "scope": "port",
+        "telemetry_seen": true,
+        "inbound_total": 25,
+        "established": 0,
+        "denied": 25,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": "2026-10-12T09:38:38Z",
+        "last_seen": "2026-10-17T20:49:02Z",
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.5,
+      "exploit_factor": 0.65,
+      "likelihood": "Low",
+      "score": 20,
+      "priority": "P4",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 5.9 (Medium).",
+        "No public exploit is known to the scanner.",
+        "Exposure: connections to service blocked by firewall.",
+        "25 connection(s) to it were blocked by a firewall.",
+        "Blast radius: the host talks to 5 internal host(s) directly and 6 within 2 hops, including 4 with High/Critical findings."
+      ]
+    },
+    {
+      "host": "10.10.4.50",
+      "hostname": "prn-4f.corp.example",
+      "os": "HP LaserJet",
+      "plugin_id": "42263",
+      "plugin_name": "Unencrypted Telnet Server",
+      "severity": 2,
+      "severity_name": "Medium",
+      "port": 23,
+      "proto": "tcp",
+      "service": "telnet",
+      "cvss": 6.5,
+      "cves": [],
+      "exploit_available": false,
+      "exploit_frameworks": [],
+      "synopsis": "The remote Telnet server transmits traffic in cleartext.",
+      "solution": "Disable Telnet and use SSH instead.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Service not observed in use",
+        "factor": 0.3,
+        "scope": "port",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.0,
+      "exploit_factor": 0.65,
+      "likelihood": "Low",
+      "score": 13,
+      "priority": "P4",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 6.5 (Medium).",
+        "No public exploit is known to the scanner.",
+        "Exposure: service not observed in use."
+      ]
+    },
+    {
+      "host": "10.10.3.5",
+      "hostname": "jump01.corp.example",
+      "os": "Microsoft Windows Server 2019",
+      "plugin_id": "58453",
+      "plugin_name": "Terminal Services Doesn't Use Network Level Authentication (NLA) Only",
+      "severity": 2,
+      "severity_name": "Medium",
+      "port": 3389,
+      "proto": "tcp",
+      "service": "msrdp",
+      "cvss": 4.0,
+      "cves": [],
+      "exploit_available": false,
+      "exploit_frameworks": [],
+      "synopsis": "The remote Terminal Services doesn't use NLA only.",
+      "solution": "Enable Network Level Authentication.",
+      "source": "quarterly_scan.nessus",
+      "exposure": {
+        "label": "Service not observed in use",
+        "factor": 0.3,
+        "scope": "port",
+        "telemetry_seen": true,
+        "inbound_total": 0,
+        "established": 0,
+        "denied": 0,
+        "attempts": 0,
+        "internal_sources": 0,
+        "external_sources": 0,
+        "top_sources": [],
+        "first_seen": null,
+        "last_seen": null,
+        "bytes": 0,
+        "threat_alerts": 0,
+        "threat_blocked": 0,
+        "threat_blocked_sources": []
+      },
+      "blast_factor": 1.36,
+      "exploit_factor": 0.65,
+      "likelihood": "Low",
+      "score": 11,
+      "priority": "P4",
+      "indicators": [],
+      "rationale": [
+        "Base severity: CVSS v3 4.0 (Medium).",
+        "No public exploit is known to the scanner.",
+        "Exposure: service not observed in use.",
+        "Blast radius: the host talks to 2 internal host(s) directly and 3 within 2 hops, including 2 with High/Critical findings."
+      ]
+    }
+  ]
+}

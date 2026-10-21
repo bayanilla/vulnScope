@@ -1,0 +1,354 @@
+import os
+import re
+import gzip
+import json
+import shutil
+import tempfile
+import threading
+import unittest
+import urllib.parse
+import urllib.request
+import uuid
+from http.server import ThreadingHTTPServer
+
+from vulnflow.correlate import Config, correlate
+from vulnflow.normalize import load
+from vulnflow.parsers import detect
+from vulnflow.pipeline import run
+from vulnflow.samples import generate
+
+
+class Base(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp()
+        cls.samples = generate(os.path.join(cls.tmp, "in"))
+
+    def write(self, name, text):
+        p = os.path.join(self.tmp, name)
+        with open(p, "w") as fh:
+            fh.write(text)
+        return p
+
+
+class ParserTests(Base):
+    def test_detects_sample_formats(self):
+        got = {os.path.basename(p): detect(p) for p in self.samples}
+        self.assertEqual(got, {"zeek_conn.log": "zeek", "paloalto_traffic.csv": "paloalto",
+                               "netflow_segment6.csv": "generic", "quarterly_scan.nessus": "nessus"})
+
+    def test_paloalto_syslog_without_header(self):
+        line = ("<14>Oct 16 03:12:00 fw01 1,2026/10/16 03:12:00,0164,TRAFFIC,end,2560,2026/10/16 03:12:00,"
+                "203.0.113.9,10.1.1.5,0.0.0.0,0.0.0.0,allow-web,,,ssl,vsys1,untrust,dmz,eth1,eth2,fwd,,1234,1,"
+                "51000,443,0,0,0x0,tcp,allow,5000,1000,4000,10,2026/10/16 03:11:58,2,any\n")
+        p = self.write("pan.log", line + line.replace("TRAFFIC", "SYSTEM"))
+        ds = load([p])
+        self.assertEqual(detect(p), "paloalto")
+        self.assertEqual(len(ds.flows), 1)
+        f = ds.flows[0]
+        self.assertEqual((f.src_ip, f.dst_ip, f.dst_port, f.action, f.src_zone), ("203.0.113.9", "10.1.1.5", 443, "allow", "untrust"))
+        self.assertEqual(ds.stats[0].dropped["SYSTEM log type not used"], 1)
+
+    def test_threat_sources(self):
+        pan = ("<14>Oct 16 03:12:00 fw01 1,2026/10/16 03:12:00,0164,THREAT,vulnerability,2560,2026/10/16 03:12:00,"
+               "203.0.113.9,10.1.1.5,0.0.0.0,0.0.0.0,allow-web,,,web-browsing,vsys1,untrust,dmz,eth1,eth2,fwd,,1234,1,"
+               "51000,443,0,0,0x0,tcp,alert,/cgi-bin/.%2e/,Apache Path Traversal CVE-2021-41773(91694),any,critical,client-to-server\n")
+        eve = ('{"timestamp":"2026-10-16T03:12:00Z","event_type":"alert","src_ip":"203.0.113.9","dest_ip":"10.1.1.5",'
+               '"dest_port":443,"proto":"TCP","alert":{"action":"allowed","signature":"ET EXPLOIT Apache CVE-2021-41773","severity":1}}\n'
+               '{"timestamp":"2026-10-16T03:12:01Z","event_type":"flow","src_ip":"10.1.1.5","src_port":50000,"dest_ip":"203.0.113.9",'
+               '"dest_port":4444,"proto":"TCP","flow":{"bytes_toserver":900,"bytes_toclient":1200,"state":"closed"}}\n')
+        notice = ('{"ts":1760584320.0,"note":"Scan::Port_Scan","msg":"203.0.113.9 scanned 30 ports","src":"203.0.113.9",'
+                  '"dst":"10.1.1.5","p":22,"actions":["Notice::ACTION_LOG"]}\n')
+        ds = load([self.write("pan_threat.log", pan), self.write("eve.json", eve), self.write("notice.log", notice)])
+        self.assertEqual(detect(os.path.join(self.tmp, "eve.json")), "suricata")
+        names = sorted(t.name for t in ds.threats)
+        self.assertEqual(len(names), 3)
+        self.assertIn("Apache Path Traversal CVE-2021-41773(91694)", names)
+        self.assertEqual(len(ds.flows), 1)
+        self.assertEqual(ds.flows[0].dst_port, 4444)
+
+    def test_zeek_json(self):
+        p = self.write("conn.json", '{"ts":1760000000.1,"id.orig_h":"10.0.0.1","id.orig_p":5000,'
+                       '"id.resp_h":"10.0.0.2","id.resp_p":445,"proto":"tcp","conn_state":"REJ"}\n')
+        f = load([p]).flows[0]
+        self.assertEqual((f.action, f.established, f.dst_port), ("deny", False, 445))
+
+    def test_zeek_streams_do_not_become_connections(self):
+        dns = self.write("00_dns.log", '{"ts":1760000001,"uid":"D1","id.orig_h":"10.0.0.1",'
+                         '"id.resp_h":"10.0.0.2","query":"plant.example"}\n')
+        smtp = self.write("01_smtp.log", '{"ts":1760000002,"uid":"S1","id.orig_h":"10.0.0.1",'
+                          '"id.resp_h":"10.0.0.3","mailfrom":"operator@example.com"}\n')
+        custom = self.write("custom.log", "#separator \\x09\n#path\tdns\n#empty_field\tEMPTY\n"
+                            "#unset_field\tNONE\n#fields\tts\tuid\tquery\tanswers\n"
+                            "1760000003\tD2\tEMPTY\tNONE\n")
+        ds = load([dns, smtp, custom])
+        self.assertEqual(len(ds.flows), 0)
+        self.assertEqual(len(ds.threats), 0)
+        self.assertEqual([e.stream for e in ds.zeek_events], ["dns", "smtp", "dns"])
+        self.assertEqual(ds.zeek_events[2].fields["query"], "")
+        self.assertIsNone(ds.zeek_events[2].fields["answers"])
+        mislabeled = self.write("conn.log", '{"ts":1760000004,"id.orig_h":"10.0.0.1",'
+                                '"id.resp_h":"10.0.0.2","query":"plant.example"}\n')
+        wrong = load([mislabeled])
+        self.assertEqual(wrong.flows, [])
+        self.assertEqual(wrong.stats[0].dropped["conn record missing connection fields"], 1)
+
+    def test_zeek_ot_logs_preserve_operations_and_direction(self):
+        modbus = self.write("modbus.log", '{"ts":1760000001,"uid":"M1","id.orig_h":"10.0.0.1",'
+                            '"id.resp_h":"10.0.0.2","is_orig":false,"func":"WRITE_MULTIPLE_REGISTERS"}\n')
+        bacnet = self.write("bacnet_device_control.log", '{"ts":1760000002,"uid":"B1",'
+                            '"source_h":"10.0.0.3","destination_h":"10.0.0.4","service":"ReinitializeDevice"}\n')
+        dnp3 = os.path.join(self.tmp, "dnp3.log.gz")
+        with gzip.open(dnp3, "wt") as fh:
+            fh.write("#separator \\x09\n#path\tdnp3\n#fields\tts\tuid\tid.orig_h\tid.resp_h\tfc_request\n"
+                     "1760000003\tN1\t10.0.0.5\t10.0.0.6\tOPERATE\n")
+        ds = load([modbus, bacnet, dnp3])
+        self.assertEqual(len(ds.flows), 0)
+        self.assertEqual([e.protocol for e in ds.ot_events], ["Modbus", "BACnet", "DNP3"])
+        self.assertEqual((ds.ot_events[0].src_ip, ds.ot_events[0].dst_ip, ds.ot_events[0].direction),
+                         ("10.0.0.2", "10.0.0.1", "responder"))
+        self.assertEqual(ds.ot_events[1].operation, "ReinitializeDevice")
+        self.assertEqual(ds.ot_events[2].operation, "OPERATE")
+
+    def test_nessus_csv_merges_cve_rows(self):
+        p = self.write("scan.csv", "Plugin ID,CVE,CVSS v3.0 Base Score,Risk,Host,Protocol,Port,Name,Synopsis,Solution\n"
+                       "97833,CVE-2017-0143,8.1,Critical,10.0.0.2,tcp,445,MS17-010,s,patch\n"
+                       "97833,CVE-2017-0144,8.1,Critical,10.0.0.2,tcp,445,MS17-010,s,patch\n")
+        ds = load([p])
+        self.assertEqual(detect(p), "nessus_csv")
+        self.assertEqual(len(ds.findings), 1)
+        self.assertEqual(ds.findings[0].cves, ["CVE-2017-0143", "CVE-2017-0144"])
+        self.assertEqual(ds.findings[0].severity, 4)
+
+    def test_generic_vpc_flow_space_delimited(self):
+        p = self.write("vpc.log", "version account-id interface-id srcaddr dstaddr srcport dstport protocol packets bytes start end action log-status\n"
+                       "2 123 eni-1 198.51.100.7 10.0.0.2 40000 22 6 10 840 1760000000 1760000060 REJECT OK\n")
+        f = load([p]).flows[0]
+        self.assertEqual((f.src_ip, f.dst_port, f.proto, f.action), ("198.51.100.7", 22, "tcp", "deny"))
+
+
+class CorrelationTests(Base):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.ds = load(cls.samples)
+        cls.res = correlate(cls.ds, Config())
+        cls.by = {(r["host"], r["plugin_id"]): r for r in cls.res["findings"]}
+
+    def test_cleaning(self):
+        zeek = next(s for s in self.ds.stats if s.fmt == "zeek")
+        self.assertEqual(zeek.dropped["missing or invalid IP"], 1)
+        self.assertEqual(self.res["summary"]["duplicate_flows_removed"], 1)
+
+    def test_exploited_web_server_is_corroborated(self):
+        r = self.by[("10.10.1.10", "153884")]
+        self.assertEqual(r["priority"], "P1")
+        self.assertEqual(r["exposure"]["label"], "Vulnerable service reached from the internet")
+        types = {i["type"] for i in r["indicators"]}
+        self.assertTrue({"return_connection", "new_lateral", "exfil", "threat_alert", "corroborated"} <= types)
+        self.assertEqual(self.res["summary"]["hosts_corroborated"], ["10.10.1.10"])
+        self.assertEqual(self.res["summary"]["hosts_to_investigate"], [])
+        # every network pattern on its own stays a lead
+        self.assertEqual({i["confidence"] for i in r["indicators"] if i["type"] != "corroborated"}, {"lead"})
+        # BlueKeep probes the IPS reset count as mitigation, not as evidence
+        bk = self.by[("10.10.3.31", "125313")]
+        self.assertEqual(bk["exposure"]["threat_blocked"], 3)
+        self.assertNotIn("threat_alert", {i["type"] for i in bk["indicators"]})
+
+    def test_return_connection_without_threat_logs_is_only_a_lead(self):
+        import csv as _csv
+        src = next(p for p in self.samples if p.endswith("paloalto_traffic.csv"))
+        dst = os.path.join(self.tmp, "pan_no_threat.csv")
+        with open(src, newline="") as fi, open(dst, "w", newline="") as fo:
+            w = _csv.writer(fo)
+            for row in _csv.reader(fi):
+                if len(row) > 2 and row[2] == "THREAT":
+                    continue
+                w.writerow(row)
+        files = [dst if p.endswith("paloalto_traffic.csv") else p for p in self.samples]
+        ds = load(files)
+        res = correlate(ds, Config())
+        self.assertEqual(res["summary"]["hosts_corroborated"], [])
+        self.assertEqual(res["summary"]["hosts_to_investigate"], ["10.10.1.10"])
+        from vulnflow.report import executive_summary
+        ex = executive_summary(res)
+        self.assertIn("Investigate", ex)
+        self.assertNotIn("Likely exploitation", ex)
+        self.assertNotIn("compromise on", ex.lower())
+
+    def test_lateral_spread_only_for_new_targets(self):
+        self.assertEqual(self.res["summary"]["hosts_possible_spread"], ["10.10.2.25", "10.10.3.31"])
+
+    def test_exposure_classes(self):
+        self.assertEqual(self.by[("10.10.1.10", "187201")]["exposure"]["label"], "Connections to service blocked by firewall")
+        self.assertEqual(self.by[("10.10.4.50", "42263")]["exposure"]["label"], "Service not observed in use")
+        self.assertEqual(self.by[("10.10.5.60", "41028")]["exposure"]["label"], "No telemetry for this host (unknown)")
+        self.assertEqual(self.by[("10.10.4.50", "42263")]["priority"], "P4")
+
+    def test_blast_radius_and_coverage(self):
+        app = next(h for h in self.res["hosts"] if h["host"] == "10.10.1.20")
+        self.assertIn("10.10.2.20", [r["ip"] for r in app["blast"]["reachable"]])
+        gaps = [g["ip"] for g in self.res["coverage"]["active_servers_not_scanned"]]
+        self.assertTrue({"10.10.0.10", "10.10.6.70", "10.10.6.71"} <= set(gaps))
+        self.assertEqual(self.res["coverage"]["scanned_not_seen"], ["10.10.5.60"])
+
+    def test_custom_internal_nets_changes_exposure(self):
+        # treat the workstation subnet as outside: SMB on fs01 becomes "reached from the internet"
+        self.assertEqual(self.by[("10.10.2.25", "97833")]["exposure"]["external_sources"], 0)
+        res = correlate(self.ds, Config(internal_nets=["10.10.0.0/24", "10.10.1.0/24", "10.10.2.0/24"]))
+        r = next(r for r in res["findings"] if r["plugin_id"] == "97833")
+        self.assertGreater(r["exposure"]["external_sources"], 0)
+
+
+class EndToEndTests(Base):
+    def test_pipeline_writes_reports(self):
+        out = os.path.join(self.tmp, "out")
+        _, paths = run(self.samples, out)
+        for name in ("executive_summary.html", "technical_report.html", "correlated_findings.csv", "results.json"):
+            self.assertTrue(os.path.getsize(paths[name]) > 0, name)
+        with open(paths["executive_summary.md"]) as fh:
+            self.assertIn("Likely exploitation", fh.read())
+
+    def test_missing_scan_is_rejected(self):
+        with self.assertRaises(ValueError):
+            run([p for p in self.samples if not p.endswith(".nessus")], os.path.join(self.tmp, "x"))
+
+    def test_recursive_folder_combines_zeek_ot_and_scan(self):
+        from vulnflow.cli import main
+        root = os.path.join(self.tmp, "bundle")
+        os.makedirs(os.path.join(root, "zeek"))
+        os.makedirs(os.path.join(root, "scans"))
+        for p in self.samples:
+            sub = "scans" if p.endswith(".nessus") else "zeek"
+            shutil.copy2(p, os.path.join(root, sub, os.path.basename(p)))
+        self.write("modbus.log", '{"ts":1760000001,"uid":"M1","id.orig_h":"10.0.0.1",'
+                   '"id.resp_h":"10.0.0.2","is_orig":true,"func":"READ_COILS"}\n')
+        shutil.copy2(os.path.join(self.tmp, "modbus.log"), os.path.join(root, "zeek", "modbus.log"))
+        for name, field in (("dns", '"query":"plant.example"'),
+                            ("smtp", '"mailfrom":"operator@example.com"')):
+            source = self.write(name + ".log", '{"ts":1760000002,"uid":"X1",'
+                                '"id.orig_h":"10.0.0.1","id.resp_h":"10.0.0.2",' + field + '}\n')
+            shutil.copy2(source, os.path.join(root, "zeek", name + ".log"))
+        out = os.path.join(root, "out")
+        self.assertEqual(main(["analyze", root, "-o", out]), 0)
+        with open(os.path.join(out, "results.json")) as fh:
+            result = json.load(fh)
+        self.assertEqual(result["summary"]["ot_protocol_counts"], {"Modbus": 1})
+        self.assertEqual(result["summary"]["zeek_event_counts"], {"dns": 1, "modbus": 1, "smtp": 1})
+        self.assertEqual(result["summary"]["flows"], 1352)
+        self.assertEqual(len(result["inputs"]), len(self.samples) + 3)
+        with open(os.path.join(out, "normalized", "ot_events.jsonl")) as fh:
+            event = json.loads(fh.readline())
+        self.assertEqual(event["operation"], "READ_COILS")
+        self.assertEqual(event["direction"], "originator")
+
+    def test_web_upload(self):
+        from vulnflow.web import make_handler
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(os.path.join(self.tmp, "runs"), Config()))
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            boundary = uuid.uuid4().hex
+            body = b""
+            for p in self.samples:
+                field = "folder"
+                with open(p, "rb") as fh:
+                    body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; "
+                             f"filename=\"bundle/{os.path.basename(p)}\"\r\nContent-Type: application/octet-stream\r\n\r\n").encode()
+                    body += fh.read() + b"\r\n"
+            body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"internal_nets\"\r\n\r\n\r\n--{boundary}--\r\n".encode()
+            req = urllib.request.Request(f"http://127.0.0.1:{srv.server_port}/analyze", data=body,
+                                         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+            with urllib.request.urlopen(req) as resp:
+                index = resp.read().decode()
+                run_url = resp.url
+            self.assertIn("Executive summary", index)
+            with urllib.request.urlopen(run_url + "executive_summary.html") as resp:
+                self.assertIn("web01", resp.read().decode())
+            with urllib.request.urlopen(run_url + "normalized/zeek_events.jsonl") as resp:
+                self.assertEqual(resp.status, 200)
+            with self.assertRaises(urllib.error.HTTPError):
+                urllib.request.urlopen(run_url + "..%2f..%2fin%2f00_x")
+        finally:
+            srv.shutdown()
+
+    def test_web_analyze_folder_in_place(self):
+        from vulnflow.web import make_handler
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(os.path.join(self.tmp, "runs3"), Config()))
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            base = f"http://127.0.0.1:{srv.server_port}"
+            with urllib.request.urlopen(base + "/") as resp:
+                page = resp.read().decode()
+            csrf = re.search(r'name="csrf" value="([^"]+)"', page)[1]
+            folder = os.path.dirname(self.samples[0])
+            post = lambda form: urllib.request.Request(base + "/analyze-folder",
+                                                       data=urllib.parse.urlencode(form).encode())
+            with self.assertRaises(urllib.error.HTTPError):          # no token, no read
+                urllib.request.urlopen(post({"path": folder}))
+            with urllib.request.urlopen(post({"path": folder, "csrf": csrf})) as resp:
+                page = resp.read().decode()
+                self.assertIn("Executive summary", page)
+                self.assertIn("explorer.html", page)
+                self.assertIn('explorer.html" target="_blank"', page)
+                run_url = resp.url
+            with urllib.request.urlopen(run_url + "executive_summary.html") as resp:
+                self.assertIn("web01", resp.read().decode())
+            with urllib.request.urlopen(post({"path": folder + "/nope", "csrf": csrf})) as resp:
+                self.assertIn("Folder not found", resp.read().decode())
+        finally:
+            srv.shutdown()
+
+    def test_web_folder_browser(self):
+        from vulnflow import web
+        os.makedirs(os.path.join(self.tmp, "pick", "case-a"), exist_ok=True)
+        os.makedirs(os.path.join(self.tmp, "pick", ".hidden"), exist_ok=True)
+        open(os.path.join(self.tmp, "pick", "notes.txt"), "w").close()
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), web.make_handler(os.path.join(self.tmp, "runs4"), Config()))
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            base = f"http://127.0.0.1:{srv.server_port}"
+            with urllib.request.urlopen(base + "/") as resp:
+                page = resp.read().decode()
+            self.assertIn('id="browse"', page)
+            csrf = re.search(r'name="csrf" value="([^"]+)"', page)[1]
+            call = lambda url, body: urllib.request.Request(base + url, data=json.dumps(body).encode(),
+                                                            headers={"Content-Type": "application/json"})
+            with self.assertRaises(urllib.error.HTTPError):          # no token, no listing
+                urllib.request.urlopen(call("/browse", {"path": self.tmp}))
+            with urllib.request.urlopen(call("/browse", {"path": os.path.join(self.tmp, "pick"), "csrf": csrf})) as resp:
+                d = json.loads(resp.read())
+            self.assertEqual(d["dirs"], ["case-a"])
+            self.assertEqual(d["files"], 1)
+            self.assertEqual(d["parent"], os.path.realpath(self.tmp))
+            gone = os.path.join(self.tmp, "pick", "missing", "deeper")   # falls back to the nearest folder
+            with urllib.request.urlopen(call("/browse", {"path": gone, "csrf": csrf})) as resp:
+                self.assertEqual(json.loads(resp.read())["path"], os.path.realpath(os.path.join(self.tmp, "pick")))
+            if not web.NATIVE_PICKER:
+                with urllib.request.urlopen(call("/pick-folder", {"csrf": csrf})) as resp:
+                    self.assertTrue(json.loads(resp.read())["unsupported"])
+        finally:
+            srv.shutdown()
+
+    def test_web_upload_size_limit(self):
+        from vulnflow.web import make_handler
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(os.path.join(self.tmp, "runs2"), Config(),
+                                                                   max_upload=1024))
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            body = b"--b\r\nContent-Disposition: form-data; name=\"telemetry\"; filename=\"x.log\"\r\n\r\n" + b"x" * 4096 + b"\r\n--b--\r\n"
+            req = urllib.request.Request(f"http://127.0.0.1:{srv.server_port}/analyze", data=body,
+                                         headers={"Content-Type": "multipart/form-data; boundary=b"})
+            try:
+                with urllib.request.urlopen(req) as resp:
+                    page = resp.read().decode()
+            except urllib.error.HTTPError as e:
+                page = e.read().decode()
+            self.assertIn("Upload must be between", page)
+            self.assertFalse(os.path.exists(os.path.join(self.tmp, "runs2")) and
+                             any(f.endswith("x.log") for _, _, fs in os.walk(os.path.join(self.tmp, "runs2")) for f in fs))
+        finally:
+            srv.shutdown()
+
+
+if __name__ == "__main__":
+    unittest.main()

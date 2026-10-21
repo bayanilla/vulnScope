@@ -1,0 +1,34 @@
+host_ip,hostname,os,port,proto,service,plugin_id,plugin_name,severity,cvss,cvss_version,cves,exploit_available,exploit_frameworks,source
+10.10.1.10,web01.corp.example,Linux Kernel 5.4 on Ubuntu 20.04,443,tcp,www,153884,Apache 2.4.49 < 2.4.51 Path Traversal and RCE,4,9.8,3,CVE-2021-41773 CVE-2021-42013,True,Metasploit,quarterly_scan.nessus
+10.10.1.20,app01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8009,tcp,ajp13,134862,Apache Tomcat AJP Connector Request Injection (Ghostcat),4,9.8,3,CVE-2020-1938,True,Metasploit,quarterly_scan.nessus
+10.10.2.25,fs01.corp.example,Microsoft Windows Server 2012 R2,445,tcp,cifs,97833,MS17-010: Security Update for Microsoft Windows SMB Server (ETERNALBLUE),4,8.1,3,CVE-2017-0143 CVE-2017-0144 CVE-2017-0145,True,Metasploit,quarterly_scan.nessus
+10.10.3.31,ws-031.corp.example,Microsoft Windows 7 Professional,3389,tcp,msrdp,125313,Microsoft RDP RCE (CVE-2019-0708) (BlueKeep),4,9.8,3,CVE-2019-0708,True,Metasploit,quarterly_scan.nessus
+10.10.2.20,db01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,5432,tcp,postgresql,183965,PostgreSQL 13.x < 13.13 Multiple Vulnerabilities,3,8.8,3,CVE-2023-5868 CVE-2023-5869 CVE-2023-5870,False,,quarterly_scan.nessus
+10.10.3.40,ws-040.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.41,ws-041.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.42,ws-042.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.43,ws-043.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.44,ws-044.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.45,ws-045.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.46,ws-046.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.47,ws-047.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.5.60,ups-mgmt.corp.example,Embedded Linux,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.1.10,web01.corp.example,Linux Kernel 5.4 on Ubuntu 20.04,22,tcp,ssh,187201,OpenSSH < 9.6 Multiple Vulnerabilities (Terrapin),2,5.9,3,CVE-2023-48795,False,,quarterly_scan.nessus
+10.10.3.5,jump01.corp.example,Microsoft Windows Server 2019,3389,tcp,msrdp,58453,Terminal Services Doesn't Use Network Level Authentication (NLA) Only,2,4.0,3,,False,,quarterly_scan.nessus
+10.10.4.50,prn-4f.corp.example,HP LaserJet,23,tcp,telnet,42263,Unencrypted Telnet Server,2,6.5,3,,False,,quarterly_scan.nessus
+10.10.1.10,web01.corp.example,Linux Kernel 5.4 on Ubuntu 20.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.1.20,app01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.20,db01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.25,fs01.corp.example,Microsoft Windows Server 2012 R2,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.31,ws-031.corp.example,Microsoft Windows 7 Professional,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.40,ws-040.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.41,ws-041.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.42,ws-042.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.43,ws-043.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.44,ws-044.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.45,ws-045.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.46,ws-046.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.47,ws-047.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.5,jump01.corp.example,Microsoft Windows Server 2019,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.50,prn-4f.corp.example,HP LaserJet,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.5.60,ups-mgmt.corp.example,Embedded Linux,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus

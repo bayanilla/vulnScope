@@ -1,0 +1,927 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Technical Analysis</title><script>
+try { document.documentElement.dataset.theme = localStorage.getItem('vulnflow-theme') || 'dark'; }
+catch (_) { document.documentElement.dataset.theme = 'dark'; }
+</script><style>
+:root,[data-theme="dark"]{--desktop:#020617;--bg:#0f172a;--fg:#f1f5f9;--muted:#cbd5e1;--line:#334155;--head:#1e293b;--accent:#22d3ee;--accent-text:#082f49;--code:#1e293b;--panel:#111c31;--radius:10px;--bar:#0b1221;--shadow:0 12px 34px #02061766}
+[data-theme="light"]{--desktop:#e2e8f0;--bg:#f8fafc;--fg:#0f172a;--muted:#475569;--line:#cbd5e1;--head:#e2e8f0;--accent:#2563eb;--accent-text:#fff;--code:#e2e8f0;--panel:#fff;--radius:10px;--bar:#fff;--shadow:0 12px 34px #47556922}
+[data-theme="nord"]{--desktop:#2e3440;--bg:#3b4252;--fg:#eceff4;--muted:#d8dee9;--line:#616e83;--head:#434c5e;--accent:#88c0d0;--accent-text:#2e3440;--code:#434c5e;--panel:#3b4252;--radius:10px;--bar:#2e3440;--shadow:0 12px 34px #1b202999}
+[data-theme="high-contrast"]{--desktop:#000;--bg:#000;--fg:#fff;--muted:#f1f5f9;--line:#fff;--head:#111;--accent:#fde047;--accent-text:#000;--code:#111;--panel:#000;--radius:0;--bar:#000;--shadow:none}
+[data-theme="matrix"]{--desktop:#000;--bg:#020b04;--fg:#86efac;--muted:#4ade80;--line:#166534;--head:#052e16;--accent:#22c55e;--accent-text:#000;--code:#052e16;--panel:#031508;--radius:4px;--bar:#001a08;--shadow:0 12px 34px #000}
+[data-theme="classic-windows"]{--desktop:#3c9bbd;--bg:#ece9d8;--fg:#17345e;--muted:#475e79;--line:#8ca7ca;--head:#d7e8f9;--accent:#0b5dcc;--accent-text:#fff;--code:#fffdf5;--panel:#fffdf5;--radius:3px;--bar:linear-gradient(#3988f8,#0b5dcc 52%,#0b4daf);--shadow:2px 4px 12px #17345e55}
+[data-theme="aqua"]{--desktop:#8095ae;--bg:#e8edf3;--fg:#1b2938;--muted:#42566b;--line:#9aabba;--head:#dce5ee;--accent:#2879cb;--accent-text:#fff;--code:#f8fbff;--panel:#f8fbff;--radius:12px;--bar:linear-gradient(#f7fbff,#9dabbc);--shadow:0 12px 28px #22344955}
+[data-theme="win2k"]{--desktop:#3a6ea5;--bg:#d4d0c8;--fg:#000;--muted:#303030;--line:#808080;--head:#e8e5dc;--accent:#0a246a;--accent-text:#fff;--code:#fff;--panel:#d4d0c8;--radius:0;--bar:linear-gradient(90deg,#0a246a,#2b5a9c);--shadow:2px 2px 0 #404040}
+html{background:var(--desktop);color-scheme:dark}
+[data-theme="light"],[data-theme="classic-windows"],[data-theme="aqua"],[data-theme="win2k"]{color-scheme:light}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;max-width:1100px;min-height:100vh;margin:0 auto;padding:24px 22px;box-shadow:var(--shadow)}
+h1{font-size:1.65rem;margin-top:.8rem}h2{margin-top:2rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}
+h3{margin-top:1.8rem;color:var(--accent)}h4{margin-bottom:.3rem}
+a{color:var(--accent)}a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.theme-bar{display:flex;align-items:center;gap:.65rem;padding:.55rem .8rem;margin:-24px -22px 24px;background:var(--bar);border-bottom:1px solid var(--line);color:var(--fg)}
+.theme-brand{font-weight:800;letter-spacing:.02em;margin-right:auto}.theme-bar label{font-size:.82rem;margin:0}.theme-bar select{max-width:180px;padding:.25rem .4rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--fg);font:inherit}
+form,.msg{background:var(--panel)}button{background:var(--accent);color:var(--accent-text);border:1px solid var(--accent);border-radius:var(--radius);cursor:pointer}button:hover{filter:brightness(1.08)}
+input,textarea,select{accent-color:var(--accent)}input[type=text],input[type=password],textarea,select{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:var(--radius)}
+table{border-collapse:collapse;width:100%;margin:.6rem 0;font-size:.9rem;display:block;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}th{background:var(--head)}
+code{background:var(--code);padding:1px 4px;border-radius:3px}li{margin:.2rem 0}
+pre{background:var(--code);padding:10px;border-radius:var(--radius);overflow-x:auto}pre code{padding:0}
+blockquote{margin:.8rem 0;padding:.4rem .9rem;border-left:3px solid var(--accent);color:var(--muted)}
+[data-theme="matrix"] body{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+[data-theme="classic-windows"] body,[data-theme="win2k"] body{font-family:Tahoma,Verdana,Arial,sans-serif}
+[data-theme="classic-windows"] .theme-bar,[data-theme="win2k"] .theme-bar{color:#fff}
+[data-theme="classic-windows"] .theme-bar{border-radius:7px 7px 0 0}
+[data-theme="win2k"] button,[data-theme="win2k"] .theme-bar select{border-radius:0;box-shadow:inset -1px -1px #404040,inset 1px 1px #fff,inset -2px -2px #808080,inset 2px 2px #e8e6e0}
+[data-theme="aqua"] button{border-radius:999px;background:linear-gradient(#83c3ff,#2879cb);box-shadow:inset 0 1px #fff9,0 2px 5px #22344944}
+[data-theme="high-contrast"] a{text-decoration:underline}
+@media(max-width:600px){body{padding:16px}.theme-bar{margin:-16px -16px 20px}.theme-brand{font-size:.9rem}.theme-bar select{max-width:145px}}
+@media print{html{background:#fff;color-scheme:light}body{box-shadow:none;max-width:none;padding:0;background:#fff;color:#000}.theme-bar{display:none}a{color:#000}}
+
+:root,[data-theme]{--p1:#ef4444;--p2:#f97316;--p3:#eab308;--p4:#64748b;--p-tx:#0b1020;
+--sev-critical:#f87171;--sev-high:#fb923c;--sev-medium:#facc15;--sev-low:#60a5fa;--sev-none:#94a3b8;
+--e-return:#c084fc;--e-ips:#ef4444;--e-spread:#fb923c;--e-internet:#94a3b8}
+[data-theme="light"],[data-theme="classic-windows"],[data-theme="aqua"],[data-theme="win2k"]{
+--p1:#b91c1c;--p2:#c2410c;--p3:#a16207;--p4:#475569;--p-tx:#fff;
+--sev-critical:#b91c1c;--sev-high:#c2410c;--sev-medium:#a16207;--sev-low:#1d4ed8;--sev-none:#64748b;
+--e-return:#7c3aed;--e-ips:#dc2626;--e-spread:#c2410c;--e-internet:#64748b}
+[data-theme="high-contrast"]{--p1:#ff5c5c;--p2:#ffa040;--p3:#fde047;--p4:#e5e7eb;--sev-critical:#ff5c5c;
+--sev-high:#ffa040;--sev-medium:#fde047;--sev-low:#7cc4ff;--e-return:#e879f9;--e-ips:#ff5c5c}
+.pri{display:inline-block;min-width:2.2em;padding:.05em .5em;border-radius:999px;font-weight:700;font-size:.82em;
+text-align:center;color:var(--p-tx);background:var(--p4);white-space:nowrap;vertical-align:.08em}
+.pri-P1{background:var(--p1)}.pri-P2{background:var(--p2)}.pri-P3{background:var(--p3)}
+.pri small{font-weight:600;opacity:.9;margin-left:.35em;font-size:.95em}
+.ev{display:inline-block;padding:.05em .55em;border-radius:4px;font-size:.8em;font-weight:700;letter-spacing:.02em;
+border:1.5px solid currentColor;white-space:nowrap;vertical-align:.08em}
+.ev-likely{color:var(--p1)}.ev-lead{color:var(--p3)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}
+.tile{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--line);
+border-radius:var(--radius);padding:12px 14px}
+.tile b{display:block;font-size:2rem;line-height:1.1}.tile span{color:var(--muted);font-size:.86rem}
+.tile.t-p1{border-left-color:var(--p1)}.tile.t-p1 b{color:var(--p1)}.tile.t-warn{border-left-color:var(--p2)}
+.tile.t-lead{border-left-color:var(--p3)}.tile.t-ok b{color:var(--muted)}
+.pbar{display:flex;height:26px;border-radius:var(--radius);overflow:hidden;margin:6px 0 4px;border:1px solid var(--line)}
+.pbar div{display:flex;align-items:center;justify-content:center;color:var(--p-tx);font-weight:700;font-size:.82rem;min-width:28px}
+.pbar .b-P1{background:var(--p1)}.pbar .b-P2{background:var(--p2)}.pbar .b-P3{background:var(--p3)}.pbar .b-P4{background:var(--p4)}
+.pbar-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.85rem;color:var(--muted);margin-bottom:10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin:14px 0}
+.panel>p.hint{margin:0 0 10px;color:var(--muted);font-size:.9rem}
+.dg-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.dg-wrap svg{display:block;max-width:none}
+.focus-note{font-size:.88rem;color:var(--muted);min-height:1.4em}.focus-note button{margin:0 0 0 8px;padding:2px 10px;font-size:.82rem}
+.meter{display:inline-block;width:64px;height:8px;border-radius:4px;background:var(--line);vertical-align:middle;margin-left:6px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--p4)}.meter.m-P1 i{background:var(--p1)}.meter.m-P2 i{background:var(--p2)}.meter.m-P3 i{background:var(--p3)}
+.why{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:.3rem 0 .6rem;font-size:.86rem}
+.why .f{border:1px solid var(--line);border-radius:999px;padding:1px 9px;background:var(--code);white-space:nowrap}
+.why .f.up{border-color:var(--p2)}.why .f.down{border-color:var(--sev-low)}.why .op{color:var(--muted)}
+.why .res{font-weight:700}
+.ftools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+.ftools button{margin:0;padding:3px 12px;font-size:.85rem;background:var(--panel);color:var(--fg);border:1px solid var(--line)}
+.ftools button[aria-pressed="true"]{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+.ftools input{flex:1;min-width:160px;max-width:300px;padding:4px 8px}
+.ftools .count{color:var(--muted);font-size:.85rem}
+.tbl-wrap{max-height:75vh;overflow:auto;border:1px solid var(--line);border-radius:var(--radius)}
+.tbl-wrap table{display:table;margin:0;border:0}.tbl-wrap th{position:sticky;top:0;z-index:1;cursor:pointer;user-select:none}
+.tbl-wrap th[aria-sort="ascending"]::after{content:" \25B2";font-size:.7em}.tbl-wrap th[aria-sort="descending"]::after{content:" \25BC";font-size:.7em}
+.tbl-wrap tbody tr{cursor:pointer}.tbl-wrap tbody tr:hover td{background:var(--head)}
+.tbl-wrap tr.sel td{background:var(--code);box-shadow:inset 0 2px 0 var(--accent),inset 0 -2px 0 var(--accent)}
+.tbl-wrap td.num{text-align:right;white-space:nowrap}
+details.blast{margin:.4rem 0 1rem}details.blast summary{cursor:pointer;color:var(--accent);font-weight:600}
+.host-tags{display:flex;flex-wrap:wrap;gap:6px;margin:-.4rem 0 .6rem}
+@media print{:root,[data-theme]{--bg:#fff;--fg:#000;--muted:#333;--line:#bbb;--head:#eee;--panel:#fff;--code:#f3f3f3;
+--p1:#b91c1c;--p2:#c2410c;--p3:#a16207;--p4:#475569;--p-tx:#fff;--sev-critical:#b91c1c;--sev-high:#c2410c;
+--sev-medium:#a16207;--sev-low:#1d4ed8;--e-return:#7c3aed;--e-ips:#dc2626;--e-spread:#c2410c;--e-internet:#64748b}
+.ftools,.focus-note,.panel>p.hint{display:none}.tbl-wrap{max-height:none;overflow:visible;border:0}
+.tbl-wrap th{position:static}.tile,.panel,.why,svg,tr{break-inside:avoid}
+.dg-wrap{overflow:visible}.dg-wrap svg{max-width:100%;height:auto}
+.pri,.ev,.pbar div,.tile{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+h2,h3{break-after:avoid}}
+
+.dg-bg{fill:var(--panel,#111c31)}.dg-ink{fill:var(--fg,#f1f5f9)}.dg-ink2{fill:var(--muted,#cbd5e1)}
+.dg-box{fill:var(--bg,#0f172a)}.dg-box.src{fill:var(--head,#1e293b)}
+.dg-halo{paint-order:stroke;stroke:var(--panel,#111c31);stroke-width:4px;stroke-linejoin:round}
+.sev-Critical{stroke:var(--sev-critical,#f87171)}.sev-High{stroke:var(--sev-high,#fb923c)}
+.sev-Medium{stroke:var(--sev-medium,#facc15)}.sev-Low{stroke:var(--sev-low,#60a5fa)}
+.sev-none,.sev-Info{stroke:var(--sev-none,#94a3b8)}
+.tx-Critical{fill:var(--sev-critical,#f87171)}.tx-High{fill:var(--sev-high,#fb923c)}
+.tx-Medium{fill:var(--sev-medium,#facc15)}.tx-Low{fill:var(--sev-low,#60a5fa)}.tx-none,.tx-Info{fill:var(--sev-none,#94a3b8)}
+.e-return{stroke:var(--e-return,#c084fc);fill:var(--e-return,#c084fc)}
+.e-ips,.e-ips-blocked{stroke:var(--e-ips,#ef4444);fill:var(--e-ips,#ef4444)}
+.e-spread{stroke:var(--e-spread,#fb923c);fill:var(--e-spread,#fb923c)}
+.e-onward{stroke:var(--fg,#f1f5f9);fill:var(--fg,#f1f5f9)}
+.e-internet{stroke:var(--e-internet,#94a3b8);fill:var(--e-internet,#94a3b8)}
+.lb-return{fill:var(--e-return,#c084fc)}.lb-ips,.lb-ips-blocked{fill:var(--e-ips,#ef4444)}
+.lb-spread{fill:var(--e-spread,#fb923c)}.lb-onward{fill:var(--fg,#f1f5f9)}.lb-internet{fill:var(--e-internet,#94a3b8)}
+path.e-return,path.e-ips,path.e-ips-blocked,path.e-spread,path.e-onward,path.e-internet,line.edge-line{fill:none}
+.tag-likely{fill:var(--sev-critical,#f87171)}.tag-lead{fill:var(--sev-medium,#facc15)}.tag-tx{fill:var(--bg,#0f172a)}
+.dg-dim{opacity:.18}.dg-focus rect,.dg-focus circle{stroke-width:4px}
+.node,.bnode{cursor:pointer}
+</style></head><body><div class="theme-bar"><span class="theme-brand">vulnPath</span><label for="theme-choice">Theme</label><select id="theme-choice" aria-label="Theme"><option value="dark">SOC Dark</option><option value="nord">Nord Calm</option><option value="high-contrast">High Contrast</option><option value="light">Light</option><option value="classic-windows">Classic Windows</option><option value="matrix">Matrix</option><option value="aqua">Mac OS X Aqua</option><option value="win2k">Windows 2000</option></select></div><script>(function(){const s=document.getElementById("theme-choice");const root=document.documentElement;s.value=[...s.options].some(o=>o.value===root.dataset.theme)?root.dataset.theme:"dark";s.addEventListener("change",()=>{root.dataset.theme=s.value;try{localStorage.setItem("vulnflow-theme",s.value)}catch(_){}})})();</script><h1>Technical Analysis: Vulnerability and Network Telemetry Correlation</h1>
+<p>Generated 2026-10-21T21:02:38Z. Telemetry window 2026-10-12T00:02:03Z to 2026-10-18T03:11:38Z.</p>
+<h2>1. Inputs and data quality</h2>
+<table><tr><th>File</th><th>Format</th><th>Records read</th><th>Kept</th><th>Dropped</th><th>Notes</th></tr>
+<tr><td>netflow_segment6.csv</td><td>generic</td><td>112</td><td>112</td><td>0</td><td></td></tr>
+<tr><td>paloalto_traffic.csv</td><td>paloalto</td><td>465</td><td>465</td><td>0</td><td>firewall timestamps are assumed to be UTC; 4 IPS/IDS alert(s) used as exploitation evidence</td></tr>
+<tr><td>quarterly_scan.nessus</td><td>nessus</td><td>33</td><td>33</td><td>0</td><td></td></tr>
+<tr><td>zeek_conn.log</td><td>zeek</td><td>781</td><td>780</td><td>1 missing or invalid IP</td><td></td></tr>
+</table>
+<p>Exact duplicate sessions removed: 1. Duplicate findings merged across scans: 0. IPS/IDS alerts loaded: 4. Internal address space: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, fc00::/7, fe80::/10, ::1/128.</p>
+<h2>2. Method</h2>
+<p>Each finding is scored 0-100 as <code>CVSS x 10 x Exploit x Exposure x BlastRadius</code>, capped at 100, then multiplied by 1.25 with corroborated exploitation evidence or 1.1 with investigation leads.</p>
+<ul>
+<li><strong>Exploit</strong>: 1.0 if a public exploit exists (1.1 if in Metasploit/CANVAS/Core), otherwise 0.65.</li>
+<li><strong>Exposure</strong> (from telemetry): 1.0 service reached from the internet; 0.85 reached internally by 5+ hosts; 0.75 reached internally; 0.45 attempts only; 0.35 blocked by firewall; 0.3 service not observed in use; 0.5 host absent from telemetry (unknown). Host-level findings (port 0, e.g. missing patches or client software) use 0.7 / 0.5 / 0.35 for internet-facing / active / quiet hosts.</li>
+<li><strong>Blast radius</strong>: 1.0 to 1.5 from the number of internal hosts this host has completed sessions with (walked 2 hops), how many of those carry High/Critical findings, and use of lateral-movement protocols (SMB, RDP, SSH, WinRM, database ports).</li>
+<li><strong>Indicators</strong> are leads, not proof. <em>Lead</em>: the host connects back to an outside address that reached the vulnerable service; new lateral connections or &gt;20 MB uploaded to the internet after that contact; an IPS/IDS alert on the service that was not blocked; a flagged host newly connecting to this vulnerable service. <em>Corroborated</em>: an unblocked IPS/IDS alert on the service plus post-contact behaviour from the host. Confirming a compromise still needs host evidence (EDR, logs, forensics), which this tool does not see.</li>
+<li><strong>Priority</strong>: P1 score &gt;= 75 or corroborated evidence; P2 &gt;= 50 or any lead; P3 &gt;= 25; P4 below.</li>
+</ul>
+<h2>3. Prioritized findings</h2>
+<h3>Hostile activity diagram</h3><div class="panel"><p class="hint">Click a host to focus the report on it. Click a finding in the table below to highlight it here.</p><div class="focus-note" aria-live="polite"></div><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg" viewBox="0 0 1050 740" width="1050" height="740" role="img" aria-label="Hostile activity against vulnerable services" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="12">
+<defs><marker id="dg-arr-return" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-return"/></marker><marker id="dg-arr-ips" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-ips"/></marker><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker><marker id="dg-arr-ips-blocked" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-ips-blocked"/></marker><marker id="dg-arr-internet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-internet"/></marker></defs>
+<rect class="dg-bg" width="1050" height="740" rx="8"/>
+<text x="30" y="36" font-size="15" font-weight="600" class="dg-ink">Hostile activity against vulnerable services</text>
+<g class="edge" data-src="internet" data-dst="10.10.1.10" data-findings="10.10.1.10|153884|443">
+<path d="M260,505.0 C335.0,505.0 335.0,105.0 410,105.0" class="e-internet" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#dg-arr-internet)"/>
+<text x="335" y="299" text-anchor="middle" font-size="11" class="dg-halo lb-internet">tcp/443 · 224 sessions</text>
+</g>
+<g class="edge" data-src="192.0.2.216" data-dst="10.10.3.31" data-findings="10.10.3.31|125313|3389">
+<path d="M260,205.0 C525.0,205.0 525.0,205.0 790,205.0" class="e-ips-blocked" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#dg-arr-ips-blocked)"/>
+<text x="525" y="199" text-anchor="middle" font-size="11" class="dg-halo lb-ips-blocked">tcp/3389 · IPS blocked ×1</text>
+</g>
+<g class="edge" data-src="192.0.2.145" data-dst="10.10.3.31" data-findings="10.10.3.31|125313|3389">
+<path d="M260,305.0 C525.0,305.0 525.0,205.0 790,205.0" class="e-ips-blocked" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#dg-arr-ips-blocked)"/>
+<text x="525" y="249" text-anchor="middle" font-size="11" class="dg-halo lb-ips-blocked">tcp/3389 · IPS blocked ×1</text>
+</g>
+<g class="edge" data-src="192.0.2.174" data-dst="10.10.3.31" data-findings="10.10.3.31|125313|3389">
+<path d="M260,405.0 C525.0,405.0 525.0,205.0 790,205.0" class="e-ips-blocked" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#dg-arr-ips-blocked)"/>
+<text x="525" y="299" text-anchor="middle" font-size="11" class="dg-halo lb-ips-blocked">tcp/3389 · IPS blocked ×1</text>
+</g>
+<g class="edge" data-src="10.10.1.10" data-dst="10.10.6.70" data-findings="10.10.1.10|153884|443">
+<path d="M640,105.0 C715.0,105.0 715.0,305.0 790,305.0" class="e-onward" stroke-width="1.8" marker-end="url(#dg-arr-onward)"/>
+<text x="715" y="199" text-anchor="middle" font-size="11" class="dg-halo lb-onward">tcp/445 onward</text>
+</g>
+<g class="edge" data-src="10.10.1.10" data-dst="10.10.2.25" data-findings="10.10.2.25|97833|445">
+<path d="M640,105.0 C715.0,105.0 715.0,105.0 790,105.0" class="e-spread" stroke-width="2.2" marker-end="url(#dg-arr-spread)"/>
+<text x="715" y="99" text-anchor="middle" font-size="11" class="dg-halo lb-spread">tcp/445 · newly reached</text>
+</g>
+<g class="edge" data-src="10.10.1.10" data-dst="10.10.3.31" data-findings="10.10.3.31|125313|3389">
+<path d="M640,105.0 C715.0,105.0 715.0,205.0 790,205.0" class="e-spread" stroke-width="2.2" marker-end="url(#dg-arr-spread)"/>
+<text x="715" y="149" text-anchor="middle" font-size="11" class="dg-halo lb-spread">tcp/3389 · newly reached</text>
+</g>
+<g class="edge" data-src="203.0.113.45" data-dst="10.10.1.10" data-findings="10.10.1.10|153884|443">
+<path d="M260,105.0 C335.0,105.0 335.0,105.0 410,105.0" class="e-ips" stroke-width="2.6" marker-end="url(#dg-arr-ips)"/>
+<text x="335" y="99" text-anchor="middle" font-size="11" class="dg-halo lb-ips">tcp/443 · IPS NOT blocked ×1</text>
+</g>
+<g class="edge" data-src="10.10.1.10" data-dst="203.0.113.45" data-findings="10.10.1.10|153884|443">
+<path d="M410,124.6 C340,158.6 330,158.6 260,124.6" class="e-return" stroke-width="2.6" marker-end="url(#dg-arr-return)"/>
+<text x="330" y="156" text-anchor="middle" font-size="11" class="dg-halo lb-return">connected back on 443, 4444 · 59 MB out</text>
+</g>
+<g class="node" data-host="203.0.113.45" data-sev="none" tabindex="0"><title>203.0.113.45: click to focus</title>
+<rect class="dg-box src sev-none" x="30" y="70" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="40" y="90" font-weight="600" class="dg-ink">203.0.113.45 (external)</text>
+<text x="40" y="107" class="dg-ink2">source: exploit attempts</text>
+</g>
+<g class="node" data-host="10.10.1.10" data-sev="Critical" tabindex="0"><title>10.10.1.10: click to focus</title>
+<rect class="dg-box sev-Critical" x="410" y="70" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="420" y="90" font-weight="600" class="dg-ink">10.10.1.10</text>
+<text x="420" y="107" class="dg-ink2">web01.corp.example</text>
+<text x="420" y="125" class="tx-Critical">Critical: CVE-2021-41773</text>
+<rect x="578" y="61" width="58" height="18" rx="9" class="tag-likely"/><text x="607" y="74" text-anchor="middle" font-size="10" font-weight="700" class="tag-tx">LIKELY</text>
+</g>
+<g class="node" data-host="10.10.2.25" data-sev="Critical" tabindex="0"><title>10.10.2.25: click to focus</title>
+<rect class="dg-box sev-Critical" x="790" y="70" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="800" y="90" font-weight="600" class="dg-ink">10.10.2.25</text>
+<text x="800" y="107" class="dg-ink2">fs01.corp.example</text>
+<text x="800" y="125" class="tx-Critical">Critical: CVE-2017-0143</text>
+<rect x="958" y="61" width="58" height="18" rx="9" class="tag-lead"/><text x="987" y="74" text-anchor="middle" font-size="10" font-weight="700" class="tag-tx">LEAD</text>
+</g>
+<g class="node" data-host="10.10.3.31" data-sev="Critical" tabindex="0"><title>10.10.3.31: click to focus</title>
+<rect class="dg-box sev-Critical" x="790" y="170" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="800" y="190" font-weight="600" class="dg-ink">10.10.3.31</text>
+<text x="800" y="207" class="dg-ink2">ws-031.corp.example</text>
+<text x="800" y="225" class="tx-Critical">Critical: CVE-2019-0708</text>
+<rect x="958" y="161" width="58" height="18" rx="9" class="tag-lead"/><text x="987" y="174" text-anchor="middle" font-size="10" font-weight="700" class="tag-tx">LEAD</text>
+</g>
+<g class="node" data-host="10.10.6.70" data-sev="none" tabindex="0"><title>10.10.6.70: click to focus</title>
+<rect class="dg-box sev-none" x="790" y="270" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="800" y="290" font-weight="600" class="dg-ink">10.10.6.70</text>
+<text x="800" y="307" class="dg-ink2">not in scan</text>
+</g>
+<g class="node" data-host="192.0.2.216" data-sev="none" tabindex="0"><title>192.0.2.216: click to focus</title>
+<rect class="dg-box src sev-none" x="30" y="170" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="40" y="190" font-weight="600" class="dg-ink">192.0.2.216 (external)</text>
+<text x="40" y="207" class="dg-ink2">source: blocked attempts</text>
+</g>
+<g class="node" data-host="192.0.2.145" data-sev="none" tabindex="0"><title>192.0.2.145: click to focus</title>
+<rect class="dg-box src sev-none" x="30" y="270" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="40" y="290" font-weight="600" class="dg-ink">192.0.2.145 (external)</text>
+<text x="40" y="307" class="dg-ink2">source: blocked attempts</text>
+</g>
+<g class="node" data-host="192.0.2.174" data-sev="none" tabindex="0"><title>192.0.2.174: click to focus</title>
+<rect class="dg-box src sev-none" x="30" y="370" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="40" y="390" font-weight="600" class="dg-ink">192.0.2.174 (external)</text>
+<text x="40" y="407" class="dg-ink2">source: blocked attempts</text>
+</g>
+<g class="node" data-host="internet" data-sev="none" tabindex="0"><title>internet: click to focus</title>
+<rect class="dg-box src sev-none" x="30" y="470" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="40" y="490" font-weight="600" class="dg-ink">Internet</text>
+<text x="40" y="507" class="dg-ink2">154 outside sources</text>
+</g>
+<text x="30" y="600" font-weight="600" class="dg-ink">Legend</text>
+<line x1="30" y1="614" x2="70" y2="614" class="edge-line e-return" stroke-width="2.6"/><text x="80" y="618" class="dg-ink2">Host connected back to the source after contact (lead)</text>
+<line x1="30" y1="632" x2="70" y2="632" class="edge-line e-ips" stroke-width="2.6"/><text x="80" y="636" class="dg-ink2">IPS/IDS alert NOT blocked (alert only)</text>
+<line x1="30" y1="650" x2="70" y2="650" class="edge-line e-spread" stroke-width="2.2"/><text x="80" y="654" class="dg-ink2">Flagged host newly reached this vulnerable service</text>
+<line x1="30" y1="668" x2="70" y2="668" class="edge-line e-onward" stroke-width="1.8"/><text x="80" y="672" class="dg-ink2">New lateral connection after contact (candidate path)</text>
+<line x1="30" y1="686" x2="70" y2="686" class="edge-line e-ips-blocked" stroke-width="1.6" stroke-dasharray="4 3"/><text x="80" y="690" class="dg-ink2">IPS/IDS alert blocked or reset</text>
+<line x1="30" y1="704" x2="70" y2="704" class="edge-line e-internet" stroke-width="1.4" stroke-dasharray="6 4"/><text x="80" y="708" class="dg-ink2">Internet sessions to the vulnerable service</text>
+<rect x="450" y="606" width="14" height="12" fill="none" stroke-width="2" class="sev-Critical"/><text x="472" y="616" class="dg-ink2">Critical vulnerability on target</text>
+<rect x="450" y="624" width="14" height="12" fill="none" stroke-width="2" class="sev-High"/><text x="472" y="634" class="dg-ink2">High vulnerability on target</text>
+<rect x="450" y="642" width="14" height="12" fill="none" stroke-width="2" class="sev-Medium"/><text x="472" y="652" class="dg-ink2">Medium vulnerability on target</text>
+<rect x="450" y="660" width="14" height="12" fill="none" stroke-width="2" class="sev-Low"/><text x="472" y="670" class="dg-ink2">Low vulnerability on target</text>
+<rect x="450" y="680" width="44" height="15" rx="7.5" class="tag-likely"/><text x="472" y="691" text-anchor="middle" font-size="9" font-weight="700" class="tag-tx">LIKELY</text><text x="502" y="691" class="dg-ink2">Alert and host behaviour agree (likely exploitation)</text>
+<rect x="450" y="700" width="44" height="15" rx="7.5" class="tag-lead"/><text x="472" y="711" text-anchor="middle" font-size="9" font-weight="700" class="tag-tx">LEAD</text><text x="502" y="711" class="dg-ink2">Pattern worth investigating, not confirmed</text>
+<text x="30" y="730" font-size="11" class="dg-ink2">Detected behaviour and candidate paths are leads, not confirmed compromise.</text>
+</svg></div></div>
+<div class="ftools" role="group" aria-label="Filter findings"><button type="button" data-pri="all" aria-pressed="true">All</button><button type="button" data-pri="P1" aria-pressed="false">P1</button><button type="button" data-pri="P2" aria-pressed="false">P2</button><button type="button" data-pri="P3" aria-pressed="false">P3</button><button type="button" data-pri="P4" aria-pressed="false">P4</button><input type="search" placeholder="Search host, CVE, service" aria-label="Search findings"><span class="count"></span></div><div class="tbl-wrap"><table class="findings"><thead><tr><th>Pri</th><th>Score</th><th>Host</th><th>Vulnerability</th><th>Port</th><th>CVSS</th><th>Exploit</th><th>Exposure</th><th>Blast</th><th>Evidence</th></tr></thead><tbody><tr data-pri="P1" data-host="10.10.1.10" data-fid="10.10.1.10|153884|443"><td data-sort="P1"><span class="pri pri-P1" title="P1: act now">P1</span></td><td class="num" data-sort="100">100<span class="meter m-P1"><i style="width:100%"></i></span></td><td>web01.corp.example (10.10.1.10)</td><td>Apache 2.4.49 &lt; 2.4.51 Path Traversal and RCE (153884)</td><td>443/tcp (www)</td><td class="num">9.8</td><td>Yes</td><td>Vulnerable service reached from the internet</td><td class="num">x1.5</td><td data-sort="0"><span class="ev ev-likely">Likely exploitation</span></td></tr><tr data-pri="P1" data-host="10.10.1.20" data-fid="10.10.1.20|134862|8009"><td data-sort="P1"><span class="pri pri-P1" title="P1: act now">P1</span></td><td class="num" data-sort="100">100<span class="meter m-P1"><i style="width:100%"></i></span></td><td>app01.corp.example (10.10.1.20)</td><td>Apache Tomcat AJP Connector Request Injection (Ghostcat) (134862)</td><td>8009/tcp (ajp13)</td><td class="num">9.8</td><td>Yes</td><td>Vulnerable service reached internally</td><td class="num">x1.24</td><td data-sort="2"></td></tr><tr data-pri="P1" data-host="10.10.3.31" data-fid="10.10.3.31|125313|3389"><td data-sort="P1"><span class="pri pri-P1" title="P1: act now">P1</span></td><td class="num" data-sort="089">89<span class="meter m-P1"><i style="width:89%"></i></span></td><td>ws-031.corp.example (10.10.3.31)</td><td>Microsoft RDP RCE (CVE-2019-0708) (BlueKeep) (125313)</td><td>3389/tcp (msrdp)</td><td class="num">9.8</td><td>Yes</td><td>Vulnerable service reached internally</td><td class="num">x1.0</td><td data-sort="1"><span class="ev ev-lead">Lead, not confirmed</span></td></tr><tr data-pri="P1" data-host="10.10.2.25" data-fid="10.10.2.25|97833|445"><td data-sort="P1"><span class="pri pri-P1" title="P1: act now">P1</span></td><td class="num" data-sort="083">83<span class="meter m-P1"><i style="width:83%"></i></span></td><td>fs01.corp.example (10.10.2.25)</td><td>MS17-010: Security Update for Microsoft Windows SMB Server (ETERNALBLUE) (97833)</td><td>445/tcp (cifs)</td><td class="num">8.1</td><td>Yes</td><td>Vulnerable service reached internally by many hosts</td><td class="num">x1.0</td><td data-sort="1"><span class="ev ev-lead">Lead, not confirmed</span></td></tr><tr data-pri="P2" data-host="10.10.3.40" data-fid="10.10.3.40|207053|0"><td data-sort="P2"><span class="pri pri-P2" title="P2: this cycle">P2</span></td><td class="num" data-sort="061">61<span class="meter m-P2"><i style="width:61%"></i></span></td><td>ws-040.corp.example (10.10.3.40)</td><td>Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities (207053)</td><td>host-level</td><td class="num">8.8</td><td>Yes</td><td>Host is active on the network</td><td class="num">x1.38</td><td data-sort="2"></td></tr><tr data-pri="P2" data-host="10.10.3.41" data-fid="10.10.3.41|207053|0"><td data-sort="P2"><span class="pri pri-P2" title="P2: this cycle">P2</span></td><td class="num" data-sort="059">59<span class="meter m-P2"><i style="width:59%"></i></span></td><td>ws-041.corp.example (10.10.3.41)</td><td>Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities (207053)</td><td>host-level</td><td class="num">8.8</td><td>Yes</td><td>Host is active on the network</td><td class="num">x1.34</td><td data-sort="2"></td></tr><tr data-pri="P2" data-host="10.10.3.42" data-fid="10.10.3.42|207053|0"><td data-sort="P2"><span class="pri pri-P2" title="P2: this cycle">P2</span></td><td class="num" data-sort="059">59<span class="meter m-P2"><i style="width:59%"></i></span></td><td>ws-042.corp.example (10.10.3.42)</td><td>Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities (207053)</td><td>host-level</td><td class="num">8.8</td><td>Yes</td><td>Host is active on the network</td><td class="num">x1.34</td><td data-sort="2"></td></tr><tr data-pri="P2" data-host="10.10.3.43" data-fid="10.10.3.43|207053|0"><td data-sort="P2"><span class="pri pri-P2" title="P2: this cycle">P2</span></td><td class="num" data-sort="059">59<span class="meter m-P2"><i style="width:59%"></i></span></td><td>ws-043.corp.example (10.10.3.43)</td><td>Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities (207053)</td><td>host-level</td><td class="num">8.8</td><td>Yes</td><td>Host is active on the network</td><td class="num">x1.34</td><td data-sort="2"></td></tr><tr data-pri="P2" data-host="10.10.3.44" data-fid="10.10.3.44|207053|0"><td data-sort="P2"><span class="pri pri-P2" title="P2: this cycle">P2</span></td><td class="num" data-sort="059">59<span class="meter m-P2"><i style="width:59%"></i></span></td><td>ws-044.corp.example (10.10.3.44)</td><td>Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities (207053)</td><td>host-level</td><td class="num">8.8</td><td>Yes</td><td>Host is active on the network</td><td class="num">x1.34</td><td data-sort="2"></td></tr><tr data-pri="P2" data-host="10.10.3.45" data-fid="10.10.3.45|207053|0"><td data-sort="P2"><span class="pri pri-P2" title="P2: this cycle">P2</span></td><td class="num" data-sort="059">59<span class="meter m-P2"><i style="width:59%"></i></span></td><td>ws-045.corp.example (10.10.3.45)</td><td>Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities (207053)</td><td>host-level</td><td class="num">8.8</td><td>Yes</td><td>Host is active on the network</td><td class="num">x1.34</td><td data-sort="2"></td></tr><tr data-pri="P2" data-host="10.10.3.46" data-fid="10.10.3.46|207053|0"><td data-sort="P2"><span class="pri pri-P2" title="P2: this cycle">P2</span></td><td class="num" data-sort="059">59<span class="meter m-P2"><i style="width:59%"></i></span></td><td>ws-046.corp.example (10.10.3.46)</td><td>Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities (207053)</td><td>host-level</td><td class="num">8.8</td><td>Yes</td><td>Host is active on the network</td><td class="num">x1.34</td><td data-sort="2"></td></tr><tr data-pri="P2" data-host="10.10.3.47" data-fid="10.10.3.47|207053|0"><td data-sort="P2"><span class="pri pri-P2" title="P2: this cycle">P2</span></td><td class="num" data-sort="059">59<span class="meter m-P2"><i style="width:59%"></i></span></td><td>ws-047.corp.example (10.10.3.47)</td><td>Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities (207053)</td><td>host-level</td><td class="num">8.8</td><td>Yes</td><td>Host is active on the network</td><td class="num">x1.34</td><td data-sort="2"></td></tr><tr data-pri="P3" data-host="10.10.2.20" data-fid="10.10.2.20|183965|5432"><td data-sort="P3"><span class="pri pri-P3" title="P3: scheduled">P3</span></td><td class="num" data-sort="045">45<span class="meter m-P3"><i style="width:45%"></i></span></td><td>db01.corp.example (10.10.2.20)</td><td>PostgreSQL 13.x &lt; 13.13 Multiple Vulnerabilities (183965)</td><td>5432/tcp (postgresql)</td><td class="num">8.8</td><td>No</td><td>Vulnerable service reached internally</td><td class="num">x1.04</td><td data-sort="2"></td></tr><tr data-pri="P3" data-host="10.10.5.60" data-fid="10.10.5.60|41028|161"><td data-sort="P3"><span class="pri pri-P3" title="P3: scheduled">P3</span></td><td class="num" data-sort="038">38<span class="meter m-P3"><i style="width:38%"></i></span></td><td>ups-mgmt.corp.example (10.10.5.60)</td><td>SNMP Agent Default Community Name (public) (41028)</td><td>161/udp (snmp)</td><td class="num">7.5</td><td>Yes</td><td>No telemetry for this host (unknown)</td><td class="num">x1.0</td><td data-sort="2"></td></tr><tr data-pri="P4" data-host="10.10.1.10" data-fid="10.10.1.10|187201|22"><td data-sort="P4"><span class="pri pri-P4" title="P4: routine">P4</span></td><td class="num" data-sort="020">20<span class="meter m-P4"><i style="width:20%"></i></span></td><td>web01.corp.example (10.10.1.10)</td><td>OpenSSH &lt; 9.6 Multiple Vulnerabilities (Terrapin) (187201)</td><td>22/tcp (ssh)</td><td class="num">5.9</td><td>No</td><td>Connections to service blocked by firewall</td><td class="num">x1.5</td><td data-sort="2"></td></tr><tr data-pri="P4" data-host="10.10.4.50" data-fid="10.10.4.50|42263|23"><td data-sort="P4"><span class="pri pri-P4" title="P4: routine">P4</span></td><td class="num" data-sort="013">13<span class="meter m-P4"><i style="width:13%"></i></span></td><td>prn-4f.corp.example (10.10.4.50)</td><td>Unencrypted Telnet Server (42263)</td><td>23/tcp (telnet)</td><td class="num">6.5</td><td>No</td><td>Service not observed in use</td><td class="num">x1.0</td><td data-sort="2"></td></tr><tr data-pri="P4" data-host="10.10.3.5" data-fid="10.10.3.5|58453|3389"><td data-sort="P4"><span class="pri pri-P4" title="P4: routine">P4</span></td><td class="num" data-sort="011">11<span class="meter m-P4"><i style="width:11%"></i></span></td><td>jump01.corp.example (10.10.3.5)</td><td>Terminal Services Doesn&#x27;t Use Network Level Authentication (NLA) Only (58453)</td><td>3389/tcp (msrdp)</td><td class="num">4.0</td><td>No</td><td>Service not observed in use</td><td class="num">x1.36</td><td data-sort="2"></td></tr></tbody></table></div>
+<h2>4. Host details</h2>
+<h3>web01.corp.example (10.10.1.10) - <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span></h3>
+<div class="host-tags"><span class="ev ev-likely">Likely exploitation</span> <span class="ev" style="color:var(--p2)">Internet-exposed</span></div><details class="blast" open><summary>Blast radius map (5 direct, 6 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.1.10" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">8009/tcp</text>
+<line x1="354" y1="191" x2="480" y2="167" class="edge-line e-spread" stroke-width="2.4" opacity="1" marker-end="url(#dg-arr-spread)"/>
+<text x="417" y="176" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<line x1="349" y1="211" x2="420" y2="270" class="edge-line e-spread" stroke-width="2.4" opacity="1" marker-end="url(#dg-arr-spread)"/>
+<text x="384" y="238" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp</text>
+<line x1="311" y1="211" x2="240" y2="270" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="276" y="238" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">53/udp</text>
+<line x1="306" y1="191" x2="180" y2="167" class="edge-line e-spread" stroke-width="2.4" opacity="1" marker-end="url(#dg-arr-spread)"/>
+<text x="243" y="176" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<g class="bnode" data-host="10.10.1.20"><title>10.10.1.20 app01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">app01</text></g>
+<g class="bnode" data-host="10.10.2.25"><title>10.10.2.25 fs01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="496" cy="164" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="496" y="190" text-anchor="middle" class="dg-ink">fs01</text></g>
+<g class="bnode" data-host="10.10.3.31"><title>10.10.3.31 ws-031.corp.example - 1 hop(s), worst finding Critical</title><circle cx="433" cy="281" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="433" y="307" text-anchor="middle" class="dg-ink">ws-031</text></g>
+<g class="bnode" data-host="10.10.0.53"><title>10.10.0.53  - 1 hop(s), worst finding none</title><circle cx="227" cy="281" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="227" y="307" text-anchor="middle" class="dg-ink">10.10.0.53</text></g>
+<g class="bnode" data-host="10.10.6.70"><title>10.10.6.70  - 1 hop(s), worst finding none</title><circle cx="164" cy="164" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="164" y="190" text-anchor="middle" class="dg-ink">10.10.6.70</text></g>
+<g class="bnode" data-host="10.10.2.20"><title>10.10.2.20 db01.corp.example - 2 hop(s), worst finding High</title><circle cx="416" cy="43" r="9" class="dg-box sev-High" stroke-width="1.5" stroke-dasharray="3 2"/><text x="416" y="65" text-anchor="middle" class="dg-ink2">db01</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-Critical" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">web01</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (5). Outer ring: 2 hops away.</text>
+<text x="14" y="368" class="dg-ink2"><tspan class="tx-High">Orange arrows</tspan>: new connections that started after the flagged contact.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Linux Kernel 5.4 on Ubuntu 20.04</li>
+<li>Findings: 1 Critical, 1 Medium</li>
+<li>Seen in telemetry: yes (249 inbound, 165 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: yes</li>
+</ul>
+<p><strong>Exploitation indicators</strong> (leads unless marked corroborated)</p>
+<ul>
+<li><span class="ev ev-lead">Lead, not confirmed</span> IPS/IDS alerted 1 time(s) on traffic to this service and did not block it: Apache HTTP Server Path Traversal Vulnerability CVE-2021-41773(91694) (from 203.0.113.45), matching CVE-2021-41773. An alert shows an attempt, not that it succeeded.</li>
+<li><span class="ev ev-lead">Lead, not confirmed</span> 10.10.1.10 opened 2 outbound connection(s) to 203.0.113.45 (port 443, 4444) after 203.0.113.45 connected to the vulnerable service. This is consistent with an exploit callback, but on its own it can also be legitimate traffic; confirm with IPS/threat logs, payload or application logs, or host evidence.</li>
+<li><span class="ev ev-lead">Lead, not confirmed</span> After the flagged inbound contact at 2026-10-16T03:12:00Z, 10.10.1.10 began connecting to 3 internal host(s) it had not talked to before, over RDP, SMB.</li>
+<li><span class="ev ev-lead">Lead, not confirmed</span> 10.10.1.10 sent 59.1 MB to external address 203.0.113.45 after the flagged inbound contact at 2026-10-16T03:12:00Z.</li>
+<li><span class="ev ev-likely">Likely exploitation</span> Independent signals agree: the IPS/IDS alerted on traffic to this vulnerable service from 203.0.113.45, the same address the host then connected back to, and the host then showed exfil, new lateral, return connection. Treat this as likely exploitation and start incident response; host forensics is still needed to confirm a compromise.</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P1" title="P1: act now">P1</span> <span class="score">100</span> Apache 2.4.49 &lt; 2.4.51 Path Traversal and RCE</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 9.8 × 10 = 98</span><span class="op"></span><span class="f up">×1.1 exploit</span><span class="op"></span><span class="f ">×1 exposure</span><span class="op"></span><span class="f up">×1.5 blast radius</span><span class="op"></span><span class="f up">×1.25 evidence</span><span class="op">=</span><span class="res">100 (capped)</span><span class="meter m-P1"><i style="width:100%"></i></span><span class="pri pri-P1" title="P1: act now">P1</span></div>
+<ul>
+<li>Plugin 153884, Critical, CVSS 9.8, port 443/tcp (www), CVE-2021-41773, CVE-2021-42013</li>
+<li>Why this score: Base severity: CVSS v3 9.8 (Critical). A public exploit is available (Metasploit). Exposure: vulnerable service reached from the internet - 224 completed sessions from 154 external and 0 internal sources. Blast radius: the host talks to 5 internal host(s) directly and 6 within 2 hops, including 4 with High/Critical findings. Corroborated exploitation evidence (IPS alert plus host behaviour); see indicators.</li>
+<li>Traffic to service: 224 completed, 0 attempts, 0 blocked; first 2026-10-12T00:02:03Z, last 2026-10-18T02:50:10Z; top sources: 198.51.100.65 (ext) x6, 198.51.100.38 (ext) x5, 198.51.100.176 (ext) x4, 198.51.100.102 (ext) x4, 198.51.100.20 (ext) x4, 203.0.113.45 (ext) x4, 198.51.100.131 (ext) x3, 198.51.100.10 (ext) x3</li>
+<li>Synopsis: The remote web server is affected by a path traversal vulnerability that can lead to remote code execution.</li>
+<li>Remediation: Upgrade to Apache version 2.4.51 or later.</li>
+</ul>
+<h4><span class="pri pri-P4" title="P4: routine">P4</span> <span class="score">20</span> OpenSSH &lt; 9.6 Multiple Vulnerabilities (Terrapin)</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 5.9 × 10 = 59</span><span class="op"></span><span class="f down">×0.65 exploit</span><span class="op"></span><span class="f down">×0.35 exposure</span><span class="op"></span><span class="f up">×1.5 blast radius</span><span class="op">=</span><span class="res">20</span><span class="meter m-P4"><i style="width:20%"></i></span><span class="pri pri-P4" title="P4: routine">P4</span></div>
+<ul>
+<li>Plugin 187201, Medium, CVSS 5.9, port 22/tcp (ssh), CVE-2023-48795</li>
+<li>Why this score: Base severity: CVSS v3 5.9 (Medium). No public exploit is known to the scanner. Exposure: connections to service blocked by firewall. 25 connection(s) to it were blocked by a firewall. Blast radius: the host talks to 5 internal host(s) directly and 6 within 2 hops, including 4 with High/Critical findings.</li>
+<li>Traffic to service: 0 completed, 0 attempts, 25 blocked; first 2026-10-12T09:38:38Z, last 2026-10-17T20:49:02Z</li>
+<li>Synopsis: The SSH server is affected by a prefix truncation weakness.</li>
+<li>Remediation: Upgrade to OpenSSH 9.6 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 5 internal host(s) directly, 6 within 2 hops. Lateral-movement protocols used: SMB (2), RDP (1). Reachable hosts with High/Critical findings: 10.10.1.20, 10.10.2.25, 10.10.3.31, 10.10.2.20.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.1.20</td><td>1</td><td>8009/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.2.25</td><td>1</td><td>445/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.3.31</td><td>1</td><td>3389/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.0.53</td><td>1</td><td>53/udp</td><td>-</td></tr>
+<tr><td>10.10.6.70</td><td>1</td><td>445/tcp</td><td>-</td></tr>
+<tr><td>10.10.2.20</td><td>2</td><td></td><td>High</td></tr>
+</table>
+<p>Outbound to 1 external address(es); top: 203.0.113.45 x2.</p>
+<h3>app01.corp.example (10.10.1.20) - <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span></h3>
+<div class="host-tags"></div><details class="blast" open><summary>Blast radius map (1 direct, 2 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.1.20" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">5432/tcp</text>
+<g class="bnode" data-host="10.10.2.20"><title>10.10.2.20 db01.corp.example - 1 hop(s), worst finding High</title><circle cx="330" cy="91" r="13" class="dg-box sev-High" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">db01</text></g>
+<g class="bnode" data-host="10.10.6.71"><title>10.10.6.71  - 2 hop(s), worst finding none</title><circle cx="416" cy="43" r="9" class="dg-box sev-none" stroke-width="1.5" stroke-dasharray="3 2"/><text x="416" y="65" text-anchor="middle" class="dg-ink2">10.10.6.71</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-Critical" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">app01</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (1). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Linux Kernel 5.15 on Ubuntu 22.04</li>
+<li>Findings: 1 Critical</li>
+<li>Seen in telemetry: yes (120 inbound, 140 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P1" title="P1: act now">P1</span> <span class="score">100</span> Apache Tomcat AJP Connector Request Injection (Ghostcat)</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 9.8 × 10 = 98</span><span class="op"></span><span class="f up">×1.1 exploit</span><span class="op"></span><span class="f down">×0.75 exposure</span><span class="op"></span><span class="f up">×1.24 blast radius</span><span class="op">=</span><span class="res">100 (capped)</span><span class="meter m-P1"><i style="width:100%"></i></span><span class="pri pri-P1" title="P1: act now">P1</span></div>
+<ul>
+<li>Plugin 134862, Critical, CVSS 9.8, port 8009/tcp (ajp13), CVE-2020-1938</li>
+<li>Why this score: Base severity: CVSS v3 9.8 (Critical). A public exploit is available (Metasploit). Exposure: vulnerable service reached internally - 120 completed sessions from 0 external and 1 internal sources. Blast radius: the host talks to 1 internal host(s) directly and 2 within 2 hops, including 1 with High/Critical findings.</li>
+<li>Traffic to service: 120 completed, 0 attempts, 0 blocked; first 2026-10-12T00:38:11Z, last 2026-10-18T02:46:28Z; top sources: 10.10.1.10 x120</li>
+<li>Synopsis: An AJP connector is listening and is affected by a file read/inclusion vulnerability.</li>
+<li>Remediation: Update Tomcat to 9.0.31 / 8.5.51 / 7.0.100 or later, or disable the AJP connector.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 1 internal host(s) directly, 2 within 2 hops. Lateral-movement protocols used: PostgreSQL (140). Reachable hosts with High/Critical findings: 10.10.2.20.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.2.20</td><td>1</td><td>5432/tcp</td><td>High</td></tr>
+<tr><td>10.10.6.71</td><td>2</td><td></td><td>-</td></tr>
+</table>
+<h3>ws-031.corp.example (10.10.3.31) - <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span></h3>
+<div class="host-tags"><span class="ev ev-lead">Lead, not confirmed</span></div>
+<ul>
+<li>Operating system: Microsoft Windows 7 Professional</li>
+<li>Findings: 1 Critical</li>
+<li>Seen in telemetry: yes (92 inbound, 0 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Exploitation indicators</strong> (leads unless marked corroborated)</p>
+<ul>
+<li><span class="ev ev-lead">Lead, not confirmed</span> 10.10.1.10, which is flagged for investigation, newly connected to this vulnerable service at 2026-10-16T04:08:00Z. Check this host for signs of lateral movement.</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P1" title="P1: act now">P1</span> <span class="score">89</span> Microsoft RDP RCE (CVE-2019-0708) (BlueKeep)</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 9.8 × 10 = 98</span><span class="op"></span><span class="f up">×1.1 exploit</span><span class="op"></span><span class="f down">×0.75 exposure</span><span class="op"></span><span class="f ">×1 blast radius</span><span class="op"></span><span class="f up">×1.1 evidence</span><span class="op">=</span><span class="res">89</span><span class="meter m-P1"><i style="width:89%"></i></span><span class="pri pri-P1" title="P1: act now">P1</span></div>
+<ul>
+<li>Plugin 125313, Critical, CVSS 9.8, port 3389/tcp (msrdp), CVE-2019-0708</li>
+<li>Why this score: Base severity: CVSS v3 9.8 (Critical). A public exploit is available (Metasploit). Exposure: vulnerable service reached internally - 31 completed sessions from 0 external and 2 internal sources. 60 connection(s) to it were blocked by a firewall. The IPS/IDS blocked 3 alerted attempt(s) against it. Traffic gives leads worth investigating; nothing in the logs confirms exploitation.</li>
+<li>Traffic to service: 31 completed, 0 attempts, 60 blocked; first 2026-10-12T05:08:06Z, last 2026-10-18T03:11:38Z; top sources: 10.10.3.5 x30, 10.10.1.10 x1</li>
+<li>Synopsis: The remote host is affected by a remote code execution vulnerability in Remote Desktop Services.</li>
+<li>Remediation: Apply the May 2019 security update and enable Network Level Authentication.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>No completed internal sessions from this host were observed.</p>
+<h3>fs01.corp.example (10.10.2.25) - <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span></h3>
+<div class="host-tags"><span class="ev ev-lead">Lead, not confirmed</span></div>
+<ul>
+<li>Operating system: Microsoft Windows Server 2012 R2</li>
+<li>Findings: 1 Critical</li>
+<li>Seen in telemetry: yes (201 inbound, 0 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Exploitation indicators</strong> (leads unless marked corroborated)</p>
+<ul>
+<li><span class="ev ev-lead">Lead, not confirmed</span> 10.10.1.10, which is flagged for investigation, newly connected to this vulnerable service at 2026-10-16T04:07:00Z. Check this host for signs of lateral movement.</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P1" title="P1: act now">P1</span> <span class="score">83</span> MS17-010: Security Update for Microsoft Windows SMB Server (ETERNALBLUE)</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.1 × 10 = 81</span><span class="op"></span><span class="f up">×1.1 exploit</span><span class="op"></span><span class="f down">×0.85 exposure</span><span class="op"></span><span class="f ">×1 blast radius</span><span class="op"></span><span class="f up">×1.1 evidence</span><span class="op">=</span><span class="res">83</span><span class="meter m-P1"><i style="width:83%"></i></span><span class="pri pri-P1" title="P1: act now">P1</span></div>
+<ul>
+<li>Plugin 97833, Critical, CVSS 8.1, port 445/tcp (cifs), CVE-2017-0143, CVE-2017-0144, CVE-2017-0145</li>
+<li>Why this score: Base severity: CVSS v3 8.1 (Critical). A public exploit is available (Metasploit). Exposure: vulnerable service reached internally by many hosts - 201 completed sessions from 0 external and 9 internal sources. Traffic gives leads worth investigating; nothing in the logs confirms exploitation.</li>
+<li>Traffic to service: 201 completed, 0 attempts, 0 blocked; first 2026-10-12T01:53:43Z, last 2026-10-18T02:55:10Z; top sources: 10.10.3.44 x25, 10.10.3.45 x25, 10.10.3.41 x25, 10.10.3.47 x25, 10.10.3.40 x25, 10.10.3.46 x25, 10.10.3.43 x25, 10.10.3.42 x25</li>
+<li>Synopsis: The remote Windows host is affected by multiple remote code execution vulnerabilities in SMBv1.</li>
+<li>Remediation: Apply MS17-010 and disable SMBv1.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>No completed internal sessions from this host were observed.</p>
+<h3>ws-040.corp.example (10.10.3.40) - <span class="pri pri-P2" title="P2: this cycle">P2<small>this cycle</small></span></h3>
+<div class="host-tags"></div><details class="blast" open><summary>Blast radius map (5 direct, 5 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.3.40" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<line x1="354" y1="191" x2="480" y2="167" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="417" y="176" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">389/tcp, 88/tcp</text>
+<line x1="349" y1="211" x2="420" y2="270" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="384" y="238" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">53/udp</text>
+<line x1="311" y1="211" x2="240" y2="270" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="276" y="238" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp, 445/tcp</text>
+<line x1="306" y1="191" x2="180" y2="167" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="243" y="176" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">8443/tcp</text>
+<g class="bnode" data-host="10.10.2.25"><title>10.10.2.25 fs01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">fs01</text></g>
+<g class="bnode" data-host="10.10.0.10"><title>10.10.0.10  - 1 hop(s), worst finding none</title><circle cx="496" cy="164" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="496" y="190" text-anchor="middle" class="dg-ink">10.10.0.10</text></g>
+<g class="bnode" data-host="10.10.0.53"><title>10.10.0.53  - 1 hop(s), worst finding none</title><circle cx="433" cy="281" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="433" y="307" text-anchor="middle" class="dg-ink">10.10.0.53</text></g>
+<g class="bnode" data-host="10.10.6.70"><title>10.10.6.70  - 1 hop(s), worst finding none</title><circle cx="227" cy="281" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="227" y="307" text-anchor="middle" class="dg-ink">10.10.6.70</text></g>
+<g class="bnode" data-host="10.10.6.71"><title>10.10.6.71  - 1 hop(s), worst finding none</title><circle cx="164" cy="164" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="164" y="190" text-anchor="middle" class="dg-ink">10.10.6.71</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-High" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">ws-040</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (5). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Microsoft Windows 10 Enterprise</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: yes (0 inbound, 88 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P2" title="P2: this cycle">P2</span> <span class="score">61</span> Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.8 × 10 = 88</span><span class="op"></span><span class="f ">×1 exploit</span><span class="op"></span><span class="f down">×0.5 exposure</span><span class="op"></span><span class="f up">×1.38 blast radius</span><span class="op">=</span><span class="res">61</span><span class="meter m-P2"><i style="width:61%"></i></span><span class="pri pri-P2" title="P2: this cycle">P2</span></div>
+<ul>
+<li>Plugin 207053, High, CVSS 8.8, port host-level, CVE-2024-7965, CVE-2024-7971</li>
+<li>Why this score: Base severity: CVSS v3 8.8 (High). A public exploit is available. Exposure: host is active on the network. Blast radius: the host talks to 5 internal host(s) directly and 5 within 2 hops, including 1 with High/Critical findings.</li>
+<li>Synopsis: The browser installed on the remote host is affected by multiple vulnerabilities.</li>
+<li>Remediation: Upgrade to Microsoft Edge version 129.0.2792.52 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 5 internal host(s) directly, 5 within 2 hops. Lateral-movement protocols used: SMB (29), Kerberos (10), LDAP (10), RDP (9). Reachable hosts with High/Critical findings: 10.10.2.25.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.2.25</td><td>1</td><td>445/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.0.10</td><td>1</td><td>389/tcp, 88/tcp</td><td>-</td></tr>
+<tr><td>10.10.0.53</td><td>1</td><td>53/udp</td><td>-</td></tr>
+<tr><td>10.10.6.70</td><td>1</td><td>3389/tcp, 445/tcp</td><td>-</td></tr>
+<tr><td>10.10.6.71</td><td>1</td><td>8443/tcp</td><td>-</td></tr>
+</table>
+<p>Outbound to 23 external address(es); top: 93.184.254.146 x1, 93.184.34.189 x1, 93.184.24.67 x1, 93.184.108.144 x1, 93.184.146.48 x1.</p>
+<h3>ws-041.corp.example (10.10.3.41) - <span class="pri pri-P2" title="P2: this cycle">P2<small>this cycle</small></span></h3>
+<div class="host-tags"></div><details class="blast" open><summary>Blast radius map (4 direct, 4 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.3.41" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<line x1="354" y1="196" x2="488" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="421" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">389/tcp, 88/tcp</text>
+<line x1="330" y1="220" x2="330" y2="284" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="249" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">53/udp</text>
+<line x1="306" y1="196" x2="172" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="239" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp, 445/tcp</text>
+<g class="bnode" data-host="10.10.2.25"><title>10.10.2.25 fs01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">fs01</text></g>
+<g class="bnode" data-host="10.10.0.10"><title>10.10.0.10  - 1 hop(s), worst finding none</title><circle cx="505" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="505" y="222" text-anchor="middle" class="dg-ink">10.10.0.10</text></g>
+<g class="bnode" data-host="10.10.0.53"><title>10.10.0.53  - 1 hop(s), worst finding none</title><circle cx="330" cy="301" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="330" y="327" text-anchor="middle" class="dg-ink">10.10.0.53</text></g>
+<g class="bnode" data-host="10.10.6.70"><title>10.10.6.70  - 1 hop(s), worst finding none</title><circle cx="155" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="155" y="222" text-anchor="middle" class="dg-ink">10.10.6.70</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-High" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">ws-041</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (4). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Microsoft Windows 10 Enterprise</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: yes (0 inbound, 81 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P2" title="P2: this cycle">P2</span> <span class="score">59</span> Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.8 × 10 = 88</span><span class="op"></span><span class="f ">×1 exploit</span><span class="op"></span><span class="f down">×0.5 exposure</span><span class="op"></span><span class="f up">×1.34 blast radius</span><span class="op">=</span><span class="res">59</span><span class="meter m-P2"><i style="width:59%"></i></span><span class="pri pri-P2" title="P2: this cycle">P2</span></div>
+<ul>
+<li>Plugin 207053, High, CVSS 8.8, port host-level, CVE-2024-7965, CVE-2024-7971</li>
+<li>Why this score: Base severity: CVSS v3 8.8 (High). A public exploit is available. Exposure: host is active on the network. Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings.</li>
+<li>Synopsis: The browser installed on the remote host is affected by multiple vulnerabilities.</li>
+<li>Remediation: Upgrade to Microsoft Edge version 129.0.2792.52 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 4 internal host(s) directly, 4 within 2 hops. Lateral-movement protocols used: SMB (27), LDAP (10), Kerberos (10), RDP (7). Reachable hosts with High/Critical findings: 10.10.2.25.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.2.25</td><td>1</td><td>445/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.0.10</td><td>1</td><td>389/tcp, 88/tcp</td><td>-</td></tr>
+<tr><td>10.10.0.53</td><td>1</td><td>53/udp</td><td>-</td></tr>
+<tr><td>10.10.6.70</td><td>1</td><td>3389/tcp, 445/tcp</td><td>-</td></tr>
+</table>
+<p>Outbound to 20 external address(es); top: 93.184.150.65 x1, 93.184.177.121 x1, 93.184.251.202 x1, 93.184.143.53 x1, 93.184.92.207 x1.</p>
+<h3>ws-042.corp.example (10.10.3.42) - <span class="pri pri-P2" title="P2: this cycle">P2<small>this cycle</small></span></h3>
+<div class="host-tags"></div><details class="blast" open><summary>Blast radius map (4 direct, 4 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.3.42" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<line x1="354" y1="196" x2="488" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="421" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">389/tcp, 88/tcp</text>
+<line x1="330" y1="220" x2="330" y2="284" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="249" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">53/udp</text>
+<line x1="306" y1="196" x2="172" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="239" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp, 445/tcp</text>
+<g class="bnode" data-host="10.10.2.25"><title>10.10.2.25 fs01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">fs01</text></g>
+<g class="bnode" data-host="10.10.0.10"><title>10.10.0.10  - 1 hop(s), worst finding none</title><circle cx="505" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="505" y="222" text-anchor="middle" class="dg-ink">10.10.0.10</text></g>
+<g class="bnode" data-host="10.10.0.53"><title>10.10.0.53  - 1 hop(s), worst finding none</title><circle cx="330" cy="301" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="330" y="327" text-anchor="middle" class="dg-ink">10.10.0.53</text></g>
+<g class="bnode" data-host="10.10.6.70"><title>10.10.6.70  - 1 hop(s), worst finding none</title><circle cx="155" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="155" y="222" text-anchor="middle" class="dg-ink">10.10.6.70</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-High" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">ws-042</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (4). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Microsoft Windows 10 Enterprise</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: yes (0 inbound, 98 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P2" title="P2: this cycle">P2</span> <span class="score">59</span> Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.8 × 10 = 88</span><span class="op"></span><span class="f ">×1 exploit</span><span class="op"></span><span class="f down">×0.5 exposure</span><span class="op"></span><span class="f up">×1.34 blast radius</span><span class="op">=</span><span class="res">59</span><span class="meter m-P2"><i style="width:59%"></i></span><span class="pri pri-P2" title="P2: this cycle">P2</span></div>
+<ul>
+<li>Plugin 207053, High, CVSS 8.8, port host-level, CVE-2024-7965, CVE-2024-7971</li>
+<li>Why this score: Base severity: CVSS v3 8.8 (High). A public exploit is available. Exposure: host is active on the network. Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings.</li>
+<li>Synopsis: The browser installed on the remote host is affected by multiple vulnerabilities.</li>
+<li>Remediation: Upgrade to Microsoft Edge version 129.0.2792.52 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 4 internal host(s) directly, 4 within 2 hops. Lateral-movement protocols used: SMB (35), Kerberos (10), LDAP (10), RDP (5). Reachable hosts with High/Critical findings: 10.10.2.25.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.2.25</td><td>1</td><td>445/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.0.10</td><td>1</td><td>389/tcp, 88/tcp</td><td>-</td></tr>
+<tr><td>10.10.0.53</td><td>1</td><td>53/udp</td><td>-</td></tr>
+<tr><td>10.10.6.70</td><td>1</td><td>3389/tcp, 445/tcp</td><td>-</td></tr>
+</table>
+<p>Outbound to 24 external address(es); top: 93.184.29.234 x1, 93.184.193.22 x1, 93.184.242.127 x1, 93.184.42.55 x1, 93.184.154.188 x1.</p>
+<h3>ws-043.corp.example (10.10.3.43) - <span class="pri pri-P2" title="P2: this cycle">P2<small>this cycle</small></span></h3>
+<div class="host-tags"></div><details class="blast" open><summary>Blast radius map (4 direct, 4 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.3.43" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<line x1="354" y1="196" x2="488" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="421" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">389/tcp, 88/tcp</text>
+<line x1="330" y1="220" x2="330" y2="284" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="249" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">53/udp</text>
+<line x1="306" y1="196" x2="172" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="239" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp, 445/tcp</text>
+<g class="bnode" data-host="10.10.2.25"><title>10.10.2.25 fs01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">fs01</text></g>
+<g class="bnode" data-host="10.10.0.10"><title>10.10.0.10  - 1 hop(s), worst finding none</title><circle cx="505" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="505" y="222" text-anchor="middle" class="dg-ink">10.10.0.10</text></g>
+<g class="bnode" data-host="10.10.0.53"><title>10.10.0.53  - 1 hop(s), worst finding none</title><circle cx="330" cy="301" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="330" y="327" text-anchor="middle" class="dg-ink">10.10.0.53</text></g>
+<g class="bnode" data-host="10.10.6.70"><title>10.10.6.70  - 1 hop(s), worst finding none</title><circle cx="155" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="155" y="222" text-anchor="middle" class="dg-ink">10.10.6.70</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-High" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">ws-043</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (4). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Microsoft Windows 10 Enterprise</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: yes (0 inbound, 73 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P2" title="P2: this cycle">P2</span> <span class="score">59</span> Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.8 × 10 = 88</span><span class="op"></span><span class="f ">×1 exploit</span><span class="op"></span><span class="f down">×0.5 exposure</span><span class="op"></span><span class="f up">×1.34 blast radius</span><span class="op">=</span><span class="res">59</span><span class="meter m-P2"><i style="width:59%"></i></span><span class="pri pri-P2" title="P2: this cycle">P2</span></div>
+<ul>
+<li>Plugin 207053, High, CVSS 8.8, port host-level, CVE-2024-7965, CVE-2024-7971</li>
+<li>Why this score: Base severity: CVSS v3 8.8 (High). A public exploit is available. Exposure: host is active on the network. Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings.</li>
+<li>Synopsis: The browser installed on the remote host is affected by multiple vulnerabilities.</li>
+<li>Remediation: Upgrade to Microsoft Edge version 129.0.2792.52 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 4 internal host(s) directly, 4 within 2 hops. Lateral-movement protocols used: SMB (28), Kerberos (10), LDAP (10), RDP (4). Reachable hosts with High/Critical findings: 10.10.2.25.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.2.25</td><td>1</td><td>445/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.0.10</td><td>1</td><td>389/tcp, 88/tcp</td><td>-</td></tr>
+<tr><td>10.10.0.53</td><td>1</td><td>53/udp</td><td>-</td></tr>
+<tr><td>10.10.6.70</td><td>1</td><td>3389/tcp, 445/tcp</td><td>-</td></tr>
+</table>
+<p>Outbound to 15 external address(es); top: 93.184.95.199 x1, 93.184.73.235 x1, 93.184.57.9 x1, 93.184.186.111 x1, 93.184.157.203 x1.</p>
+<h3>ws-044.corp.example (10.10.3.44) - <span class="pri pri-P2" title="P2: this cycle">P2<small>this cycle</small></span></h3>
+<div class="host-tags"></div><details class="blast" open><summary>Blast radius map (4 direct, 4 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.3.44" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<line x1="354" y1="196" x2="488" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="421" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">389/tcp, 88/tcp</text>
+<line x1="330" y1="220" x2="330" y2="284" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="249" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">53/udp</text>
+<line x1="306" y1="196" x2="172" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="239" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp, 445/tcp</text>
+<g class="bnode" data-host="10.10.2.25"><title>10.10.2.25 fs01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">fs01</text></g>
+<g class="bnode" data-host="10.10.0.10"><title>10.10.0.10  - 1 hop(s), worst finding none</title><circle cx="505" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="505" y="222" text-anchor="middle" class="dg-ink">10.10.0.10</text></g>
+<g class="bnode" data-host="10.10.0.53"><title>10.10.0.53  - 1 hop(s), worst finding none</title><circle cx="330" cy="301" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="330" y="327" text-anchor="middle" class="dg-ink">10.10.0.53</text></g>
+<g class="bnode" data-host="10.10.6.70"><title>10.10.6.70  - 1 hop(s), worst finding none</title><circle cx="155" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="155" y="222" text-anchor="middle" class="dg-ink">10.10.6.70</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-High" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">ws-044</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (4). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Microsoft Windows 10 Enterprise</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: yes (0 inbound, 76 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P2" title="P2: this cycle">P2</span> <span class="score">59</span> Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.8 × 10 = 88</span><span class="op"></span><span class="f ">×1 exploit</span><span class="op"></span><span class="f down">×0.5 exposure</span><span class="op"></span><span class="f up">×1.34 blast radius</span><span class="op">=</span><span class="res">59</span><span class="meter m-P2"><i style="width:59%"></i></span><span class="pri pri-P2" title="P2: this cycle">P2</span></div>
+<ul>
+<li>Plugin 207053, High, CVSS 8.8, port host-level, CVE-2024-7965, CVE-2024-7971</li>
+<li>Why this score: Base severity: CVSS v3 8.8 (High). A public exploit is available. Exposure: host is active on the network. Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings.</li>
+<li>Synopsis: The browser installed on the remote host is affected by multiple vulnerabilities.</li>
+<li>Remediation: Upgrade to Microsoft Edge version 129.0.2792.52 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 4 internal host(s) directly, 4 within 2 hops. Lateral-movement protocols used: SMB (32), LDAP (10), Kerberos (10), RDP (3). Reachable hosts with High/Critical findings: 10.10.2.25.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.2.25</td><td>1</td><td>445/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.0.10</td><td>1</td><td>389/tcp, 88/tcp</td><td>-</td></tr>
+<tr><td>10.10.0.53</td><td>1</td><td>53/udp</td><td>-</td></tr>
+<tr><td>10.10.6.70</td><td>1</td><td>3389/tcp, 445/tcp</td><td>-</td></tr>
+</table>
+<p>Outbound to 15 external address(es); top: 93.184.212.230 x1, 93.184.79.186 x1, 93.184.24.184 x1, 93.184.199.32 x1, 93.184.176.250 x1.</p>
+<h3>ws-045.corp.example (10.10.3.45) - <span class="pri pri-P2" title="P2: this cycle">P2<small>this cycle</small></span></h3>
+<div class="host-tags"></div><details class="blast" open><summary>Blast radius map (4 direct, 4 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.3.45" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<line x1="354" y1="196" x2="488" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="421" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">389/tcp, 88/tcp</text>
+<line x1="330" y1="220" x2="330" y2="284" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="249" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">53/udp</text>
+<line x1="306" y1="196" x2="172" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="239" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp, 445/tcp</text>
+<g class="bnode" data-host="10.10.2.25"><title>10.10.2.25 fs01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">fs01</text></g>
+<g class="bnode" data-host="10.10.0.10"><title>10.10.0.10  - 1 hop(s), worst finding none</title><circle cx="505" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="505" y="222" text-anchor="middle" class="dg-ink">10.10.0.10</text></g>
+<g class="bnode" data-host="10.10.0.53"><title>10.10.0.53  - 1 hop(s), worst finding none</title><circle cx="330" cy="301" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="330" y="327" text-anchor="middle" class="dg-ink">10.10.0.53</text></g>
+<g class="bnode" data-host="10.10.6.70"><title>10.10.6.70  - 1 hop(s), worst finding none</title><circle cx="155" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="155" y="222" text-anchor="middle" class="dg-ink">10.10.6.70</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-High" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">ws-045</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (4). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Microsoft Windows 10 Enterprise</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: yes (0 inbound, 81 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P2" title="P2: this cycle">P2</span> <span class="score">59</span> Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.8 × 10 = 88</span><span class="op"></span><span class="f ">×1 exploit</span><span class="op"></span><span class="f down">×0.5 exposure</span><span class="op"></span><span class="f up">×1.34 blast radius</span><span class="op">=</span><span class="res">59</span><span class="meter m-P2"><i style="width:59%"></i></span><span class="pri pri-P2" title="P2: this cycle">P2</span></div>
+<ul>
+<li>Plugin 207053, High, CVSS 8.8, port host-level, CVE-2024-7965, CVE-2024-7971</li>
+<li>Why this score: Base severity: CVSS v3 8.8 (High). A public exploit is available. Exposure: host is active on the network. Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings.</li>
+<li>Synopsis: The browser installed on the remote host is affected by multiple vulnerabilities.</li>
+<li>Remediation: Upgrade to Microsoft Edge version 129.0.2792.52 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 4 internal host(s) directly, 4 within 2 hops. Lateral-movement protocols used: SMB (30), Kerberos (10), LDAP (10), RDP (6). Reachable hosts with High/Critical findings: 10.10.2.25.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.2.25</td><td>1</td><td>445/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.0.10</td><td>1</td><td>389/tcp, 88/tcp</td><td>-</td></tr>
+<tr><td>10.10.0.53</td><td>1</td><td>53/udp</td><td>-</td></tr>
+<tr><td>10.10.6.70</td><td>1</td><td>3389/tcp, 445/tcp</td><td>-</td></tr>
+</table>
+<p>Outbound to 19 external address(es); top: 93.184.224.121 x1, 93.184.243.41 x1, 93.184.14.6 x1, 93.184.172.109 x1, 93.184.74.93 x1.</p>
+<h3>ws-046.corp.example (10.10.3.46) - <span class="pri pri-P2" title="P2: this cycle">P2<small>this cycle</small></span></h3>
+<div class="host-tags"></div><details class="blast" open><summary>Blast radius map (4 direct, 4 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.3.46" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<line x1="354" y1="196" x2="488" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="421" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">389/tcp, 88/tcp</text>
+<line x1="330" y1="220" x2="330" y2="284" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="249" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">53/udp</text>
+<line x1="306" y1="196" x2="172" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="239" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp</text>
+<g class="bnode" data-host="10.10.2.25"><title>10.10.2.25 fs01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">fs01</text></g>
+<g class="bnode" data-host="10.10.0.10"><title>10.10.0.10  - 1 hop(s), worst finding none</title><circle cx="505" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="505" y="222" text-anchor="middle" class="dg-ink">10.10.0.10</text></g>
+<g class="bnode" data-host="10.10.0.53"><title>10.10.0.53  - 1 hop(s), worst finding none</title><circle cx="330" cy="301" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="330" y="327" text-anchor="middle" class="dg-ink">10.10.0.53</text></g>
+<g class="bnode" data-host="10.10.6.70"><title>10.10.6.70  - 1 hop(s), worst finding none</title><circle cx="155" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="155" y="222" text-anchor="middle" class="dg-ink">10.10.6.70</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-High" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">ws-046</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (4). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Microsoft Windows 10 Enterprise</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: yes (0 inbound, 76 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P2" title="P2: this cycle">P2</span> <span class="score">59</span> Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.8 × 10 = 88</span><span class="op"></span><span class="f ">×1 exploit</span><span class="op"></span><span class="f down">×0.5 exposure</span><span class="op"></span><span class="f up">×1.34 blast radius</span><span class="op">=</span><span class="res">59</span><span class="meter m-P2"><i style="width:59%"></i></span><span class="pri pri-P2" title="P2: this cycle">P2</span></div>
+<ul>
+<li>Plugin 207053, High, CVSS 8.8, port host-level, CVE-2024-7965, CVE-2024-7971</li>
+<li>Why this score: Base severity: CVSS v3 8.8 (High). A public exploit is available. Exposure: host is active on the network. Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings.</li>
+<li>Synopsis: The browser installed on the remote host is affected by multiple vulnerabilities.</li>
+<li>Remediation: Upgrade to Microsoft Edge version 129.0.2792.52 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 4 internal host(s) directly, 4 within 2 hops. Lateral-movement protocols used: SMB (25), Kerberos (10), LDAP (10), RDP (8). Reachable hosts with High/Critical findings: 10.10.2.25.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.2.25</td><td>1</td><td>445/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.0.10</td><td>1</td><td>389/tcp, 88/tcp</td><td>-</td></tr>
+<tr><td>10.10.0.53</td><td>1</td><td>53/udp</td><td>-</td></tr>
+<tr><td>10.10.6.70</td><td>1</td><td>3389/tcp</td><td>-</td></tr>
+</table>
+<p>Outbound to 17 external address(es); top: 93.184.223.178 x1, 93.184.85.157 x1, 93.184.64.87 x1, 93.184.247.117 x1, 93.184.80.151 x1.</p>
+<h3>ws-047.corp.example (10.10.3.47) - <span class="pri pri-P2" title="P2: this cycle">P2<small>this cycle</small></span></h3>
+<div class="host-tags"></div><details class="blast" open><summary>Blast radius map (4 direct, 4 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.3.47" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">445/tcp</text>
+<line x1="354" y1="196" x2="488" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="421" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">389/tcp, 88/tcp</text>
+<line x1="330" y1="220" x2="330" y2="284" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="249" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">53/udp</text>
+<line x1="306" y1="196" x2="172" y2="196" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="239" y="193" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp, 445/tcp</text>
+<g class="bnode" data-host="10.10.2.25"><title>10.10.2.25 fs01.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">fs01</text></g>
+<g class="bnode" data-host="10.10.0.10"><title>10.10.0.10  - 1 hop(s), worst finding none</title><circle cx="505" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="505" y="222" text-anchor="middle" class="dg-ink">10.10.0.10</text></g>
+<g class="bnode" data-host="10.10.0.53"><title>10.10.0.53  - 1 hop(s), worst finding none</title><circle cx="330" cy="301" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="330" y="327" text-anchor="middle" class="dg-ink">10.10.0.53</text></g>
+<g class="bnode" data-host="10.10.6.70"><title>10.10.6.70  - 1 hop(s), worst finding none</title><circle cx="155" cy="196" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="155" y="222" text-anchor="middle" class="dg-ink">10.10.6.70</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-High" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">ws-047</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (4). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Microsoft Windows 10 Enterprise</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: yes (0 inbound, 75 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P2" title="P2: this cycle">P2</span> <span class="score">59</span> Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.8 × 10 = 88</span><span class="op"></span><span class="f ">×1 exploit</span><span class="op"></span><span class="f down">×0.5 exposure</span><span class="op"></span><span class="f up">×1.34 blast radius</span><span class="op">=</span><span class="res">59</span><span class="meter m-P2"><i style="width:59%"></i></span><span class="pri pri-P2" title="P2: this cycle">P2</span></div>
+<ul>
+<li>Plugin 207053, High, CVSS 8.8, port host-level, CVE-2024-7965, CVE-2024-7971</li>
+<li>Why this score: Base severity: CVSS v3 8.8 (High). A public exploit is available. Exposure: host is active on the network. Blast radius: the host talks to 4 internal host(s) directly and 4 within 2 hops, including 1 with High/Critical findings.</li>
+<li>Synopsis: The browser installed on the remote host is affected by multiple vulnerabilities.</li>
+<li>Remediation: Upgrade to Microsoft Edge version 129.0.2792.52 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 4 internal host(s) directly, 4 within 2 hops. Lateral-movement protocols used: SMB (30), LDAP (10), Kerberos (10), RDP (2). Reachable hosts with High/Critical findings: 10.10.2.25.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.2.25</td><td>1</td><td>445/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.0.10</td><td>1</td><td>389/tcp, 88/tcp</td><td>-</td></tr>
+<tr><td>10.10.0.53</td><td>1</td><td>53/udp</td><td>-</td></tr>
+<tr><td>10.10.6.70</td><td>1</td><td>3389/tcp, 445/tcp</td><td>-</td></tr>
+</table>
+<p>Outbound to 17 external address(es); top: 93.184.191.222 x1, 93.184.59.143 x1, 93.184.89.58 x1, 93.184.108.230 x1, 93.184.67.66 x1.</p>
+<h3>db01.corp.example (10.10.2.20) - <span class="pri pri-P3" title="P3: scheduled">P3<small>scheduled</small></span></h3>
+<div class="host-tags"></div><details class="blast"><summary>Blast radius map (1 direct, 1 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.2.20" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">8443/tcp</text>
+<g class="bnode" data-host="10.10.6.71"><title>10.10.6.71  - 1 hop(s), worst finding none</title><circle cx="330" cy="91" r="13" class="dg-box sev-none" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">10.10.6.71</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-High" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">db01</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (1). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Linux Kernel 5.15 on Ubuntu 22.04</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: yes (170 inbound, 30 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P3" title="P3: scheduled">P3</span> <span class="score">45</span> PostgreSQL 13.x &lt; 13.13 Multiple Vulnerabilities</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 8.8 × 10 = 88</span><span class="op"></span><span class="f down">×0.65 exploit</span><span class="op"></span><span class="f down">×0.75 exposure</span><span class="op"></span><span class="f up">×1.04 blast radius</span><span class="op">=</span><span class="res">45</span><span class="meter m-P3"><i style="width:45%"></i></span><span class="pri pri-P3" title="P3: scheduled">P3</span></div>
+<ul>
+<li>Plugin 183965, High, CVSS 8.8, port 5432/tcp (postgresql), CVE-2023-5868, CVE-2023-5869, CVE-2023-5870</li>
+<li>Why this score: Base severity: CVSS v3 8.8 (High). No public exploit is known to the scanner. Exposure: vulnerable service reached internally - 140 completed sessions from 0 external and 1 internal sources. Blast radius: the host talks to 1 internal host(s) directly and 1 within 2 hops.</li>
+<li>Traffic to service: 140 completed, 0 attempts, 0 blocked; first 2026-10-12T00:34:43Z, last 2026-10-18T02:23:17Z; top sources: 10.10.1.20 x140</li>
+<li>Synopsis: The database server is affected by multiple vulnerabilities including an integer overflow.</li>
+<li>Remediation: Upgrade to PostgreSQL 13.13 or later.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 1 internal host(s) directly, 1 within 2 hops.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.6.71</td><td>1</td><td>8443/tcp</td><td>-</td></tr>
+</table>
+<h3>ups-mgmt.corp.example (10.10.5.60) - <span class="pri pri-P3" title="P3: scheduled">P3<small>scheduled</small></span></h3>
+<div class="host-tags"></div>
+<ul>
+<li>Operating system: Embedded Linux</li>
+<li>Findings: 1 High</li>
+<li>Seen in telemetry: no (0 inbound, 0 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P3" title="P3: scheduled">P3</span> <span class="score">38</span> SNMP Agent Default Community Name (public)</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 7.5 × 10 = 75</span><span class="op"></span><span class="f ">×1 exploit</span><span class="op"></span><span class="f down">×0.5 exposure</span><span class="op"></span><span class="f ">×1 blast radius</span><span class="op">=</span><span class="res">38</span><span class="meter m-P3"><i style="width:38%"></i></span><span class="pri pri-P3" title="P3: scheduled">P3</span></div>
+<ul>
+<li>Plugin 41028, High, CVSS 7.5, port 161/udp (snmp), CVE-1999-0517</li>
+<li>Why this score: Base severity: CVSS v3 7.5 (High). A public exploit is available. Exposure: no telemetry for this host (unknown).</li>
+<li>Synopsis: The community name of the remote SNMP server can be guessed.</li>
+<li>Remediation: Disable SNMP or change the default community string.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>No completed internal sessions from this host were observed.</p>
+<h3>prn-4f.corp.example (10.10.4.50) - <span class="pri pri-P4" title="P4: routine">P4<small>routine</small></span></h3>
+<div class="host-tags"></div>
+<ul>
+<li>Operating system: HP LaserJet</li>
+<li>Findings: 1 Medium</li>
+<li>Seen in telemetry: yes (8 inbound, 0 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P4" title="P4: routine">P4</span> <span class="score">13</span> Unencrypted Telnet Server</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 6.5 × 10 = 65</span><span class="op"></span><span class="f down">×0.65 exploit</span><span class="op"></span><span class="f down">×0.3 exposure</span><span class="op"></span><span class="f ">×1 blast radius</span><span class="op">=</span><span class="res">13</span><span class="meter m-P4"><i style="width:13%"></i></span><span class="pri pri-P4" title="P4: routine">P4</span></div>
+<ul>
+<li>Plugin 42263, Medium, CVSS 6.5, port 23/tcp (telnet)</li>
+<li>Why this score: Base severity: CVSS v3 6.5 (Medium). No public exploit is known to the scanner. Exposure: service not observed in use.</li>
+<li>Synopsis: The remote Telnet server transmits traffic in cleartext.</li>
+<li>Remediation: Disable Telnet and use SSH instead.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>No completed internal sessions from this host were observed.</p>
+<h3>jump01.corp.example (10.10.3.5) - <span class="pri pri-P4" title="P4: routine">P4<small>routine</small></span></h3>
+<div class="host-tags"></div><details class="blast"><summary>Blast radius map (2 direct, 3 within reach)</summary><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg blast" viewBox="0 0 660 380" width="660" height="380" role="img" aria-label="Blast radius of 10.10.3.5" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+<defs><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker></defs>
+<rect class="dg-bg" width="660" height="380" rx="8"/>
+<line x1="330" y1="172" x2="330" y2="108" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="137" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">3389/tcp</text>
+<line x1="330" y1="220" x2="330" y2="284" class="edge-line e-onward" stroke-width="1" opacity="0.55"/>
+<text x="330" y="249" text-anchor="middle" font-size="10" class="dg-halo dg-ink2">22/tcp</text>
+<g class="bnode" data-host="10.10.3.31"><title>10.10.3.31 ws-031.corp.example - 1 hop(s), worst finding Critical</title><circle cx="330" cy="91" r="13" class="dg-box sev-Critical" stroke-width="2.5"/><text x="330" y="117" text-anchor="middle" class="dg-ink">ws-031</text></g>
+<g class="bnode" data-host="10.10.2.20"><title>10.10.2.20 db01.corp.example - 1 hop(s), worst finding High</title><circle cx="330" cy="301" r="13" class="dg-box sev-High" stroke-width="2.5"/><text x="330" y="327" text-anchor="middle" class="dg-ink">db01</text></g>
+<g class="bnode" data-host="10.10.6.71"><title>10.10.6.71  - 2 hop(s), worst finding none</title><circle cx="416" cy="43" r="9" class="dg-box sev-none" stroke-width="1.5" stroke-dasharray="3 2"/><text x="416" y="65" text-anchor="middle" class="dg-ink2">10.10.6.71</text></g>
+<circle cx="330.0" cy="196.0" r="24" class="dg-box src sev-Medium" stroke-width="3.5"/><text x="330.0" y="200.0" text-anchor="middle" font-weight="700" class="dg-ink">jump01</text>
+<text x="14" y="22" class="dg-ink2">Inner ring: direct peers (2). Outer ring: 2 hops away.</text>
+</svg></div></details>
+<ul>
+<li>Operating system: Microsoft Windows Server 2019</li>
+<li>Findings: 1 Medium</li>
+<li>Seen in telemetry: yes (0 inbound, 60 outbound sessions)</li>
+<li>Internet-exposed vulnerable service: no</li>
+</ul>
+<p><strong>Findings and exposure evidence</strong></p>
+<h4><span class="pri pri-P4" title="P4: routine">P4</span> <span class="score">11</span> Terminal Services Doesn't Use Network Level Authentication (NLA) Only</h4>
+<div class="why" aria-label="Score breakdown"><span class="f ">CVSS 4.0 × 10 = 40</span><span class="op"></span><span class="f down">×0.65 exploit</span><span class="op"></span><span class="f down">×0.3 exposure</span><span class="op"></span><span class="f up">×1.36 blast radius</span><span class="op">=</span><span class="res">11</span><span class="meter m-P4"><i style="width:11%"></i></span><span class="pri pri-P4" title="P4: routine">P4</span></div>
+<ul>
+<li>Plugin 58453, Medium, CVSS 4.0, port 3389/tcp (msrdp)</li>
+<li>Why this score: Base severity: CVSS v3 4.0 (Medium). No public exploit is known to the scanner. Exposure: service not observed in use. Blast radius: the host talks to 2 internal host(s) directly and 3 within 2 hops, including 2 with High/Critical findings.</li>
+<li>Synopsis: The remote Terminal Services doesn't use NLA only.</li>
+<li>Remediation: Enable Network Level Authentication.</li>
+</ul>
+<p><strong>Blast radius</strong></p>
+<p>Completed sessions to 2 internal host(s) directly, 3 within 2 hops. Lateral-movement protocols used: SSH (30), RDP (30). Reachable hosts with High/Critical findings: 10.10.3.31, 10.10.2.20.</p>
+<table><tr><th>Reachable host</th><th>Hops</th><th>Ports used</th><th>Worst finding</th></tr>
+<tr><td>10.10.3.31</td><td>1</td><td>3389/tcp</td><td>Critical</td></tr>
+<tr><td>10.10.2.20</td><td>1</td><td>22/tcp</td><td>High</td></tr>
+<tr><td>10.10.6.71</td><td>2</td><td></td><td>-</td></tr>
+</table>
+<h2>5. Coverage gaps</h2>
+<p>15 of 16 scanned hosts appear in telemetry; 19 internal addresses were seen in total.</p>
+<p><strong>Scanned but not seen in telemetry</strong> (exposure unknown; check sensor placement): 10.10.5.60</p>
+<p><strong>Active internal servers not in the scan</strong> (add to scan scope):</p>
+<table><tr><th>Host</th><th>Services observed</th><th>Sessions</th></tr>
+<tr><td>10.10.0.10</td><td>389/tcp, 88/tcp</td><td>160</td></tr>
+<tr><td>10.10.0.53</td><td>53/udp</td><td>88</td></tr>
+<tr><td>10.10.6.70</td><td>3389/tcp, 445/tcp</td><td>81</td></tr>
+<tr><td>10.10.6.71</td><td>8443/tcp</td><td>31</td></tr>
+</table>
+<h2>6. Output files</h2>
+<ul>
+<li><code>executive_summary.md/.html</code>: leadership summary</li>
+<li><code>technical_report.md/.html</code>: this report</li>
+<li><code>correlated_findings.csv</code>: one row per finding with scores, for ticketing or spreadsheets</li>
+<li><code>results.json</code>: full machine-readable result</li>
+<li><code>hostile_activity.svg</code>: the hostile activity diagram as a standalone image</li>
+<li><code>explorer.html</code>: interactive host explorer (who targets each host, and its internal blast radius)</li>
+<li><code>normalized/flows.csv</code>, <code>normalized/findings.csv</code>: cleaned inputs in the common schema</li>
+<li><code>normalized/zeek_events.jsonl</code>: other Zeek streams with stream identity and source fields</li>
+<li><code>normalized/ot_events.jsonl</code>: industrial protocol records with operation and message direction</li>
+</ul><script>
+(function(){
+const table=document.querySelector('table.findings');
+const svg=document.querySelector('svg.dg:not(.blast)');
+const note=document.querySelector('.focus-note');
+let filterPri='all', filterHost='', query='';
+function apply(){
+  if(!table)return;let n=0;
+  table.querySelectorAll('tbody tr').forEach(tr=>{
+    const ok=(filterPri==='all'||tr.dataset.pri===filterPri)&&(!filterHost||tr.dataset.host===filterHost)
+      &&(!query||tr.textContent.toLowerCase().includes(query));
+    tr.hidden=!ok;if(ok)n++;});
+  const c=document.querySelector('.ftools .count');if(c)c.textContent=n+' shown';
+}
+function focusHost(host,fid){
+  if(svg){
+    const nodes=svg.querySelectorAll('.node'),edges=svg.querySelectorAll('.edge');
+    if(!host){nodes.forEach(x=>x.classList.remove('dg-dim','dg-focus'));edges.forEach(x=>x.classList.remove('dg-dim'));}
+    else{
+      const linked=new Set([host]);
+      edges.forEach(e=>{const on=fid?(e.dataset.findings||'').split(' ').includes(fid)
+          :(e.dataset.src===host||e.dataset.dst===host);
+        e.classList.toggle('dg-dim',!on);if(on){linked.add(e.dataset.src);linked.add(e.dataset.dst);}});
+      nodes.forEach(nd=>{nd.classList.toggle('dg-dim',!linked.has(nd.dataset.host));
+        nd.classList.toggle('dg-focus',nd.dataset.host===host);});
+    }
+  }
+  if(note){note.innerHTML='';if(host){note.append('Focused on '+host+'. ');
+    const b=document.createElement('button');b.type='button';b.textContent='Clear focus';
+    b.onclick=()=>{filterHost='';focusHost('');apply();table&&table.querySelectorAll('tr.sel').forEach(r=>r.classList.remove('sel'));};
+    note.append(b);}}
+}
+if(svg)svg.querySelectorAll('.node').forEach(nd=>{
+  const go=()=>{const h=nd.dataset.host;if(h==='internet')return;
+    filterHost=(filterHost===h)?'':h;focusHost(filterHost);apply();};
+  nd.addEventListener('click',go);nd.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});
+});
+if(table){
+  table.querySelectorAll('tbody tr').forEach(tr=>tr.addEventListener('click',()=>{
+    const was=tr.classList.contains('sel');
+    table.querySelectorAll('tr.sel').forEach(r=>r.classList.remove('sel'));
+    if(was){focusHost('');return;}
+    tr.classList.add('sel');focusHost(tr.dataset.host,tr.dataset.fid);
+    if(svg){const r=svg.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)svg.scrollIntoView({behavior:'smooth',block:'center'});}
+  }));
+  document.querySelectorAll('.ftools button[data-pri]').forEach(b=>b.addEventListener('click',()=>{
+    filterPri=b.dataset.pri;document.querySelectorAll('.ftools button[data-pri]').forEach(x=>x.setAttribute('aria-pressed',x===b));apply();}));
+  const q=document.querySelector('.ftools input');if(q)q.addEventListener('input',()=>{query=q.value.trim().toLowerCase();apply();});
+  table.querySelectorAll('th').forEach((th,i)=>th.addEventListener('click',()=>{
+    const dir=th.getAttribute('aria-sort')==='ascending'?'descending':'ascending';
+    table.querySelectorAll('th').forEach(x=>x.removeAttribute('aria-sort'));th.setAttribute('aria-sort',dir);
+    const rows=[...table.tBodies[0].rows];
+    const key=r=>{const c=r.cells[i];return c.dataset.sort!==undefined?c.dataset.sort:c.textContent.trim().toLowerCase();};
+    rows.sort((a,b)=>{const x=key(a),y=key(b),nx=parseFloat(x),ny=parseFloat(y);
+      const d=(!isNaN(nx)&&!isNaN(ny))?nx-ny:x.localeCompare(y);return dir==='ascending'?d:-d;});
+    rows.forEach(r=>table.tBodies[0].append(r));}));
+  apply();
+}
+window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));
+})();
+</script></body></html>
