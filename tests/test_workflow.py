@@ -235,7 +235,7 @@ class EndToEndTests(Base):
             result = json.load(fh)
         self.assertEqual(result["summary"]["ot_protocol_counts"], {"Modbus": 1})
         self.assertEqual(result["summary"]["zeek_event_counts"], {"dns": 1, "modbus": 1, "smtp": 1})
-        self.assertEqual(result["summary"]["flows"], 1352)
+        self.assertEqual(result["summary"]["flows"], 9764)
         self.assertEqual(len(result["inputs"]), len(self.samples) + 3)
         with open(os.path.join(out, "normalized", "ot_events.jsonl")) as fh:
             event = json.loads(fh.readline())

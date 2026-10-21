@@ -1,9 +1,214 @@
 host_ip,hostname,os,port,proto,service,plugin_id,plugin_name,severity,cvss,cvss_version,cves,exploit_available,exploit_frameworks,source
 10.10.1.10,web01.corp.example,Linux Kernel 5.4 on Ubuntu 20.04,443,tcp,www,153884,Apache 2.4.49 < 2.4.51 Path Traversal and RCE,4,9.8,3,CVE-2021-41773 CVE-2021-42013,True,Metasploit,quarterly_scan.nessus
 10.10.1.20,app01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8009,tcp,ajp13,134862,Apache Tomcat AJP Connector Request Injection (Ghostcat),4,9.8,3,CVE-2020-1938,True,Metasploit,quarterly_scan.nessus
+10.10.1.30,vpn01.corp.example,Ivanti Connect Secure 22.3,443,tcp,www,189987,Ivanti Connect Secure Command Injection (CVE-2024-21887),4,9.1,3,CVE-2023-46805 CVE-2024-21887,True,Metasploit,quarterly_scan.nessus
+10.10.2.24,sql01.corp.example,Microsoft Windows Server 2016,1433,tcp,mssql,73756,Microsoft SQL Server Unsupported Version Detection,4,10.0,3,,False,,quarterly_scan.nessus
 10.10.2.25,fs01.corp.example,Microsoft Windows Server 2012 R2,445,tcp,cifs,97833,MS17-010: Security Update for Microsoft Windows SMB Server (ETERNALBLUE),4,8.1,3,CVE-2017-0143 CVE-2017-0144 CVE-2017-0145,True,Metasploit,quarterly_scan.nessus
+10.10.2.30,app02.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8080,tcp,www,156057,Apache Log4j < 2.15.0 Remote Code Execution (Log4Shell),4,10.0,3,CVE-2021-44228,True,Metasploit,quarterly_scan.nessus
+10.10.2.31,app03.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8080,tcp,www,156057,Apache Log4j < 2.15.0 Remote Code Execution (Log4Shell),4,10.0,3,CVE-2021-44228,True,Metasploit,quarterly_scan.nessus
+10.10.2.32,app04.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8080,tcp,www,156057,Apache Log4j < 2.15.0 Remote Code Execution (Log4Shell),4,10.0,3,CVE-2021-44228,True,Metasploit,quarterly_scan.nessus
+10.10.2.40,sccm01.corp.example,Microsoft Windows Server 2019,0,tcp,general,205440,KB5041578: Windows Server 2019 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.2.41,backup01.corp.example,Microsoft Windows Server 2019,9401,tcp,veeam,173914,Veeam Backup & Replication Credential Disclosure (CVE-2023-27532),4,7.5,3,CVE-2023-27532,True,Metasploit,quarterly_scan.nessus
+10.10.2.43,print01.corp.example,Microsoft Windows Server 2016,0,tcp,general,151440,Windows Print Spooler Service Enabled (PrintNightmare),4,8.8,3,CVE-2021-34527,True,Metasploit,quarterly_scan.nessus
+10.10.2.44,git01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,443,tcp,www,187600,GitLab 16.1 < 16.7.2 Account Takeover via Password Reset,4,10.0,3,CVE-2023-7028,True,,quarterly_scan.nessus
+10.10.2.45,jenkins01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8080,tcp,www,189463,Jenkins < 2.442 Arbitrary File Read (CVE-2024-23897),4,9.8,3,CVE-2024-23897,True,Metasploit,quarterly_scan.nessus
+10.10.3.100,ws-100.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.101,ws-101.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.102,ws-102.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.104,ws-104.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.107,ws-107.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.109,ws-109.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.115,ws-115.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.116,ws-116.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.118,ws-118.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.119,ws-119.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.122,ws-122.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.128,ws-128.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.129,ws-129.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.134,ws-134.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.138,ws-138.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.142,ws-142.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.143,ws-143.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.149,ws-149.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.150,ws-150.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.151,ws-151.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.153,ws-153.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.156,ws-156.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.158,ws-158.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.163,ws-163.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.169,ws-169.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.170,ws-170.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.172,ws-172.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.173,ws-173.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.177,ws-177.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.179,ws-179.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.183,ws-183.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.188,ws-188.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.189,ws-189.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.192,ws-192.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.193,ws-193.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.195,ws-195.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.199,ws-199.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
 10.10.3.31,ws-031.corp.example,Microsoft Windows 7 Professional,3389,tcp,msrdp,125313,Microsoft RDP RCE (CVE-2019-0708) (BlueKeep),4,9.8,3,CVE-2019-0708,True,Metasploit,quarterly_scan.nessus
+10.10.3.56,ws-056.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.58,ws-058.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.59,ws-059.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.63,ws-063.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.76,ws-076.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.77,ws-077.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.82,ws-082.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.85,ws-085.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.92,ws-092.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.93,ws-093.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.94,ws-094.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.3.98,ws-098.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.4.60,cam-60.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.4.61,cam-61.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.4.62,cam-62.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.4.63,cam-63.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.4.64,cam-64.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.4.65,cam-65.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.4.66,cam-66.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.4.67,cam-67.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.4.68,cam-68.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.4.69,cam-69.corp.example,Hikvision IP Camera,80,tcp,www,153600,Hikvision IP Camera Command Injection (CVE-2021-36260),4,9.8,3,CVE-2021-36260,True,Metasploit,quarterly_scan.nessus
+10.10.7.10,lt-010.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.13,lt-013.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.18,lt-018.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.19,lt-019.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.21,lt-021.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.23,lt-023.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.26,lt-026.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.31,lt-031.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.33,lt-033.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.34,lt-034.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.40,lt-040.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.42,lt-042.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.43,lt-043.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.7.46,lt-046.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,205440,KB5041580: Windows 10 Version 22H2 Security Update (August 2024),4,9.8,3,CVE-2024-38063,False,,quarterly_scan.nessus
+10.10.1.11,web02.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,443,tcp,www,200206,nginx 1.25.x < 1.25.4 Multiple Vulnerabilities,3,7.5,3,CVE-2024-24989,False,,quarterly_scan.nessus
+10.10.1.12,web03.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,443,tcp,www,200206,nginx 1.25.x < 1.25.4 Multiple Vulnerabilities,3,7.5,3,CVE-2024-24989,False,,quarterly_scan.nessus
+10.10.1.13,web04.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,443,tcp,www,200206,nginx 1.25.x < 1.25.4 Multiple Vulnerabilities,3,7.5,3,CVE-2024-24989,False,,quarterly_scan.nessus
+10.10.1.14,web05.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,443,tcp,www,200206,nginx 1.25.x < 1.25.4 Multiple Vulnerabilities,3,7.5,3,CVE-2024-24989,False,,quarterly_scan.nessus
+10.10.1.40,proxy01.corp.example,Linux Kernel 4.18 on Red Hat Enterprise Linux 8,3128,tcp,http_proxy,182251,Squid < 6.4 Multiple Vulnerabilities,3,7.5,3,CVE-2023-46846,False,,quarterly_scan.nessus
 10.10.2.20,db01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,5432,tcp,postgresql,183965,PostgreSQL 13.x < 13.13 Multiple Vulnerabilities,3,8.8,3,CVE-2023-5868 CVE-2023-5869 CVE-2023-5870,False,,quarterly_scan.nessus
+10.10.2.21,db02.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,5432,tcp,postgresql,183965,PostgreSQL 13.x < 13.13 Multiple Vulnerabilities,3,8.8,3,CVE-2023-5868 CVE-2023-5869 CVE-2023-5870,False,,quarterly_scan.nessus
+10.10.2.22,db03.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,5432,tcp,postgresql,183965,PostgreSQL 13.x < 13.13 Multiple Vulnerabilities,3,8.8,3,CVE-2023-5868 CVE-2023-5869 CVE-2023-5870,False,,quarterly_scan.nessus
+10.10.2.23,db04.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,5432,tcp,postgresql,183965,PostgreSQL 13.x < 13.13 Multiple Vulnerabilities,3,8.8,3,CVE-2023-5868 CVE-2023-5869 CVE-2023-5870,False,,quarterly_scan.nessus
+10.10.2.42,mon01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.3.100,ws-100.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.102,ws-102.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.103,ws-103.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.105,ws-105.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.106,ws-106.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.108,ws-108.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.109,ws-109.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.110,ws-110.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.111,ws-111.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.112,ws-112.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.113,ws-113.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.113,ws-113.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.114,ws-114.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.114,ws-114.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.115,ws-115.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.118,ws-118.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.118,ws-118.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.119,ws-119.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.120,ws-120.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.121,ws-121.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.121,ws-121.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.122,ws-122.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.122,ws-122.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.124,ws-124.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.125,ws-125.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.126,ws-126.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.127,ws-127.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.128,ws-128.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.128,ws-128.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.129,ws-129.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.129,ws-129.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.130,ws-130.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.130,ws-130.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.131,ws-131.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.132,ws-132.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.133,ws-133.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.133,ws-133.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.134,ws-134.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.134,ws-134.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.135,ws-135.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.136,ws-136.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.137,ws-137.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.137,ws-137.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.140,ws-140.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.140,ws-140.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.140,ws-140.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.143,ws-143.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.146,ws-146.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.147,ws-147.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.148,ws-148.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.148,ws-148.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.148,ws-148.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.149,ws-149.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.149,ws-149.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.150,ws-150.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.151,ws-151.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.152,ws-152.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.152,ws-152.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.153,ws-153.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.153,ws-153.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.155,ws-155.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.155,ws-155.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.157,ws-157.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.157,ws-157.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.158,ws-158.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.158,ws-158.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.159,ws-159.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.160,ws-160.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.161,ws-161.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.161,ws-161.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.163,ws-163.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.164,ws-164.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.165,ws-165.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.166,ws-166.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.166,ws-166.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.167,ws-167.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.169,ws-169.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.170,ws-170.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.171,ws-171.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.171,ws-171.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.173,ws-173.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.174,ws-174.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.174,ws-174.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.176,ws-176.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.176,ws-176.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.176,ws-176.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.177,ws-177.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.179,ws-179.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.179,ws-179.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.180,ws-180.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.180,ws-180.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.181,ws-181.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.182,ws-182.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.183,ws-183.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.184,ws-184.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.184,ws-184.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.185,ws-185.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.186,ws-186.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.186,ws-186.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.187,ws-187.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.187,ws-187.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.188,ws-188.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.188,ws-188.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.189,ws-189.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.190,ws-190.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.191,ws-191.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.192,ws-192.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.192,ws-192.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.193,ws-193.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.197,ws-197.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.198,ws-198.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.198,ws-198.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.199,ws-199.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
 10.10.3.40,ws-040.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
 10.10.3.41,ws-041.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
 10.10.3.42,ws-042.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
@@ -12,14 +217,365 @@ host_ip,hostname,os,port,proto,service,plugin_id,plugin_name,severity,cvss,cvss_
 10.10.3.45,ws-045.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
 10.10.3.46,ws-046.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
 10.10.3.47,ws-047.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.48,ws-048.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.48,ws-048.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.49,ws-049.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.49,ws-049.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.50,ws-050.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.50,ws-050.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.51,ws-051.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.51,ws-051.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.52,ws-052.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.53,ws-053.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.53,ws-053.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.54,ws-054.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.55,ws-055.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.57,ws-057.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.58,ws-058.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.59,ws-059.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.60,ws-060.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.60,ws-060.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.61,ws-061.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.62,ws-062.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.62,ws-062.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.62,ws-062.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.63,ws-063.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.63,ws-063.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.65,ws-065.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.65,ws-065.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.65,ws-065.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.66,ws-066.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.67,ws-067.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.67,ws-067.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.67,ws-067.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.68,ws-068.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.69,ws-069.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.69,ws-069.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.69,ws-069.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.71,ws-071.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.71,ws-071.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.73,ws-073.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.74,ws-074.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.74,ws-074.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.75,ws-075.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.76,ws-076.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.77,ws-077.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.78,ws-078.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.79,ws-079.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.79,ws-079.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.80,ws-080.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.80,ws-080.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.81,ws-081.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.81,ws-081.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.82,ws-082.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.83,ws-083.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.84,ws-084.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.86,ws-086.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.87,ws-087.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.88,ws-088.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.89,ws-089.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.90,ws-090.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.90,ws-090.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.91,ws-091.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.92,ws-092.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.93,ws-093.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.93,ws-093.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.94,ws-094.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.3.95,ws-095.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.96,ws-096.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.96,ws-096.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.3.97,ws-097.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.98,ws-098.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.98,ws-098.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.3.99,ws-099.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.3.99,ws-099.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.4.51,prn-51.corp.example,HP LaserJet,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.4.52,prn-52.corp.example,Xerox VersaLink,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.4.53,prn-53.corp.example,Ricoh MP,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.4.54,prn-54.corp.example,Ricoh MP,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.4.55,prn-55.corp.example,Ricoh MP,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.4.56,prn-56.corp.example,HP LaserJet,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.4.57,prn-57.corp.example,HP LaserJet,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.4.58,prn-58.corp.example,Ricoh MP,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
 10.10.5.60,ups-mgmt.corp.example,Embedded Linux,161,udp,snmp,41028,SNMP Agent Default Community Name (public),3,7.5,3,CVE-1999-0517,True,,quarterly_scan.nessus
+10.10.7.10,lt-010.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.7.12,lt-012.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.7.14,lt-014.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.7.15,lt-015.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.7.16,lt-016.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.7.17,lt-017.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.7.17,lt-017.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.7.18,lt-018.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.7.19,lt-019.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.7.20,lt-020.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.7.20,lt-020.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.7.21,lt-021.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.7.22,lt-022.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.7.24,lt-024.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.7.24,lt-024.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.7.25,lt-025.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.7.25,lt-025.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.7.26,lt-026.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.7.27,lt-027.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.7.29,lt-029.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.7.30,lt-030.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.7.32,lt-032.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.7.33,lt-033.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.7.33,lt-033.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.7.34,lt-034.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.7.35,lt-035.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.7.36,lt-036.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,192951,Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29),3,7.8,3,CVE-2024-30284,False,,quarterly_scan.nessus
+10.10.7.37,lt-037.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.7.40,lt-040.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.7.42,lt-042.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.7.43,lt-043.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
+10.10.7.44,lt-044.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,206722,Google Chrome < 128.0.6613.84 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965,True,,quarterly_scan.nessus
+10.10.7.44,lt-044.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,189385,7-Zip < 24.07 Code Execution,3,7.0,3,CVE-2024-11477,False,,quarterly_scan.nessus
+10.10.7.45,lt-045.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,207053,Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities,3,8.8,3,CVE-2024-7965 CVE-2024-7971,True,,quarterly_scan.nessus
 10.10.1.10,web01.corp.example,Linux Kernel 5.4 on Ubuntu 20.04,22,tcp,ssh,187201,OpenSSH < 9.6 Multiple Vulnerabilities (Terrapin),2,5.9,3,CVE-2023-48795,False,,quarterly_scan.nessus
+10.10.1.25,mail01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,25,tcp,smtp,187315,Postfix SMTP Smuggling,2,5.3,3,CVE-2023-51764,False,,quarterly_scan.nessus
+10.10.2.26,fs02.corp.example,Microsoft Windows Server 2019,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.2.33,app05.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8080,tcp,www,171340,Apache Tomcat 9.0.x < 9.0.71 Information Disclosure,2,5.3,3,CVE-2023-28708,False,,quarterly_scan.nessus
+10.10.2.34,app06.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8080,tcp,www,171340,Apache Tomcat 9.0.x < 9.0.71 Information Disclosure,2,5.3,3,CVE-2023-28708,False,,quarterly_scan.nessus
+10.10.2.35,app07.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8080,tcp,www,171340,Apache Tomcat 9.0.x < 9.0.71 Information Disclosure,2,5.3,3,CVE-2023-28708,False,,quarterly_scan.nessus
+10.10.2.36,app08.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8080,tcp,www,171340,Apache Tomcat 9.0.x < 9.0.71 Information Disclosure,2,5.3,3,CVE-2023-28708,False,,quarterly_scan.nessus
+10.10.2.37,app09.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,8080,tcp,www,171340,Apache Tomcat 9.0.x < 9.0.71 Information Disclosure,2,5.3,3,CVE-2023-28708,False,,quarterly_scan.nessus
+10.10.3.103,ws-103.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.104,ws-104.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.105,ws-105.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.109,ws-109.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.110,ws-110.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.111,ws-111.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.111,ws-111.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.114,ws-114.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.115,ws-115.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.116,ws-116.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.117,ws-117.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.119,ws-119.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.120,ws-120.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.123,ws-123.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.125,ws-125.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.125,ws-125.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.127,ws-127.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.131,ws-131.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.133,ws-133.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.138,ws-138.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.139,ws-139.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.141,ws-141.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.142,ws-142.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.142,ws-142.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.143,ws-143.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.144,ws-144.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.145,ws-145.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.152,ws-152.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.154,ws-154.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.157,ws-157.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.159,ws-159.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.160,ws-160.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.161,ws-161.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.162,ws-162.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.163,ws-163.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.165,ws-165.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.166,ws-166.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.168,ws-168.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.171,ws-171.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.175,ws-175.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.178,ws-178.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.180,ws-180.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.182,ws-182.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.182,ws-182.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.186,ws-186.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.189,ws-189.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.190,ws-190.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.193,ws-193.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.194,ws-194.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.195,ws-195.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.196,ws-196.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.196,ws-196.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.199,ws-199.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.48,ws-048.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
 10.10.3.5,jump01.corp.example,Microsoft Windows Server 2019,3389,tcp,msrdp,58453,Terminal Services Doesn't Use Network Level Authentication (NLA) Only,2,4.0,3,,False,,quarterly_scan.nessus
+10.10.3.50,ws-050.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.52,ws-052.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.53,ws-053.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.55,ws-055.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.56,ws-056.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.58,ws-058.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.6,jump02.corp.example,Microsoft Windows Server 2022,3389,tcp,msrdp,58453,Terminal Services Doesn't Use Network Level Authentication (NLA) Only,2,4.0,3,,False,,quarterly_scan.nessus
+10.10.3.61,ws-061.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.61,ws-061.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.64,ws-064.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.70,ws-070.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.71,ws-071.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.72,ws-072.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.75,ws-075.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.78,ws-078.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.82,ws-082.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.85,ws-085.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.86,ws-086.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.88,ws-088.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.89,ws-089.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.90,ws-090.corp.example,Microsoft Windows 10 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.3.92,ws-092.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.94,ws-094.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.3.99,ws-099.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
 10.10.4.50,prn-4f.corp.example,HP LaserJet,23,tcp,telnet,42263,Unencrypted Telnet Server,2,6.5,3,,False,,quarterly_scan.nessus
+10.10.7.11,lt-011.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.12,lt-012.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.13,lt-013.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.14,lt-014.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.15,lt-015.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.16,lt-016.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.17,lt-017.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.21,lt-021.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.25,lt-025.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.26,lt-026.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.27,lt-027.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.28,lt-028.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.28,lt-028.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.29,lt-029.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.29,lt-029.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.31,lt-031.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.34,lt-034.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.35,lt-035.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.36,lt-036.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.36,lt-036.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.37,lt-037.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.38,lt-038.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.39,lt-039.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.41,lt-041.corp.example,Microsoft Windows 11 Enterprise,445,tcp,cifs,57608,SMB Signing not required,2,5.3,3,,False,,quarterly_scan.nessus
+10.10.7.43,lt-043.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
+10.10.7.44,lt-044.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,201084,Zoom Client < 6.0.2 Privilege Escalation,2,6.5,3,CVE-2024-27240,False,,quarterly_scan.nessus
 10.10.1.10,web01.corp.example,Linux Kernel 5.4 on Ubuntu 20.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.1.11,web02.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.1.12,web03.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.1.13,web04.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.1.14,web05.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.1.20,app01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.1.25,mail01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.1.30,vpn01.corp.example,Ivanti Connect Secure 22.3,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.1.40,proxy01.corp.example,Linux Kernel 4.18 on Red Hat Enterprise Linux 8,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.2.20,db01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.21,db02.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.22,db03.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.23,db04.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.24,sql01.corp.example,Microsoft Windows Server 2016,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.2.25,fs01.corp.example,Microsoft Windows Server 2012 R2,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.26,fs02.corp.example,Microsoft Windows Server 2019,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.30,app02.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.31,app03.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.32,app04.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.33,app05.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.34,app06.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.35,app07.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.36,app08.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.37,app09.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.40,sccm01.corp.example,Microsoft Windows Server 2019,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.41,backup01.corp.example,Microsoft Windows Server 2019,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.42,mon01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.43,print01.corp.example,Microsoft Windows Server 2016,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.44,git01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.2.45,jenkins01.corp.example,Linux Kernel 5.15 on Ubuntu 22.04,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.100,ws-100.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.101,ws-101.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.102,ws-102.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.103,ws-103.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.104,ws-104.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.105,ws-105.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.106,ws-106.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.107,ws-107.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.108,ws-108.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.109,ws-109.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.110,ws-110.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.111,ws-111.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.112,ws-112.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.113,ws-113.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.114,ws-114.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.115,ws-115.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.116,ws-116.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.117,ws-117.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.118,ws-118.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.119,ws-119.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.120,ws-120.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.121,ws-121.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.122,ws-122.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.123,ws-123.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.124,ws-124.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.125,ws-125.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.126,ws-126.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.127,ws-127.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.128,ws-128.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.129,ws-129.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.130,ws-130.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.131,ws-131.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.132,ws-132.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.133,ws-133.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.134,ws-134.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.135,ws-135.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.136,ws-136.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.137,ws-137.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.138,ws-138.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.139,ws-139.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.140,ws-140.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.141,ws-141.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.142,ws-142.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.143,ws-143.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.144,ws-144.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.145,ws-145.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.146,ws-146.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.147,ws-147.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.148,ws-148.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.149,ws-149.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.150,ws-150.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.151,ws-151.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.152,ws-152.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.153,ws-153.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.154,ws-154.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.155,ws-155.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.156,ws-156.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.157,ws-157.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.158,ws-158.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.159,ws-159.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.160,ws-160.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.161,ws-161.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.162,ws-162.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.163,ws-163.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.164,ws-164.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.165,ws-165.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.166,ws-166.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.167,ws-167.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.168,ws-168.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.169,ws-169.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.170,ws-170.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.171,ws-171.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.172,ws-172.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.173,ws-173.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.174,ws-174.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.175,ws-175.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.176,ws-176.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.177,ws-177.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.178,ws-178.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.179,ws-179.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.180,ws-180.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.181,ws-181.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.182,ws-182.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.183,ws-183.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.184,ws-184.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.185,ws-185.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.186,ws-186.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.187,ws-187.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.188,ws-188.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.189,ws-189.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.190,ws-190.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.191,ws-191.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.192,ws-192.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.193,ws-193.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.194,ws-194.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.195,ws-195.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.196,ws-196.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.197,ws-197.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.198,ws-198.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.199,ws-199.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.3.31,ws-031.corp.example,Microsoft Windows 7 Professional,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.3.40,ws-040.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.3.41,ws-041.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
@@ -29,6 +585,114 @@ host_ip,hostname,os,port,proto,service,plugin_id,plugin_name,severity,cvss,cvss_
 10.10.3.45,ws-045.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.3.46,ws-046.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.3.47,ws-047.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.48,ws-048.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.49,ws-049.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.3.5,jump01.corp.example,Microsoft Windows Server 2019,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.50,ws-050.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.51,ws-051.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.52,ws-052.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.53,ws-053.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.54,ws-054.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.55,ws-055.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.56,ws-056.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.57,ws-057.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.58,ws-058.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.59,ws-059.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.6,jump02.corp.example,Microsoft Windows Server 2022,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.60,ws-060.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.61,ws-061.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.62,ws-062.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.63,ws-063.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.64,ws-064.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.65,ws-065.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.66,ws-066.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.67,ws-067.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.68,ws-068.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.69,ws-069.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.70,ws-070.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.71,ws-071.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.72,ws-072.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.73,ws-073.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.74,ws-074.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.75,ws-075.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.76,ws-076.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.77,ws-077.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.78,ws-078.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.79,ws-079.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.80,ws-080.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.81,ws-081.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.82,ws-082.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.83,ws-083.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.84,ws-084.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.85,ws-085.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.86,ws-086.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.87,ws-087.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.88,ws-088.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.89,ws-089.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.90,ws-090.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.91,ws-091.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.92,ws-092.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.93,ws-093.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.94,ws-094.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.95,ws-095.corp.example,Microsoft Windows 10 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.96,ws-096.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.97,ws-097.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.98,ws-098.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.3.99,ws-099.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.4.50,prn-4f.corp.example,HP LaserJet,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.51,prn-51.corp.example,HP LaserJet,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.52,prn-52.corp.example,Xerox VersaLink,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.53,prn-53.corp.example,Ricoh MP,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.54,prn-54.corp.example,Ricoh MP,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.55,prn-55.corp.example,Ricoh MP,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.56,prn-56.corp.example,HP LaserJet,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.57,prn-57.corp.example,HP LaserJet,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.58,prn-58.corp.example,Ricoh MP,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.60,cam-60.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.61,cam-61.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.62,cam-62.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.63,cam-63.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.64,cam-64.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.65,cam-65.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.66,cam-66.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.67,cam-67.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.68,cam-68.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.4.69,cam-69.corp.example,Hikvision IP Camera,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
 10.10.5.60,ups-mgmt.corp.example,Embedded Linux,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.10,lt-010.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.11,lt-011.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.12,lt-012.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.13,lt-013.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.14,lt-014.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.15,lt-015.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.16,lt-016.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.17,lt-017.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.18,lt-018.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.19,lt-019.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.20,lt-020.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.21,lt-021.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.22,lt-022.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.23,lt-023.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.24,lt-024.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.25,lt-025.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.26,lt-026.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.27,lt-027.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.28,lt-028.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.29,lt-029.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.30,lt-030.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.31,lt-031.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.32,lt-032.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.33,lt-033.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.34,lt-034.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.35,lt-035.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.36,lt-036.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.37,lt-037.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.38,lt-038.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.39,lt-039.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.40,lt-040.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.41,lt-041.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.42,lt-042.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.43,lt-043.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.44,lt-044.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.45,lt-045.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus
+10.10.7.46,lt-046.corp.example,Microsoft Windows 11 Enterprise,0,tcp,general,19506,Nessus Scan Information,0,,,,False,,quarterly_scan.nessus

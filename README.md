@@ -11,7 +11,7 @@ AI analyst needs `pip install anthropic` only if you choose Anthropic.
 ## Quick start
 
 ```bash
-# 1. Try it on the synthetic sample environment
+# 1. Try it on the synthetic sample environment (250 hosts, about 9,800 sessions)
 python3 -m vulnflow samples samples
 python3 -m vulnflow analyze samples -o example_output
 

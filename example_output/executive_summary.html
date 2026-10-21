@@ -114,23 +114,23 @@ path.e-return,path.e-ips,path.e-ips-blocked,path.e-spread,path.e-onward,path.e-i
 .dg-dim{opacity:.18}.dg-focus rect,.dg-focus circle{stroke-width:4px}
 .node,.bnode{cursor:pointer}
 </style></head><body><div class="theme-bar"><span class="theme-brand">vulnPath</span><label for="theme-choice">Theme</label><select id="theme-choice" aria-label="Theme"><option value="dark">SOC Dark</option><option value="nord">Nord Calm</option><option value="high-contrast">High Contrast</option><option value="light">Light</option><option value="classic-windows">Classic Windows</option><option value="matrix">Matrix</option><option value="aqua">Mac OS X Aqua</option><option value="win2k">Windows 2000</option></select></div><script>(function(){const s=document.getElementById("theme-choice");const root=document.documentElement;s.value=[...s.options].some(o=>o.value===root.dataset.theme)?root.dataset.theme:"dark";s.addEventListener("change",()=>{root.dataset.theme=s.value;try{localStorage.setItem("vulnflow-theme",s.value)}catch(_){}})})();</script><h1>Executive Summary: Vulnerability Exposure Assessment</h1>
-<p>Prepared 2026-10-21. Network activity analysed from 2026-10-12T00:02:03Z to 2026-10-18T03:11:38Z.</p>
+<p>Prepared 2026-10-21. Network activity analysed from 2026-10-12T00:01:19Z to 2026-10-18T03:11:38Z.</p>
 <h2>Bottom line</h2>
 <p><strong>Likely exploitation on web01.corp.example (10.10.1.10).</strong> An IPS/IDS alert on a vulnerable service and the host's own traffic afterwards point the same way. Start incident response; host forensics is needed to confirm a compromise.</p>
 <p>A flagged system later made new connections to vulnerable services on 2 other systems (fs01.corp.example (10.10.2.25), ws-031.corp.example (10.10.3.31)). If the first system is compromised, these are the likely next targets.</p>
-<p>4 vulnerabilities on 4 systems need action now (Priority 1).</p>
-<p>1 vulnerable service on 1 system is being reached from the internet; it has a publicly available exploit.</p>
-<p>Of 17 vulnerabilities reported by the scanner, 2 sit on services with no observed traffic and can be scheduled rather than rushed.</p>
+<p>20 vulnerabilities on 20 systems need action now (Priority 1).</p>
+<p>6 vulnerable services on 6 systems are being reached from the internet; 1 of them have a publicly available exploit.</p>
+<p>Of 447 vulnerabilities reported by the scanner, 48 sit on services with no observed traffic and can be scheduled rather than rushed.</p>
 <p>4 active servers seen on the network were not in the scan, so their risk is unknown.</p>
 <h2>Key numbers</h2>
-<div class="tiles"><div class="tile t-p1"><b>4</b><span>Priority 1 findings (act now)</span></div><div class="tile t-p1"><b>1</b><span>Systems with likely exploitation</span></div><div class="tile t-ok"><b>0</b><span>Systems to investigate (leads)</span></div><div class="tile t-warn"><b>1</b><span>Vulnerable services reached from the internet</span></div><div class="tile t-warn"><b>4</b><span>Active servers missing from the scan</span></div><div class="tile "><b>1,352</b><span>Network sessions analysed across 16 scanned systems</span></div></div><div class="pbar" role="img" aria-label="Findings by priority"><div class="b-P1" style="flex:4" title="4 P1 findings (act now)">4</div><div class="b-P2" style="flex:8" title="8 P2 findings (this cycle)">8</div><div class="b-P3" style="flex:2" title="2 P3 findings (scheduled)">2</div><div class="b-P4" style="flex:3" title="3 P4 findings (routine)">3</div></div><div class="pbar-legend"><span><span class="pri pri-P1" title="P1: act now">P1</span> act now: 4 (23%)</span><span><span class="pri pri-P2" title="P2: this cycle">P2</span> this cycle: 8 (47%)</span><span><span class="pri pri-P3" title="P3: scheduled">P3</span> scheduled: 2 (11%)</span><span><span class="pri pri-P4" title="P4: routine">P4</span> routine: 3 (17%)</span></div>
+<div class="tiles"><div class="tile t-p1"><b>20</b><span>Priority 1 findings (act now)</span></div><div class="tile t-p1"><b>1</b><span>Systems with likely exploitation</span></div><div class="tile t-ok"><b>0</b><span>Systems to investigate (leads)</span></div><div class="tile t-warn"><b>6</b><span>Vulnerable services reached from the internet</span></div><div class="tile t-warn"><b>4</b><span>Active servers missing from the scan</span></div><div class="tile "><b>9,764</b><span>Network sessions analysed across 250 scanned systems</span></div></div><div class="pbar" role="img" aria-label="Findings by priority"><div class="b-P1" style="flex:20" title="20 P1 findings (act now)">20</div><div class="b-P2" style="flex:130" title="130 P2 findings (this cycle)">130</div><div class="b-P3" style="flex:249" title="249 P3 findings (scheduled)">249</div><div class="b-P4" style="flex:48" title="48 P4 findings (routine)">48</div></div><div class="pbar-legend"><span><span class="pri pri-P1" title="P1: act now">P1</span> act now: 20 (4%)</span><span><span class="pri pri-P2" title="P2: this cycle">P2</span> this cycle: 130 (29%)</span><span><span class="pri pri-P3" title="P3: scheduled">P3</span> scheduled: 249 (55%)</span><span><span class="pri pri-P4" title="P4: routine">P4</span> routine: 48 (10%)</span></div>
 <h2>Top risks</h2>
 <ol>
 <li><strong>web01.corp.example (10.10.1.10)</strong>: Apache 2.4.49 &lt; 2.4.51 Path Traversal and RCE (CVE-2021-41773, CVE-2021-42013). Vulnerable service reached from the internet; public exploit exists; compromise could spread to 6 connected systems; <span class="ev ev-likely">Likely exploitation</span>. Risk score 100/100, <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span>.</li>
 <li><strong>app01.corp.example (10.10.1.20)</strong>: Apache Tomcat AJP Connector Request Injection (Ghostcat) (CVE-2020-1938). Vulnerable service reached internally; public exploit exists; compromise could spread to 2 connected systems. Risk score 100/100, <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span>.</li>
-<li><strong>ws-031.corp.example (10.10.3.31)</strong>: Microsoft RDP RCE (CVE-2019-0708) (BlueKeep). Vulnerable service reached internally; public exploit exists; <span class="ev ev-lead">Lead, not confirmed</span>. Risk score 89/100, <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span>.</li>
-<li><strong>fs01.corp.example (10.10.2.25)</strong>: MS17-010: Security Update for Microsoft Windows SMB Server (ETERNALBLUE) (CVE-2017-0143, CVE-2017-0144). Vulnerable service reached internally by many hosts; public exploit exists; <span class="ev ev-lead">Lead, not confirmed</span>. Risk score 83/100, <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span>.</li>
-<li><strong>ws-040.corp.example (10.10.3.40)</strong>: Microsoft Edge (Chromium) &lt; 129.0.2792.52 Multiple Vulnerabilities (CVE-2024-7965, CVE-2024-7971). Host is active on the network; public exploit exists; compromise could spread to 5 connected systems. Risk score 61/100, <span class="pri pri-P2" title="P2: this cycle">P2<small>this cycle</small></span>.</li>
+<li><strong>app02.corp.example (10.10.2.30)</strong>: Apache Log4j &lt; 2.15.0 Remote Code Execution (Log4Shell) (CVE-2021-44228). Vulnerable service reached internally by many hosts; public exploit exists; compromise could spread to 4 connected systems. Risk score 100/100, <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span>.</li>
+<li><strong>app03.corp.example (10.10.2.31)</strong>: Apache Log4j &lt; 2.15.0 Remote Code Execution (Log4Shell) (CVE-2021-44228). Vulnerable service reached internally by many hosts; public exploit exists; compromise could spread to 2 connected systems. Risk score 100/100, <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span>.</li>
+<li><strong>app04.corp.example (10.10.2.32)</strong>: Apache Log4j &lt; 2.15.0 Remote Code Execution (Log4Shell) (CVE-2021-44228). Vulnerable service reached internally by many hosts; public exploit exists; compromise could spread to 3 connected systems. Risk score 100/100, <span class="pri pri-P1" title="P1: act now">P1<small>act now</small></span>.</li>
 </ol>
 <h3>Where the hostile activity is</h3><div class="panel"><p class="hint">Click a host to focus the report on it. Click a finding in the table below to highlight it here.</p><div class="focus-note" aria-live="polite"></div><div class="dg-wrap"><svg xmlns="http://www.w3.org/2000/svg" class="dg" viewBox="0 0 1050 740" width="1050" height="740" role="img" aria-label="Hostile activity against vulnerable services" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="12">
 <defs><marker id="dg-arr-return" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-return"/></marker><marker id="dg-arr-ips" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-ips"/></marker><marker id="dg-arr-spread" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-spread"/></marker><marker id="dg-arr-onward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-onward"/></marker><marker id="dg-arr-ips-blocked" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-ips-blocked"/></marker><marker id="dg-arr-internet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="lb-internet"/></marker></defs>
@@ -139,6 +139,22 @@ path.e-return,path.e-ips,path.e-ips-blocked,path.e-spread,path.e-onward,path.e-i
 <g class="edge" data-src="internet" data-dst="10.10.1.10" data-findings="10.10.1.10|153884|443">
 <path d="M260,505.0 C335.0,505.0 335.0,105.0 410,105.0" class="e-internet" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#dg-arr-internet)"/>
 <text x="335" y="299" text-anchor="middle" font-size="11" class="dg-halo lb-internet">tcp/443 · 224 sessions</text>
+</g>
+<g class="edge" data-src="internet" data-dst="10.10.1.11" data-findings="10.10.1.11|200206|443">
+<path d="M260,505.0 C335.0,505.0 335.0,205.0 410,205.0" class="e-internet" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#dg-arr-internet)"/>
+<text x="335" y="349" text-anchor="middle" font-size="11" class="dg-halo lb-internet">tcp/443 · 90 sessions</text>
+</g>
+<g class="edge" data-src="internet" data-dst="10.10.1.13" data-findings="10.10.1.13|200206|443">
+<path d="M260,505.0 C335.0,505.0 335.0,305.0 410,305.0" class="e-internet" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#dg-arr-internet)"/>
+<text x="335" y="399" text-anchor="middle" font-size="11" class="dg-halo lb-internet">tcp/443 · 79 sessions</text>
+</g>
+<g class="edge" data-src="internet" data-dst="10.10.1.12" data-findings="10.10.1.12|200206|443">
+<path d="M260,505.0 C335.0,505.0 335.0,405.0 410,405.0" class="e-internet" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#dg-arr-internet)"/>
+<text x="335" y="449" text-anchor="middle" font-size="11" class="dg-halo lb-internet">tcp/443 · 85 sessions</text>
+</g>
+<g class="edge" data-src="internet" data-dst="10.10.1.14" data-findings="10.10.1.14|200206|443">
+<path d="M260,505.0 C335.0,505.0 335.0,505.0 410,505.0" class="e-internet" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#dg-arr-internet)"/>
+<text x="335" y="499" text-anchor="middle" font-size="11" class="dg-halo lb-internet">tcp/443 · 120 sessions</text>
 </g>
 <g class="edge" data-src="192.0.2.216" data-dst="10.10.3.31" data-findings="10.10.3.31|125313|3389">
 <path d="M260,205.0 C525.0,205.0 525.0,205.0 790,205.0" class="e-ips-blocked" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#dg-arr-ips-blocked)"/>
@@ -218,6 +234,30 @@ path.e-return,path.e-ips,path.e-ips-blocked,path.e-spread,path.e-onward,path.e-i
 <text x="40" y="390" font-weight="600" class="dg-ink">192.0.2.174 (external)</text>
 <text x="40" y="407" class="dg-ink2">source: blocked attempts</text>
 </g>
+<g class="node" data-host="10.10.1.11" data-sev="High" tabindex="0"><title>10.10.1.11: click to focus</title>
+<rect class="dg-box sev-High" x="410" y="170" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="420" y="190" font-weight="600" class="dg-ink">10.10.1.11</text>
+<text x="420" y="207" class="dg-ink2">web02.corp.example</text>
+<text x="420" y="225" class="tx-High">High: CVE-2024-24989</text>
+</g>
+<g class="node" data-host="10.10.1.13" data-sev="High" tabindex="0"><title>10.10.1.13: click to focus</title>
+<rect class="dg-box sev-High" x="410" y="270" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="420" y="290" font-weight="600" class="dg-ink">10.10.1.13</text>
+<text x="420" y="307" class="dg-ink2">web04.corp.example</text>
+<text x="420" y="325" class="tx-High">High: CVE-2024-24989</text>
+</g>
+<g class="node" data-host="10.10.1.12" data-sev="High" tabindex="0"><title>10.10.1.12: click to focus</title>
+<rect class="dg-box sev-High" x="410" y="370" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="420" y="390" font-weight="600" class="dg-ink">10.10.1.12</text>
+<text x="420" y="407" class="dg-ink2">web03.corp.example</text>
+<text x="420" y="425" class="tx-High">High: CVE-2024-24989</text>
+</g>
+<g class="node" data-host="10.10.1.14" data-sev="High" tabindex="0"><title>10.10.1.14: click to focus</title>
+<rect class="dg-box sev-High" x="410" y="470" width="230" height="70" rx="8" stroke-width="2"/>
+<text x="420" y="490" font-weight="600" class="dg-ink">10.10.1.14</text>
+<text x="420" y="507" class="dg-ink2">web05.corp.example</text>
+<text x="420" y="525" class="tx-High">High: CVE-2024-24989</text>
+</g>
 <g class="node" data-host="internet" data-sev="none" tabindex="0"><title>internet: click to focus</title>
 <rect class="dg-box src sev-none" x="30" y="470" width="230" height="70" rx="8" stroke-width="2"/>
 <text x="40" y="490" font-weight="600" class="dg-ink">Internet</text>
@@ -242,13 +282,13 @@ path.e-return,path.e-ips,path.e-ips-blocked,path.e-spread,path.e-onward,path.e-i
 <ol>
 <li><strong>Start incident response for web01.corp.example (10.10.1.10).</strong> Preserve logs and memory, confirm on the host, contain, then patch. Patching alone will not remove an attacker. Include fs01.corp.example (10.10.2.25), ws-031.corp.example (10.10.3.31) in the scope.</li>
 <li><strong>Patch or shield internet-facing exploitable services within 48 hours</strong>: web01.corp.example (10.10.1.10). If a patch cannot go in, restrict access at the firewall.</li>
-<li><strong>Limit how far a breach can spread.</strong> 10 high-priority systems can reach other vulnerable systems directly; restrict admin protocols (SMB, RDP, SSH) between these segments.</li>
-<li><strong>Fix 11 internally reachable high-priority vulnerabilities</strong> in the current patch cycle; they are the next step for an attacker already inside.</li>
+<li><strong>Limit how far a breach can spread.</strong> 120 high-priority systems can reach other vulnerable systems directly; restrict admin protocols (SMB, RDP, SSH) between these segments.</li>
+<li><strong>Fix 145 internally reachable high-priority vulnerabilities</strong> in the current patch cycle; they are the next step for an attacker already inside.</li>
 <li><strong>Close the scan gap.</strong> Add the 4 unscanned active servers to the scan scope so their exposure can be assessed.</li>
 <li><strong>Schedule the remaining findings</strong> through normal patching, and switch off services that no one is using.</li>
 </ol>
 <h2>How confident is this?</h2>
-<p>The assessment combines the vulnerability scan with 1,352 observed network sessions. 15 of 16 scanned systems appeared in the network data. A system with no observed traffic is scored as "unknown" rather than safe. Telemetry only shows what the sensors could see, so absence of traffic is not proof that a service is unreachable.</p>
+<p>The assessment combines the vulnerability scan with 9,764 observed network sessions. 249 of 250 scanned systems appeared in the network data. A system with no observed traffic is scored as "unknown" rather than safe. Telemetry only shows what the sensors could see, so absence of traffic is not proof that a service is unreachable.</p>
 <p>Full evidence for every finding is in the technical report.</p><script>
 (function(){
 const table=document.querySelector('table.findings');

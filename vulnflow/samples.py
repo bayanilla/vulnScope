@@ -1,4 +1,10 @@
-"""Generate a small synthetic environment that exercises every code path.
+"""Generate a synthetic 250-host environment that exercises every code path.
+
+The estate: a DMZ (web, mail, VPN, proxy), a server subnet, ~190 Windows workstations and
+VPN laptops, printers and cameras. Background traffic covers both directions: clients
+using file, directory, proxy and app servers, backups, monitoring and software pushes
+(east/west), plus customers, mail, VPN users, browsing through the proxy, IoT cloud
+check-ins and blocked internet scanning (north/south).
 
 Story: web01 (DMZ) runs a vulnerable Apache. An outside address trips the firewall's
 IPS signature for that CVE (alert only), web01 then connects back to it, uploads data
@@ -69,6 +75,140 @@ for ip in WORKSTATIONS:
                   3, 8.8, ["CVE-2024-7965", "CVE-2024-7971"], True, False,
                   "The browser installed on the remote host is affected by multiple vulnerabilities.",
                   "Upgrade to Microsoft Edge version 129.0.2792.52 or later."))
+
+
+# -- the rest of the estate (250 scanned hosts in total) ---------------------------------
+_E = random.Random(2026)        # fixed, so the scan and hostnames never change between runs
+DMZ_WEB = [f"10.10.1.{i}" for i in range(11, 15)]
+MAIL, VPN, PROXY = "10.10.1.25", "10.10.1.30", "10.10.1.40"
+APPS = [f"10.10.2.{i}" for i in range(30, 38)]
+DBS = ["10.10.2.21", "10.10.2.22", "10.10.2.23"]
+SQL, FS02 = "10.10.2.24", "10.10.2.26"
+SCCM, BACKUP, MON, PRINTSRV, GIT, CI = (f"10.10.2.{i}" for i in range(40, 46))
+JUMP02 = "10.10.3.6"
+PRINTERS = [f"10.10.4.{i}" for i in range(51, 59)]
+CAMERAS = [f"10.10.4.{i}" for i in range(60, 70)]
+OFFICE = [f"10.10.3.{i}" for i in range(48, 200)]
+LAPTOPS = [f"10.10.7.{i}" for i in range(10, 47)]   # VPN address pool
+CLIENTS = WORKSTATIONS + OFFICE + LAPTOPS
+NEW_SERVERS = APPS + DBS + [SQL, FS02, SCCM, BACKUP, MON, PRINTSRV, GIT, CI]
+
+for i, ip in enumerate(DMZ_WEB, 2):
+    HOSTS[ip] = (f"web0{i}.corp.example", "Linux Kernel 5.15 on Ubuntu 22.04")
+HOSTS[MAIL] = ("mail01.corp.example", "Linux Kernel 5.15 on Ubuntu 22.04")
+HOSTS[VPN] = ("vpn01.corp.example", "Ivanti Connect Secure 22.3")
+HOSTS[PROXY] = ("proxy01.corp.example", "Linux Kernel 4.18 on Red Hat Enterprise Linux 8")
+for i, ip in enumerate(APPS, 2):
+    HOSTS[ip] = (f"app0{i}.corp.example", "Linux Kernel 5.15 on Ubuntu 22.04")
+for i, ip in enumerate(DBS, 2):
+    HOSTS[ip] = (f"db0{i}.corp.example", "Linux Kernel 5.15 on Ubuntu 22.04")
+HOSTS[SQL] = ("sql01.corp.example", "Microsoft Windows Server 2016")
+HOSTS[FS02] = ("fs02.corp.example", "Microsoft Windows Server 2019")
+HOSTS[SCCM] = ("sccm01.corp.example", "Microsoft Windows Server 2019")
+HOSTS[BACKUP] = ("backup01.corp.example", "Microsoft Windows Server 2019")
+HOSTS[MON] = ("mon01.corp.example", "Linux Kernel 5.15 on Ubuntu 22.04")
+HOSTS[PRINTSRV] = ("print01.corp.example", "Microsoft Windows Server 2016")
+HOSTS[GIT] = ("git01.corp.example", "Linux Kernel 5.15 on Ubuntu 22.04")
+HOSTS[CI] = ("jenkins01.corp.example", "Linux Kernel 5.15 on Ubuntu 22.04")
+HOSTS[JUMP02] = ("jump02.corp.example", "Microsoft Windows Server 2022")
+for ip in PRINTERS:
+    HOSTS[ip] = (f"prn-{ip.split('.')[-1]}.corp.example", _E.choice(["HP LaserJet", "Xerox VersaLink", "Ricoh MP"]))
+for ip in CAMERAS:
+    HOSTS[ip] = (f"cam-{ip.split('.')[-1]}.corp.example", "Hikvision IP Camera")
+for ip in OFFICE:
+    HOSTS[ip] = (f"ws-{ip.split('.')[-1]:0>3}.corp.example",
+                 _E.choice(["Microsoft Windows 10 Enterprise"] * 3 + ["Microsoft Windows 11 Enterprise"] * 2))
+for ip in LAPTOPS:
+    HOSTS[ip] = (f"lt-{ip.split('.')[-1]:0>3}.corp.example", "Microsoft Windows 11 Enterprise")
+
+
+def _v(ip, port, svc, pid, name, sev, cvss, cves, expl, msf, syn, sol, proto="tcp"):
+    VULNS.append((ip, port, proto, svc, pid, name, sev, cvss, cves, expl, msf, syn, sol))
+
+
+CLIENT_VULNS = [  # plugins a typical client fleet carries, picked per host
+    (0, "general", "207053", "Microsoft Edge (Chromium) < 129.0.2792.52 Multiple Vulnerabilities", 3, 8.8,
+     ["CVE-2024-7965", "CVE-2024-7971"], True, False,
+     "The browser installed on the remote host is affected by multiple vulnerabilities.",
+     "Upgrade to Microsoft Edge version 129.0.2792.52 or later."),
+    (0, "general", "206722", "Google Chrome < 128.0.6613.84 Multiple Vulnerabilities", 3, 8.8,
+     ["CVE-2024-7965"], True, False, "The browser installed on the remote host is affected by multiple vulnerabilities.",
+     "Upgrade to Google Chrome version 128.0.6613.84 or later."),
+    (0, "general", "205440", "KB5041580: Windows 10 Version 22H2 Security Update (August 2024)", 4, 9.8,
+     ["CVE-2024-38063"], False, False, "The remote Windows host is missing security update 5041580.",
+     "Apply Security Update 5041580."),
+    (0, "general", "192951", "Adobe Acrobat Reader < 24.002.20687 Multiple Vulnerabilities (APSB24-29)", 3, 7.8,
+     ["CVE-2024-30284"], False, False, "The PDF reader on the remote host is affected by multiple vulnerabilities.",
+     "Upgrade to Adobe Acrobat Reader 24.002.20687 or later."),
+    (0, "general", "189385", "7-Zip < 24.07 Code Execution", 3, 7.0, ["CVE-2024-11477"], False, False,
+     "The archiver on the remote host is affected by a code execution vulnerability.", "Upgrade to 7-Zip 24.07 or later."),
+    (0, "general", "201084", "Zoom Client < 6.0.2 Privilege Escalation", 2, 6.5, ["CVE-2024-27240"], False, False,
+     "The Zoom client on the remote host is affected by a privilege escalation vulnerability.",
+     "Upgrade to Zoom Client 6.0.2 or later."),
+    (445, "cifs", "57608", "SMB Signing not required", 2, 5.3, [], False, False,
+     "Signing is not required on the remote SMB server.", "Enforce message signing in the host's configuration."),
+]
+for ip in OFFICE + LAPTOPS:
+    for c in _E.sample(CLIENT_VULNS, _E.randint(1, 3)):
+        _v(ip, *c)
+
+for ip in DMZ_WEB:
+    _v(ip, 443, "www", "200206", "nginx 1.25.x < 1.25.4 Multiple Vulnerabilities", 3, 7.5, ["CVE-2024-24989"],
+       False, False, "The web server is affected by multiple denial of service vulnerabilities.",
+       "Upgrade to nginx 1.25.4 or later.")
+_v(MAIL, 25, "smtp", "187315", "Postfix SMTP Smuggling", 2, 5.3, ["CVE-2023-51764"], False, False,
+   "The mail server is affected by an SMTP smuggling vulnerability.", "Upgrade Postfix and set smtpd_forbid_bare_newline.")
+_v(VPN, 443, "www", "189987", "Ivanti Connect Secure Command Injection (CVE-2024-21887)", 4, 9.1,
+   ["CVE-2023-46805", "CVE-2024-21887"], True, True,
+   "The VPN appliance is affected by authentication bypass and command injection vulnerabilities.",
+   "Apply the vendor patch and run the integrity checker.")
+_v(PROXY, 3128, "http_proxy", "182251", "Squid < 6.4 Multiple Vulnerabilities", 3, 7.5, ["CVE-2023-46846"],
+   False, False, "The proxy is affected by request smuggling and denial of service vulnerabilities.",
+   "Upgrade to Squid 6.4 or later.")
+for ip in APPS[:3]:
+    _v(ip, 8080, "www", "156057", "Apache Log4j < 2.15.0 Remote Code Execution (Log4Shell)", 4, 10.0,
+       ["CVE-2021-44228"], True, True, "The application uses a Log4j version affected by remote code execution.",
+       "Upgrade to Apache Log4j 2.17.1 or later.")
+for ip in APPS[3:]:
+    _v(ip, 8080, "www", "171340", "Apache Tomcat 9.0.x < 9.0.71 Information Disclosure", 2, 5.3, ["CVE-2023-28708"],
+       False, False, "The Tomcat server is affected by an information disclosure vulnerability.",
+       "Upgrade to Apache Tomcat 9.0.71 or later.")
+for ip in DBS:
+    _v(ip, 5432, "postgresql", "183965", "PostgreSQL 13.x < 13.13 Multiple Vulnerabilities", 3, 8.8,
+       ["CVE-2023-5868", "CVE-2023-5869", "CVE-2023-5870"], False, False,
+       "The database server is affected by multiple vulnerabilities including an integer overflow.",
+       "Upgrade to PostgreSQL 13.13 or later.")
+_v(SQL, 1433, "mssql", "73756", "Microsoft SQL Server Unsupported Version Detection", 4, 10.0, [], False, False,
+   "The installed version of SQL Server is no longer supported.", "Upgrade to a supported version of SQL Server.")
+_v(FS02, 445, "cifs", "57608", "SMB Signing not required", 2, 5.3, [], False, False,
+   "Signing is not required on the remote SMB server.", "Enforce message signing in the host's configuration.")
+_v(SCCM, 0, "general", "205440", "KB5041578: Windows Server 2019 Security Update (August 2024)", 4, 9.8,
+   ["CVE-2024-38063"], False, False, "The remote Windows host is missing security update 5041578.",
+   "Apply Security Update 5041578.")
+_v(BACKUP, 9401, "veeam", "173914", "Veeam Backup & Replication Credential Disclosure (CVE-2023-27532)", 4, 7.5,
+   ["CVE-2023-27532"], True, True, "The backup service exposes encrypted credentials to unauthenticated users.",
+   "Upgrade to Veeam Backup & Replication 12.0.0.1420 P20230223 or later.")
+_v(MON, 161, "snmp", "41028", "SNMP Agent Default Community Name (public)", 3, 7.5, ["CVE-1999-0517"], True, False,
+   "The community name of the remote SNMP server can be guessed.", "Disable SNMP or change the default community string.",
+   proto="udp")
+_v(PRINTSRV, 0, "general", "151440", "Windows Print Spooler Service Enabled (PrintNightmare)", 4, 8.8,
+   ["CVE-2021-34527"], True, True, "The Print Spooler service on the remote host is affected by remote code execution.",
+   "Apply the July 2021 updates and restrict Point and Print.")
+_v(GIT, 443, "www", "187600", "GitLab 16.1 < 16.7.2 Account Takeover via Password Reset", 4, 10.0, ["CVE-2023-7028"],
+   True, False, "The GitLab instance allows account takeover through the password reset flow.",
+   "Upgrade to GitLab 16.7.2 or later and enable two-factor authentication.")
+_v(CI, 8080, "www", "189463", "Jenkins < 2.442 Arbitrary File Read (CVE-2024-23897)", 4, 9.8, ["CVE-2024-23897"],
+   True, True, "The Jenkins CLI allows unauthenticated reading of arbitrary files.", "Upgrade to Jenkins 2.442 or later.")
+_v(JUMP02, 3389, "msrdp", "58453", "Terminal Services Doesn't Use Network Level Authentication (NLA) Only", 2, 4.0,
+   [], False, False, "The remote Terminal Services doesn't use NLA only.", "Enable Network Level Authentication.")
+for ip in PRINTERS:
+    _v(ip, 161, "snmp", "41028", "SNMP Agent Default Community Name (public)", 3, 7.5, ["CVE-1999-0517"], True, False,
+       "The community name of the remote SNMP server can be guessed.",
+       "Disable SNMP or change the default community string.", proto="udp")
+for ip in CAMERAS:
+    _v(ip, 80, "www", "153600", "Hikvision IP Camera Command Injection (CVE-2021-36260)", 4, 9.8, ["CVE-2021-36260"],
+       True, True, "The camera's web server is affected by an unauthenticated command injection vulnerability.",
+       "Upgrade the camera firmware to the vendor's fixed release.")
 
 
 def _nessus(path):
@@ -181,7 +321,101 @@ def _flows(rng):
                        bytes=rng.randint(1000, 90000)))
     nf.append(dict(ts=t(), s="10.10.3.40", d="10.10.6.71", sp=50000, dp=8443, bytes=500))
     nf.append(nf[-1])  # exact duplicate, removed during cleaning
+    _estate_flows(random.Random(rng.random()), t, zeek, pan)
     return zeek, pan, nf, threats
+
+
+def _estate_flows(rng, t, zeek, pan):
+    """Background traffic for the rest of the estate. Nothing here is suspicious on purpose."""
+    def z(s, d, dp, n, proto="tcp", svc="-", state="SF"):
+        for _ in range(n):
+            zeek.append(dict(ts=t(), s=s, sp=rng.randint(49152, 65535), d=d, dp=dp, proto=proto, svc=svc,
+                             state=state, ob=0 if state != "SF" else rng.randint(200, 6000),
+                             rb=0 if state != "SF" else rng.randint(500, 60000)))
+
+    def p(s, d, dp, app, n, action="allow", fz="trust", tz="untrust", big=False):
+        for _ in range(n):
+            ok = action == "allow"
+            pan.append(dict(ts=t(), s=s() if callable(s) else s, sp=rng.randint(1024, 65535),
+                            d=d() if callable(d) else d, dp=dp, app=app, action=action, fz=fz, tz=tz,
+                            sent=rng.randint(400, 3000), rcvd=rng.randint(2000, 400000 if big else 90000) if ok else 0))
+
+    def ext(prefix):
+        return lambda: f"{prefix}.{rng.randint(1, 254)}"
+
+    # east/west: every client logs on, resolves names, maps drives, prints and uses the proxy and apps
+    for ws in OFFICE + LAPTOPS:
+        z(ws, "10.10.0.10", 88, rng.randint(2, 5), svc="krb")
+        z(ws, "10.10.0.10", 389, rng.randint(2, 5), svc="ldap")
+        z(ws, "10.10.0.53", 53, rng.randint(2, 6), proto="udp", svc="dns")
+        z(ws, rng.choice(["10.10.2.25", FS02, FS02]), 445, rng.randint(3, 10), svc="smb")
+        z(ws, PROXY, 3128, rng.randint(4, 12), svc="http")
+        z(ws, rng.choice(APPS), 8080, rng.randint(1, 4), svc="http")
+        z(ws, SCCM, 8530, rng.randint(1, 2), svc="http")
+        if rng.random() < 0.5:
+            z(ws, PRINTSRV, 445, rng.randint(1, 2), svc="smb")
+        if rng.random() < 0.12:     # developers
+            z(ws, GIT, 443, rng.randint(2, 6), svc="ssl")
+            z(ws, GIT, 22, rng.randint(1, 3), svc="ssh")
+            z(ws, CI, 8080, rng.randint(1, 3), svc="http")
+    for ws in OFFICE[::9]:          # software pushes from SCCM to a slice of the fleet
+        z(SCCM, ws, 445, 2, svc="smb")
+        z(SCCM, ws, 135, 1, svc="dce_rpc")
+    for k, web in enumerate(DMZ_WEB):
+        z(web, APPS[k], 8080, rng.randint(60, 90), svc="http")
+        z(web, "10.10.0.53", 53, 10, proto="udp", svc="dns")
+    for app in APPS:
+        z(app, rng.choice(DBS), 5432, rng.randint(40, 80), svc="postgresql")
+        z(app, "10.10.0.10", 389, 4, svc="ldap")
+    for app in APPS[::2]:
+        z(app, SQL, 1433, rng.randint(20, 40), svc="tds")
+    z(DBS[0], DBS[1], 5432, 30, svc="postgresql")      # replication
+    z(CI, GIT, 22, 40, svc="ssh")
+    z(CI, APPS[5], 22, 12, svc="ssh")                   # deployments
+    z(MAIL, "10.10.0.10", 389, 20, svc="ldap")
+    z(PROXY, "10.10.0.53", 53, 60, proto="udp", svc="dns")
+    z(PRINTSRV, "10.10.0.10", 389, 6, svc="ldap")
+    for prn in PRINTERS:
+        z(PRINTSRV, prn, 9100, rng.randint(10, 30), svc="-")
+        z(MON, prn, 161, 6, proto="udp", svc="snmp")
+    for cam in CAMERAS:
+        z(MON, cam, 80, 4, svc="http")
+        z(MON, cam, 554, 6, svc="rtsp")
+    for srv in NEW_SERVERS + DMZ_WEB + [MAIL, PROXY, VPN]:
+        if srv != MON:
+            z(MON, srv, 161, 3, proto="udp", svc="snmp")
+        if srv not in (BACKUP, MON, VPN):
+            z(BACKUP, srv, 445 if srv in (SQL, FS02, SCCM, PRINTSRV) else 22, 2,
+              svc="smb" if srv in (SQL, FS02, SCCM, PRINTSRV) else "ssh")
+    for srv in [SQL, FS02, SCCM, BACKUP, PRINTSRV]:
+        z(JUMP02, srv, 3389, rng.randint(3, 8), svc="rdp")
+    for srv in APPS + DBS + [GIT, CI, MON]:
+        z(JUMP02, srv, 22, rng.randint(2, 6), svc="ssh")
+    z(SCCM, BACKUP, 9401, 4, svc="-")                   # backup console
+    z(OFFICE[3], "10.10.3.90", 445, 3, state="REJ")     # peer-to-peer SMB refused
+    z(OFFICE[7], CAMERAS[2], 80, 4, state="S0")         # a user poking at a camera's web UI
+
+    # north/south through the firewall
+    for web in DMZ_WEB:
+        p(ext("198.51.100"), web, 443, "ssl", rng.randint(60, 120), fz="untrust", tz="dmz")
+    p(ext("209.85.220"), MAIL, 25, "smtp", 90, fz="untrust", tz="dmz")          # inbound mail
+    p(MAIL, ext("40.107.22"), 25, "smtp", 70, fz="dmz", tz="untrust")           # outbound mail
+    p(ext("73.162"), VPN, 443, "ssl", 160, fz="untrust", tz="dmz")              # staff on VPN
+    p(ext("24.18"), VPN, 443, "ssl", 90, fz="untrust", tz="dmz")
+    p(PROXY, ext("93.184"), 443, "ssl", 380, fz="dmz", big=True)                # browsing via the proxy
+    p(PROXY, ext("151.101"), 443, "ssl", 160, fz="dmz", big=True)
+    p(PROXY, ext("142.250"), 80, "web-browsing", 60, fz="dmz")
+    p(SCCM, ext("13.107.4"), 443, "ms-update", 40, big=True)
+    p(GIT, ext("140.82.112"), 443, "github", 25)
+    p(CI, ext("104.16.24"), 443, "ssl", 30)                                     # package mirrors
+    for cam in CAMERAS:                                                         # IoT cloud check-ins
+        p(cam, ext("47.88.59"), 443, "ssl", rng.randint(3, 8))
+    p(lambda: rng.choice(OFFICE), ext("93.184"), 443, "ssl", 120, action="deny")  # direct browsing blocked
+    p(lambda: rng.choice(OFFICE), "8.8.8.8", 53, "dns", 40, action="deny")        # outside DNS blocked
+    p(ext("192.0.2"), VPN, 22, "incomplete", 45, action="deny", fz="untrust", tz="dmz")
+    p(ext("192.0.2"), MAIL, 3389, "incomplete", 30, action="deny", fz="untrust", tz="dmz")
+    p(ext("198.18.0"), lambda: rng.choice(DMZ_WEB), 8080, "incomplete", 50, action="deny",
+      fz="untrust", tz="dmz")
 
 
 def generate(outdir: str, seed: int = 7) -> list[str]:

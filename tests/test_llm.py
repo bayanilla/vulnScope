@@ -44,7 +44,10 @@ class ContextTests(Base):
         a, b = build_context(self.res), build_context(self.res)
         self.assertEqual(a, b)                       # byte-identical => cacheable
         data = json.loads(a)
-        self.assertEqual(len(data["findings"]), len(self.res["findings"]))
+        total = len(self.res["findings"])
+        self.assertEqual(len(data["findings"]), min(total, llm.MAX_FINDINGS_IN_CONTEXT))
+        if total > llm.MAX_FINDINGS_IN_CONTEXT:     # the sample estate is larger than the cap
+            self.assertIn(f"of {total} findings", data["note"])
         self.assertIn("connected back", " ".join(data["findings"][0]["indicators"]).replace("outbound connection(s) to", "connected back"))
 
     def test_focus_details_finds_hosts_and_cves(self):
