@@ -39,7 +39,7 @@ TYPES = {".html": "text/html; charset=utf-8", ".md": "text/markdown; charset=utf
          ".jsonl": "application/x-ndjson; charset=utf-8"}
 
 FORM = """<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Vulnerability Exposure Workflow</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>vulnScope</title>
 {theme_init}<style>{css} form{{border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:16px 0}}
 label{{display:block;font-weight:600;margin:14px 0 4px}} .hint{{color:var(--muted);font-size:.9rem}}
 button{{margin-top:18px;padding:8px 18px;font-size:1rem}}
@@ -52,7 +52,7 @@ button.secondary{{background:transparent;color:var(--fg);border:1px solid var(--
 #pk-list{{list-style:none;margin:8px 0 0;padding:0;max-height:280px;overflow:auto;border-top:1px solid var(--line)}}
 #pk-list li{{padding:5px 8px;cursor:pointer;border-bottom:1px solid var(--line)}} #pk-list li:hover,#pk-list li:focus{{background:rgba(127,127,127,.15)}}
 #pk-list li::before{{content:"📁  "}}</style></head><body>{theme_ui}
-<h1>Vulnerability Exposure Workflow</h1>
+<h1>Point vulnScope to the files</h1>
 <p>Point the workflow at a folder of network telemetry and Nessus results, or upload files. It cleans and
 normalizes the data, correlates scanned hosts with observed traffic, and produces an executive summary and a
 technical report.</p>
