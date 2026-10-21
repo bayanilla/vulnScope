@@ -67,7 +67,7 @@ border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 8px 30px rgba(0,0
 text-shadow:0 0 12px rgba(46,230,214,.5);pointer-events:none;animation:breathe 3s infinite;transition:opacity .6s}
 #hint.gone{opacity:0}
 #intro{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;
-background:radial-gradient(circle,rgba(4,7,13,.2),rgba(4,7,13,.95));transition:opacity 1.2s;z-index:10}
+background:radial-gradient(circle,transparent,var(--bg) 85%);transition:opacity 1.2s;z-index:10}
 #intro.gone{opacity:0}#intro-text{color:var(--cyan);letter-spacing:.3em;font-size:13px;text-transform:uppercase;
 text-shadow:0 0 14px rgba(46,230,214,.6)}
 @keyframes pulse{50%{opacity:.35}}@keyframes breathe{50%{opacity:.45}}

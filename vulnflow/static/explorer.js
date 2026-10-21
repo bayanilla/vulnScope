@@ -5,6 +5,15 @@ const cv = document.getElementById('stage'), ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// backdrop follows the report theme picked on the vulnflow pages (same browser storage when served);
+// light themes get a dark slate, since the glowing graph needs a dark canvas
+const BACKDROP = {dark: ['#16223a', '#0f172a'], nord: ['#434c5e', '#3b4252'], 'high-contrast': ['#0a0a0a', '#000000'],
+  matrix: ['#05200c', '#020b04']};
+const SLATE = ['#3a4a60', '#283548'];
+let themeName = 'dark';
+try { themeName = localStorage.getItem('vulnflow-theme') || 'dark'; } catch (_) {}
+const [BG_IN, BG_OUT] = BACKDROP[themeName] || SLATE;
+document.documentElement.style.setProperty('--bg', BG_OUT);
 const SEV = {Critical: '#ff3b5c', High: '#ff8a3d', Medium: '#ffd23f', Low: '#4dabf7', Info: '#8da2b5', '': '#8da2b5'};
 const RETURN = '#b98cff';
 const KIND = {alert: '#ff3b5c', vuln: '#ff8a3d', reached: '#ffc857', outbound: RETURN, attempt: '#8892a6', blocked: '#5b6b82'};
@@ -198,7 +207,7 @@ function frame(now) {
   ctx.clearRect(0, 0, W, H);
   // backdrop: deep gradient + parallax stars
   const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.75);
-  g.addColorStop(0, '#0a1424'); g.addColorStop(1, '#03050a');
+  g.addColorStop(0, BG_IN); g.addColorStop(1, BG_OUT);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   const T = now / 1000;
   stars.forEach(s => {
