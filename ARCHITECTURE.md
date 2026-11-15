@@ -190,7 +190,24 @@ Mac, the native Python install is faster.
 
 ### Air-gapped networks and enclaves
 
-On a computer with internet access, build a bundle for the target's architecture:
+**From a release (nothing to build).** Each GitHub release has the published image saved as a file
+per architecture, with `compose.yaml`, `env.example`, `LOAD.txt` and `SHA256SUMS`. Download the
+image file for the target (`amd64` for Intel/AMD, `arm64` for Apple silicon and ARM servers) and
+the four small files, carry them across, then:
+
+```sh
+sha256sum -c SHA256SUMS --ignore-missing
+docker load -i vulnscope-max-1.2.0-image-amd64.tar.gz
+cp env.example .env           # set VULNSCOPE_DATA, VULNSCOPE_RUNS, and VULNSCOPE_OFFLINE=1
+docker compose up -d          # the image is already loaded, so nothing is pulled
+```
+
+These files are pulled back from ghcr.io after publishing, so they are exactly the image others
+download. The release workflow is `.github/workflows/release.yml`; see
+[Releasing](DEVELOPMENT.md#releasing-a-ready-made-image).
+
+**Your own build.** For changes not released yet, or with your own build flags, build a bundle
+for the target's architecture on a computer with internet access:
 
 ```sh
 scripts/docker/offline-bundle.sh linux/amd64     # Intel/AMD PCs and servers
