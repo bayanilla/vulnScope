@@ -23,6 +23,7 @@ and correlates with DuckDB.
 
 - [Start VulnScope](#start-vulnscope)
   - [Update VulnScope (Docker)](#update-vulnscope-docker)
+  - [Port in use or page won't load](#port-in-use-or-page-wont-load)
 - [Analyze your logs and scans](#analyze-your-logs-and-scans)
 - [Explore hosts](#explore-hosts)
 - [Ask the Security Assistant](#ask-the-security-assistant)
@@ -118,6 +119,64 @@ python3 -m vulnflow serve            # upload page on http://127.0.0.1:8080/
 `start_upload_page.py` does the same from VS Code's Run button and opens the browser. Without the
 install step VulnScope stops with `ModuleNotFoundError: No module named 'duckdb'`. Packet captures
 also need Zeek (`brew install zeek`, a Linux package, or `VULNSCOPE_ZEEK=/path/to/zeek`).
+
+### Port in use or page won't load
+
+VulnScope never changes your computer's network or proxy settings. If the upload page does not
+start or does not open, check these on your system.
+
+**Port 8080 is already in use.** Another program on this computer is listening on 8080: often a
+local proxy (Burp Suite, OWASP ZAP, mitmproxy), another web app, or an older VulnScope. You see:
+
+- Docker: `Bind for 127.0.0.1:8080 failed: port is already allocated`, or on Linux
+  `failed to bind host port ... address already in use`, and the container does not start.
+- Python: `OSError: [Errno 48] Address already in use` (macOS), `[Errno 98]` (Linux) or
+  `[WinError 10048]` (Windows).
+
+Find out what is using the port:
+
+| System | Command |
+|---|---|
+| macOS | `lsof -nP -iTCP:8080 -sTCP:LISTEN` |
+| Linux | `sudo ss -ltnp 'sport = :8080'` |
+| Windows (PowerShell) | `Get-Process -Id (Get-NetTCPConnection -LocalPort 8080 -State Listen).OwningProcess` |
+| Windows (Command Prompt) | `netstat -ano \| findstr :8080`, then `tasklist /FI "PID eq <pid>"` |
+| Docker | `docker ps --filter publish=8080` (another container holding the port) |
+
+Then either stop that program, or run VulnScope on another port:
+
+- **Docker:** set `VULNSCOPE_PORT=8090` in `.env` (the same for the ready-made and the self-built
+  `compose.yaml`), run `docker compose up -d`, and open **http://127.0.0.1:8090/**. Leave the `8080`
+  on the right of the `ports:` line in `compose.yaml` alone; that is the port inside the container.
+- **Python:** `python3 -m vulnflow serve --port 8090`, then open **http://127.0.0.1:8090/**.
+  `start_upload_page.py` already moves to the next free port on its own and prints which one.
+
+Theme, view and Explorer choices are remembered per address, so on a new port pick them again.
+
+**The page will not load behind a proxy.** If your browser or operating system sends web traffic
+through a proxy, it may also send `http://127.0.0.1:8080/` there, and the proxy refuses or cannot
+reach it (an error page from the proxy, a timeout, or "access denied"). Add `127.0.0.1` and
+`localhost` to the proxy bypass list:
+
+- **Windows:** Settings > Network & internet > Proxy > Manual proxy setup, add
+  `127.0.0.1;localhost` under "Use the proxy server except for addresses", and tick
+  "Don't use the proxy server for local (intranet) addresses".
+- **macOS:** System Settings > Network > (your connection) > Details > Proxies, add `127.0.0.1`
+  and `localhost` to "Bypass proxy settings for these hosts & domains".
+- **Firefox** has its own setting: Settings > Network Settings, "No proxy for".
+- **PAC file or group policy:** if a managed PAC file sends everything to the proxy or the settings
+  are locked, ask your IT or proxy team to exempt `127.0.0.1` and `localhost`.
+
+Chrome and Edge already skip the proxy for `localhost` and `127.0.0.1` unless a policy or PAC file
+says otherwise. A proxy on another machine (such as `proxy.corp.example:8080`) does not conflict
+with VulnScope's port 8080; only a program listening on this computer does. Always open the page as
+`127.0.0.1` or `localhost`: other names for this computer are refused on purpose (see
+[Upload page security](ARCHITECTURE.md#upload-page-security)).
+
+If you set `HTTP_PROXY` or `HTTPS_PROXY` in the environment VulnScope runs in, its own outbound
+calls (IOC article previews, Cloudflare Radar, the AI provider) use that proxy too. Add
+`NO_PROXY=localhost,127.0.0.1` there if you point the Security Assistant at a model on this
+computer (for example `--llm-base-url http://localhost:11434/v1`).
 
 ### Try it without your own data
 
