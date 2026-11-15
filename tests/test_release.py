@@ -20,6 +20,8 @@ def service_lines(name: str) -> list[str]:
     body = text[text.index("\nname: vulnscope") :].splitlines()
     out, skipping = [], False
     for line in body:
+        if line.startswith("name: ") or line.startswith("# Its own project name"):
+            continue  # the release file runs as its own project (tested below)
         if IMAGE_KEYS.match(line):
             skipping = True  # also skip the key's own indented lines (build: / context: .)
             continue
@@ -39,6 +41,21 @@ class ReleaseComposeTests(unittest.TestCase):
         self.assertIn("image: ${VULNSCOPE_IMAGE:-ghcr.io/bayanilla/vulnscope-max:latest}", text)
         self.assertNotIn("build:", text)
         self.assertNotIn("pull_policy: never", text)
+
+    def test_release_compose_is_its_own_project(self) -> None:
+        # Same project name = same container: `up` in one folder would replace the other folder's container.
+        def name(f: str) -> str:
+            return re.search(r"^name: (\S+)", (ROOT / f).read_text(encoding="utf-8"), re.M).group(1)
+        self.assertEqual(name("compose.yaml"), "vulnscope")
+        self.assertEqual(name("compose.release.yaml"), "vulnscope-release")
+
+    def test_default_port_avoids_8080_on_the_host(self) -> None:
+        # 8080 is Burp Suite's and OWASP ZAP's default. The container side stays 8080 (Dockerfile EXPOSE, healthcheck).
+        for f in ("compose.yaml", "compose.release.yaml"):
+            text = (ROOT / f).read_text(encoding="utf-8")
+            self.assertIn('"127.0.0.1:${VULNSCOPE_PORT:-8765}:8080"', text, f)
+            self.assertIn('VULNSCOPE_PUBLIC_PORT: "${VULNSCOPE_PORT:-8765}"', text, f)
+        self.assertRegex((ROOT / ".env.example").read_text(encoding="utf-8"), r"(?m)^VULNSCOPE_PORT=8765$")
 
     def test_env_example_does_not_pick_an_image(self) -> None:
         # A VULNSCOPE_IMAGE line in .env.example would override the ghcr.io default for everyone who copies it.

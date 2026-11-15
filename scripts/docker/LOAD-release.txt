@@ -22,7 +22,9 @@ Nothing is built on your computer. Put compose.yaml and env.example in a folder 
 
 3. Start it:
       docker compose up -d
-   Open http://127.0.0.1:8080/ in a browser on this computer.
+   Open http://127.0.0.1:8765/ in a browser on this computer.
+   "port is already allocated": another program uses 8765; set VULNSCOPE_PORT=<another port>
+   in .env and run the same command again.
 
 4. Command line instead of the upload page:
       docker compose run --rm vulnscope analyze /data/case1 -o /runs/case1
