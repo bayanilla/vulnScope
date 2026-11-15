@@ -42,7 +42,8 @@ python3 -m unittest discover -s tests
   ordinary web browsing and the WRCCDC data is Zeek logs, which hold no file contents. Run it locally
   with `scripts/accuracy/run.sh /tmp/brim-data /tmp/brim-work` (needs Docker; about 10 minutes).
 
-It needs no secrets, API key or model. A PR shows a green check or a red cross for each job; the
+The Release workflow runs all of it again on a version tag before publishing an image (see
+[Releasing](#releasing-a-ready-made-image)). It needs no secrets, API key or model. A PR shows a green check or a red cross for each job; the
 failing step's log is one click away under **Details**.
 
 | Test file | Covers |
@@ -60,6 +61,7 @@ failing step's log is one click away under **Details**.
 | `test_saved.py`, `test_report_name.py` | Reopening a saved report; report names, networks and timestamped run folders |
 | `test_compare.py` | Compare reports: counts per report and network, the re-hunt over saved data, the all-networks Explorer (islands, shared-item highlights, fair trimming), command line and page, the two-company sample |
 | `test_web_errors.py` | Which analysis errors the upload page shows, and which go to the server console |
+| `test_release.py` | The ready-made image's `compose.release.yaml` matches `compose.yaml` apart from the image; `.env.example` does not pin an image |
 
 ## Samples
 
@@ -89,6 +91,37 @@ scripts/docker/offline-bundle.sh linux/arm64           # air-gapped bundle; see 
 
 The image must use the same Python as the Zeek base (Debian trixie, Python 3.13), since DuckDB is
 a compiled wheel. Both linux/amd64 and linux/arm64 builds are supported.
+
+## Releasing a ready-made image
+
+`.github/workflows/release.yml` publishes the image so analysts can `docker compose pull` instead of
+building. It runs when a tag starting with `v` is pushed:
+
+```sh
+git checkout main && git pull --ff-only
+git tag v1.2.0 && git push origin v1.2.0      # or GitHub: Releases > Draft a new release > new tag v1.2.0
+```
+
+1. **CI**: the whole `ci.yml` (hygiene, tests, Explorer, Docker image, accuracy) runs on the tagged
+   commit. Nothing is published if any job fails.
+2. **Image**: builds linux/amd64 and linux/arm64 (arm64 under QEMU) and pushes
+   `ghcr.io/bayanilla/vulnscope-max:1.2.0`, `:1.2` and `:latest`. A pre-release tag such as
+   `v1.2.0-rc1` gets only its own tag and never moves `latest`.
+3. **Release**: pulls each architecture back from ghcr.io, checks it starts, saves it with
+   `docker save` (about 190 MB each, gzipped) and attaches both files, `compose.yaml` (a copy of
+   `compose.release.yaml`), `env.example`, `LOAD.txt` (from `scripts/docker/LOAD-release.txt`) and
+   `SHA256SUMS` to the GitHub release, creating the release with generated notes if it does not exist.
+
+It uses only the workflow's own `GITHUB_TOKEN`; no secrets to set up. **Actions > Release > Run
+workflow** builds both architectures without pushing or releasing anything, as a dry run.
+
+The first push creates the package on ghcr.io. If `docker compose pull` then asks for a login, the
+package is private: open it from the repository's **Packages** list, **Package settings > Change
+visibility > Public**. A private package works too, but every analyst then needs
+`docker login ghcr.io` with a GitHub token that can read it.
+
+`compose.release.yaml` must stay the same as `compose.yaml` apart from where the image comes from;
+`tests/test_release.py` fails when one is changed without the other.
 
 ## Local data that must stay local
 

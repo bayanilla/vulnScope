@@ -1,0 +1,31 @@
+VulnScope MAX + Zeek @VERSION@, ready-made image
+=================================================
+
+Needs Docker (Docker Engine with the Compose plugin on Linux, Docker Desktop on macOS/Windows).
+Nothing is built on your computer. Put compose.yaml and env.example in a folder of their own.
+
+1. Settings (optional): copy env.example to .env next to compose.yaml and edit it:
+   VULNSCOPE_DATA = your logs/scans/PCAP folder, VULNSCOPE_RUNS = where results go.
+
+2a. With internet access, download the image:
+      docker compose pull
+    It is @IMAGE@:latest; to stay on this release set
+    VULNSCOPE_IMAGE=@IMAGE@:@VERSION@ in .env.
+
+2b. No internet (enclave): carry the image file for your computer across and load it:
+      amd64 = Intel/AMD PCs and servers, arm64 = Apple silicon Macs and ARM servers
+      sha256sum -c SHA256SUMS --ignore-missing   (macOS: shasum -a 256 -c SHA256SUMS --ignore-missing;
+                                                  Windows: Get-FileHash <file> and compare)
+      docker load -i vulnscope-max-@VERSION@-image-amd64.tar.gz
+    In .env also set VULNSCOPE_OFFLINE=1 (skips IOC article previews), keep the Security
+    Assistant on the built-in offline provider and leave CLOUDFLARE_RADAR_API_TOKEN unset.
+
+3. Start it:
+      docker compose up -d
+   Open http://127.0.0.1:8080/ in a browser on this computer.
+
+4. Command line instead of the upload page:
+      docker compose run --rm vulnscope analyze /data/case1 -o /runs/case1
+
+Updating: `docker compose pull && docker compose up -d` (offline: load the newer image file,
+then `docker compose up -d`). Then run Analyze again; older runs keep the version they were made with.

@@ -41,6 +41,18 @@ One image holds VulnScope, DuckDB and [Zeek](https://zeek.org) for linux/amd64 a
 (Intel/AMD PCs, servers and Apple silicon Macs), so packet captures work out of the box. You need
 Docker Desktop on macOS and Windows, or Docker Engine with the Compose plugin on Linux.
 
+**Ready-made image (nothing to build).** Each release publishes the image to
+`ghcr.io/bayanilla/vulnscope-max`. From the [latest release](https://github.com/bayanilla/vulnscope_max/releases/latest)
+download `compose.yaml` and `env.example` into a folder of their own, then:
+
+```sh
+cp env.example .env           # optional: set VULNSCOPE_DATA, VULNSCOPE_RUNS, port, memory
+docker compose pull           # download the image
+docker compose up -d          # start the upload page
+```
+
+**Build it yourself** from this repository instead (for changes not released yet):
+
 ```sh
 git clone https://github.com/bayanilla/vulnscope_max.git
 cd vulnscope_max
@@ -48,15 +60,27 @@ cp .env.example .env          # optional: set VULNSCOPE_DATA, VULNSCOPE_RUNS, po
 docker compose up -d          # builds once, then starts the upload page
 ```
 
-Open **http://127.0.0.1:8080/**. Results go to `VULNSCOPE_RUNS` (default `./vulnscope-out`).
-Stop it with `docker compose down`. For enclaves with no internet, build an offline bundle on a
-connected computer and load it on the other side; see
-[Air-gapped networks](ARCHITECTURE.md#air-gapped-networks-and-enclaves).
+Either way, open **http://127.0.0.1:8080/**. Results go to `VULNSCOPE_RUNS` (default
+`./vulnscope-out`). Stop it with `docker compose down`. For enclaves with no internet, each release
+also has the image as a file per architecture (`vulnscope-max-<version>-image-amd64.tar.gz` for
+Intel/AMD, `-arm64` for Apple silicon and ARM servers) to carry across and `docker load`, with the
+steps in the release's `LOAD.txt`; see [Air-gapped networks](ARCHITECTURE.md#air-gapped-networks-and-enclaves).
 
 ### Update VulnScope (Docker)
 
-The image holds a copy of the code taken when it was built, so restarting Docker or the container
-keeps running the old version. To update, rebuild:
+The image holds a copy of the code taken when it was built (or released), so restarting Docker or
+the container keeps running the old version.
+
+With the **ready-made image**, download the new version and restart on it:
+
+```sh
+docker compose pull && docker compose up -d
+```
+
+If you pinned a version with `VULNSCOPE_IMAGE=ghcr.io/bayanilla/vulnscope-max:1.2.0` in `.env`,
+change the number first. Offline, `docker load` the newer image file, then `docker compose up -d`.
+
+If you **built it yourself**, rebuild:
 
 ```sh
 cd vulnscope_max                       # the folder you cloned
@@ -75,9 +99,10 @@ To check that it worked, `docker compose ps` should show the container as `Up` (
 |---|---|
 | `git pull` refuses: "Your local changes would be overwritten" | Someone edited files in the folder. `git status` lists them. Keep a copy with `git stash` (put it back later with `git stash pop`), or discard them with `git checkout -- <file>`, then pull again. `.env` is not tracked, so your settings are safe. |
 | macOS: `docker: command not found` or `docker-credential-desktop` not found | Docker Desktop's tools are not on your PATH. Run `export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"`, or add that line to `~/.zshrc`. |
-| The page looks unchanged after updating | You restarted without `--build`, or are looking at an old run. Rebuild as above, reload, and analyze again. |
+| The page looks unchanged after updating | You restarted without `--build` (or `pull`), or are looking at an old run. Update as above, reload, and analyze again. |
+| `docker compose pull`: "denied" or "unauthorized" | The image is not public yet, or the name in `VULNSCOPE_IMAGE` is wrong. Check the [package page](https://github.com/bayanilla/vulnscope_max/pkgs/container/vulnscope-max), or build it yourself. |
 | Explorer, theme or view choices look different | The browser remembers them per address (`127.0.0.1:8080` and `127.0.0.1:8100` are separate). Pick them again, or clear the site's data. |
-| Air-gapped bundle | Build a new bundle on a connected computer, `docker load` the new image, unpack the new source over the old folder (keep your `.env`), then `docker compose up -d --no-build`. See [Air-gapped networks](ARCHITECTURE.md#air-gapped-networks-and-enclaves). |
+| Air-gapped bundle | Load the newer image file from the release and `docker compose up -d`, or build a new bundle on a connected computer, `docker load` the new image, unpack the new source over the old folder (keep your `.env`), then `docker compose up -d --no-build`. See [Air-gapped networks](ARCHITECTURE.md#air-gapped-networks-and-enclaves). |
 
 ### With Python
 
