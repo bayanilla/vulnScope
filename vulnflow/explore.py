@@ -11,9 +11,14 @@ where to look; it is not a probability of compromise and it never confirms one.
 """
 from __future__ import annotations
 
+import base64
+import io
 import ipaddress
 import json
+import math
 import os
+import re
+import zlib
 from collections import Counter, defaultdict
 from datetime import datetime
 
@@ -24,6 +29,14 @@ STATIC = os.path.join(os.path.dirname(__file__), "static")
 MAX_HOP2, MAX_NODES = 30, 2000
 MAX_SUBNET_LINKS, MAX_RISKY_LINKS, MAX_INTERNET, MAX_INTERNET_TARGETS = 600, 200, 80, 12
 MAX_CONNECTION_EXAMPLES, MAX_OT_EVENTS_PER_HOST = 6, 40
+# A host's card keeps its first MAX_LIST outside addresses and MAX_LIST internal peers (in the card's
+# own order); outside addresses with an IPS alert that was not blocked are kept even past that, up to
+# MAX_LIST_ALERTS. (Hits on vulnerable services are not: an exposed server can be reached by thousands
+# of internet scanners. They rank right after alerts, so they fill the list first.) Counts, the internet panel, Attack paths and the overview are worked out from the full
+# lists first, so they stay exact. When a list is cut, only its first MAX_LIST_EXAMPLES rows keep their
+# connection examples. The full lists go to normalized/explorer_contacts.parquet (with the flow copies),
+# which the upload server hands to the page, one host at a time, when the report is opened through it.
+MAX_LIST, MAX_LIST_EXAMPLES, MAX_LIST_ALERTS = 200, 20, 1000
 # Timeline view: individual flows drawn at their timestamps. Large runs keep flagged flows (to/from an
 # alert or IOC address, then blocked) up to half the cap, sampled over the whole run, and fill the rest
 # with a fixed random sample (see _timeline).
@@ -57,46 +70,17 @@ class _Pair:
         self.examples: list[dict] = []
 
 
-def _pairs(ds) -> dict[tuple, _Pair]:
-    """Per (source, destination) connection rollup, aggregated in DuckDB."""
-    con = ds.flow_store().con
-    pairs: dict[tuple, _Pair] = {}
-    cur = con.cursor()
-    cur.execute("""
-        SELECT src_ip, dst_ip, count(*), count(*) FILTER (action = 'allow' AND established),
-               count(*) FILTER (action <> 'allow'),
-               list(DISTINCT dst_port) FILTER (dst_port IS NOT NULL),
-               list(DISTINCT dst_port) FILTER (dst_port IS NOT NULL AND action = 'allow' AND established),
-               coalesce(sum(bytes_out + bytes_in), 0), min(ts), max(ts),
-               min(ts) FILTER (action = 'allow' AND established), max(ts) FILTER (action = 'allow' AND established)
-        FROM flows WHERE src_ip <> dst_ip GROUP BY src_ip, dst_ip ORDER BY min(seq)""")
-    while rows := cur.fetchmany(10_000):
-        for src, dst, n, est, blocked, tried, ports, nbytes, first, last, first_est, last_est in rows:
-            p = _Pair()
-            p.sessions, p.established, p.blocked, p.bytes = int(n), int(est), int(blocked), int(nbytes)
-            p.tried, p.ports = set(tried or ()), set(ports or ())
-            p.first, p.last = utc(first), utc(last)
-            p.first_est, p.last_est = utc(first_est), utc(last_est)
-            pairs[(src, dst)] = p
-    # Examples: the first distinct connections of each pair, in time order. A sorted scan
-    # (which DuckDB spills to disk) keeps memory flat; a window function per pair does not.
-    cur.execute("""
-        SELECT src_ip, dst_ip, src_port, dst_port, proto, app, action, established, source
-        FROM flows WHERE src_ip <> dst_ip ORDER BY src_ip, dst_ip, seq""")
-    p, p_key = None, None
-    while rows := cur.fetchmany(10_000):
-        for src, dst, sport, dport, proto, app, action, est, source in rows:
-            if p is None or p_key != (src, dst):
-                p_key = (src, dst)
-                p = pairs[p_key]
-            if len(p.examples) >= MAX_CONNECTION_EXAMPLES:
-                continue
-            ex = {"src_ip": src, "src_port": sport, "dst_ip": dst, "dst_port": dport, "proto": proto,
-                  "app": app, "action": action, "established": est, "source": source}
-            if ex not in p.examples:
-                p.examples.append(ex)
-    cur.close()
-    return pairs
+def _pair(row) -> _Pair:
+    """A _Pair from a PAIR_STATS row (store.py); None when the row is empty (no traffic that way)."""
+    n, est, blocked, tried, ports, nbytes, first, last, first_est, last_est = row
+    if n is None:
+        return None
+    p = _Pair()
+    p.sessions, p.established, p.blocked, p.bytes = int(n), int(est), int(blocked), int(nbytes)
+    p.tried, p.ports = set(tried or ()), set(ports or ())
+    p.first, p.last = utc(first), utc(last)
+    p.first_est, p.last_est = utc(first_est), utc(last_est)
+    return p
 
 
 def _iso(ts):
@@ -140,30 +124,69 @@ def _vuln_hits(ds, services: dict, scanners=()) -> dict[tuple, set]:
     port, protocol and the finding's scan window exactly as the report does. Probes from the
     vulnerability scanner itself are not counted, as in the report."""
     rows = [(h, p, pr, naive(lo), naive(hi)) for h, svcs in services.items() for p, pr, lo, hi in svcs]
-    if not rows:
-        return {}
-    store = ds.flow_store()
-    store.insert_rows("explore_vkeys", {"host": "VARCHAR", "port": "INTEGER", "proto": "VARCHAR",
-                                        "lo": "TIMESTAMP", "hi": "TIMESTAMP"}, set(rows))
     hits = defaultdict(set)
-    for src, dst, port, proto in store.con.execute("""
-            SELECT DISTINCT f.src_ip, f.dst_ip, f.dst_port, f.proto FROM flows f JOIN explore_vkeys k
-              ON f.dst_ip = k.host AND f.dst_port = k.port AND f.proto = k.proto
-             AND (k.lo IS NULL OR f.ts IS NULL OR f.ts BETWEEN k.lo AND k.hi)
-            WHERE f.action = 'allow' AND f.established AND f.src_ip <> f.dst_ip
-              AND NOT list_contains(?, f.src_ip)""", [list(scanners)]).fetchall():
+    for src, dst, port, proto in ds.flow_store().vuln_hits(rows, scanners):
         hits[(src, dst)].add((port, proto))
-    store.con.execute("DROP TABLE explore_vkeys")
     return hits
 
 
-def build(res: dict, ds, cfg: Config | None = None) -> dict:
+def _ms(iso) -> float | None:
+    try:
+        return _parse_iso(iso).timestamp() * 1000 if iso else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _attack_bins(window, rows) -> list:
+    """The Attack paths view's timeline bars for one host, from all of its outside addresses:
+    [[bar, vuln, blocked, outbound]], with the bars attackpaths.js renderTimeline draws."""
+    t0, t1 = (_ms(w) for w in (window or [None, None])[:2])
+    if t0 is None or t1 is None or not t1 > t0:
+        return []
+    width = max(3600e3, math.ceil((t1 - t0) / 56 / 3600e3) * 3600e3)
+    nb = math.ceil((t1 - t0) / width)
+    bins: dict[int, list] = {}
+    for a in rows:
+        col = {"vuln": 1, "blocked": 2, "outbound": 3}.get(a["kind"])
+        t = _ms(a["first"]) if col else None
+        if t is None:
+            continue
+        i = math.floor((t - t0) / width)
+        if 0 <= i < nb:
+            bins.setdefault(i, [i, 0, 0, 0])[col] += 1
+    return [bins[i] for i in sorted(bins)]
+
+
+def _cut(rows: list, cap: int | None, keep=lambda r: False) -> list:
+    """The first ``cap`` rows, plus any later row ``keep`` says must stay (in order)."""
+    if cap is None or len(rows) <= cap:
+        return rows
+    return rows[:cap] + [r for r in rows[cap:] if keep(r)]
+
+
+def build(res: dict, ds, cfg: Config | None = None, cap: int | None = MAX_LIST,
+          contacts_path: str | None = None) -> dict:
+    """The Explorer data for a run. ``cap``: rows kept in each host's lists (None keeps every row).
+    ``contacts_path``: also write every host's full lists there (Parquet), for the upload server."""
     cfg = cfg or Config(internal_nets=res["config"]["internal_nets"])
     net = _Net(cfg.internal_nets)
     telemetry_only = not res["summary"].get("vulnerability_data_available", True)
-    pairs = _pairs(ds)
+    store = ds.flow_store()
+    scanned = [h["host"] for h in res["hosts"]]
+
+    def ext(ip):
+        try:
+            return not net.internal(ip)
+        except ValueError:
+            return False
+
+    store.explorer_tables(ext, scanned)
+    # Pairs between internal hosts (and hosts with a card) are held here; a host's contacts with
+    # outside addresses stream from DuckDB one host at a time below.
+    pairs = {}
     out_of, in_to = defaultdict(set), defaultdict(set)
-    for s, d in pairs:
+    for s, d, *row in store.inner_pairs():
+        pairs[(s, d)] = _pair(row)
         out_of[s].add(d)
         in_to[d].add(s)
 
@@ -193,18 +216,20 @@ def build(res: dict, ds, cfg: Config | None = None) -> dict:
 
     # Addresses that were only probed and never answered are not hosts: they are counted per host
     # ("probed, no answer") instead of being drawn as peers.
-    answering = ds.flow_store().answering_ips()
-    broadcast = ds.flow_store().broadcast_ips() - answering
+    answering = store.answering_ips()
+    broadcast = store.broadcast_ips() - answering
     traffic_scanners = {e["ip"]: e for e in res["summary"].get("traffic_scanners") or ()}
-
-    def ext(ip):
-        try:
-            return not net.internal(ip)
-        except ValueError:
-            return False
+    reached: dict[tuple, dict] = {}
 
     def reach(a: str, b: str) -> dict:
-        """How easily someone in control of `a` could compromise `b`, from what was observed."""
+        """How easily someone in control of `a` could compromise `b`, from what was observed
+        (it depends only on the two hosts, so each pair is worked out once)."""
+        got = reached.get((a, b))
+        if got is None:
+            got = reached[(a, b)] = _reach(a, b)
+        return got
+
+    def _reach(a: str, b: str) -> dict:
         fwd, back = pairs.get((a, b)), pairs.get((b, a))
         if telemetry_only:
             return {"p": 0.0, "why": ["Vulnerability status unknown; observed connections do not establish compromise likelihood."]}
@@ -246,7 +271,6 @@ def build(res: dict, ds, cfg: Config | None = None) -> dict:
             why.append("not in the vulnerability scan, so its weaknesses are unknown")
         return {"p": round(min(1.0, r * v), 2), "why": why}
 
-    scanned = [h["host"] for h in res["hosts"]]
     nodes: dict[str, dict] = {}
     from .netmap import NetMap
     netmap = NetMap(res.get("network_map", []))
@@ -272,63 +296,12 @@ def build(res: dict, ds, cfg: Config | None = None) -> dict:
             nodes[ip]["net"] = netmap.index(ip)
         return nodes[ip]
 
+    contacts = _ContactWriter(store) if contacts_path else None
+    inports: dict[str, Counter] = defaultdict(Counter)      # ports hosts with a card use on each peer
+    peers_cut = False
     focus = {}
     for ip in scanned:
         node(ip)
-        # north/south: every outside address this host exchanged traffic with, in either direction
-        atk = []
-        for src in in_to.get(ip, set()) | out_of.get(ip, set()):
-            if not ext(src):
-                continue
-            p, back = pairs.get((src, ip)), pairs.get((ip, src))
-            al = alerts[ip].get(src, [])
-            open_al = [t for t in al if not t.blocked]
-            hit = sorted({port for port, _ in vhits.get((src, ip), ())}) if p else []
-            if p:
-                kind = ("alert" if open_al else "vuln" if hit else "reached" if p.established
-                        else "blocked" if p.blocked else "attempt")
-            else:
-                kind = "alert" if open_al else "outbound"
-            span = [x for x in (p, back) if x]
-            first = min((x.first for x in span if x.first), default=None)
-            last = max((x.last for x in span if x.last), default=None)
-            atk.append({"ip": src, "kind": kind, "dir": "both" if p and back else "in" if p else "out",
-                        "sessions": p.sessions if p else 0, "established": p.established if p else 0,
-                        "blocked": p.blocked if p else 0, "ports": sorted(p.tried)[:8] if p else [],
-                        "vuln_ports": hit,
-                        "out_sessions": back.sessions if back else 0,
-                        "out_established": back.established if back else 0,
-                        "out_ports": sorted(back.tried)[:8] if back else [],
-                        "connection_examples": (p.examples if p else []) + (back.examples if back else []),
-                        "alerts": len(open_al), "alerts_blocked": len(al) - len(open_al),
-                        "alerts_in": sum(t.src_ip == src for t in al),
-                        "alert_examples": [{"src_ip": t.src_ip, "dst_ip": t.dst_ip,
-                                            "dst_port": t.dst_port, "name": t.name,
-                                            "blocked": t.blocked} for t in al[:MAX_CONNECTION_EXAMPLES]],
-                        "signatures": sorted({t.name for t in al})[:3],
-                        "returned": _returned(p, back),
-                        "first": _iso(first), "last": _iso(last)})
-        known_outside = {a["ip"] for a in atk}
-        for src, al in alerts[ip].items():           # IPS-only sources with no flow in either direction
-            if ext(src) and src not in known_outside:
-                open_al = [t for t in al if not t.blocked]
-                atk.append({"ip": src, "kind": "alert" if open_al else "blocked",
-                            "dir": "out" if all(t.src_ip == ip for t in al) else "in", "sessions": 0,
-                            "established": 0, "blocked": 0, "ports": sorted({t.dst_port for t in al if t.dst_port})[:8],
-                            "vuln_ports": [], "out_sessions": 0, "out_established": 0, "out_ports": [],
-                            "connection_examples": [],
-                            "alerts": len(open_al), "alerts_blocked": len(al) - len(open_al),
-                            "alerts_in": sum(t.src_ip == src for t in al),
-                            "alert_examples": [{"src_ip": t.src_ip, "dst_ip": t.dst_ip,
-                                                "dst_port": t.dst_port, "name": t.name,
-                                                "blocked": t.blocked} for t in al[:MAX_CONNECTION_EXAMPLES]],
-                            "signatures": sorted({t.name for t in al})[:3], "returned": False,
-                            "first": None, "last": None})
-        rank = {"alert": 0, "vuln": 1, "reached": 2, "outbound": 3, "attempt": 4, "blocked": 5}
-        atk.sort(key=lambda a: (rank[a["kind"]], -a["alerts"], -a["alerts_blocked"], -a["established"],
-                                -a["sessions"] - a["out_sessions"], a["ip"]))
-        n_ext = len(atk)
-
         # east/west: every internal peer in either direction (failed attempts too), then onward peers
         peers, probed_only, probed_blocked = [], Counter(), 0
         for other in (out_of.get(ip, set()) | in_to.get(ip, set())):
@@ -351,11 +324,13 @@ def build(res: dict, ds, cfg: Config | None = None) -> dict:
                           "out_tries": o.sessions if o else 0, "in_tries": i.sessions if i else 0,
                           "ports_out": sorted(o.ports if ok else o.tried)[:8] if o else [],
                           "ports_in": sorted(i.ports if ok else i.tried)[:8] if i else [],
-                          "connection_examples": (o.examples if o else []) + (i.examples if i else []),
+                          "connection_examples": [],
                           "p": est["p"], "band": ("Unknown" if telemetry_only else _band(est["p"])) if ok else "None", "why": est["why"]})
         peers.sort(key=lambda p: (-p["p"], p["band"] == "None", -(p["out"] + p["in"]),
                                   -(p["out_tries"] + p["in_tries"]), p["ip"]))
         n_peers = len(peers)
+        for p in peers:
+            inports[p["ip"]].update(p["ports_out"])
         hop1 = {p["ip"]: p["p"] for p in peers}
         hop2 = {}
         for mid, p1 in hop1.items():
@@ -372,8 +347,15 @@ def build(res: dict, ds, cfg: Config | None = None) -> dict:
         h2 = sorted((p for p in hop2.values() if p["p"] >= 0.05), key=lambda p: (-p["p"], p["ip"]))[:MAX_HOP2]
         for p in h2:
             node(p["ip"])
+        if contacts:
+            contacts.add(ip, "p", peers)
+        blast = {"high": sum(p["band"] == "High" for p in peers),
+                 "medium": sum(p["band"] == "Medium" for p in peers),
+                 "low": sum(p["band"] == "Low" for p in peers)}
+        kept_peers = _cut(peers, cap)
+        peers_cut |= len(kept_peers) < n_peers
         focus[ip] = {
-            "attackers": atk, "attackers_total": n_ext, "peers": peers, "peers_total": n_peers, "hop2": h2,
+            "attackers": [], "attackers_total": 0, "peers": kept_peers, "peers_total": n_peers, "hop2": h2,
             "probed_only": sum(probed_only.values()), "probed_blocked": probed_blocked,
             # where this host's unanswered probing went: [subnet, addresses], most probed first
             "probed_ranges": [[sn, n] for sn, n in sorted(probed_only.items(), key=lambda kv: (-kv[1], kv[0]))[:12]],
@@ -385,9 +367,7 @@ def build(res: dict, ds, cfg: Config | None = None) -> dict:
                           "exposure": r["exposure"]["label"],
                           "evidence": [{"c": i["confidence"], "t": i["text"]} for i in r["indicators"]]}
                          for r in findings.get(ip, [])],
-            "blast": {"high": sum(p["band"] == "High" for p in peers),
-                      "medium": sum(p["band"] == "Medium" for p in peers),
-                      "low": sum(p["band"] == "Low" for p in peers)},
+            "blast": blast,
         }
 
     # overview edges: internal pairs touching at least one node we keep
@@ -407,28 +387,132 @@ def build(res: dict, ds, cfg: Config | None = None) -> dict:
                                         nodes[n]["pri"] or "P9", -(nodes[n]["score"] or 0),
                                         n not in alerted, n not in ot_hosts, -activity(n), n))[:MAX_NODES]
     kept = set(keep)
+
+    # north/south: every outside address each host exchanged traffic with, in either direction,
+    # one host at a time; the internet panel adds up all of them
+    inet = _InternetTally(kept)
+    ext_stats: dict[str, tuple[int, bool]] = {}
+    window = [res["summary"].get("window_start"), res["summary"].get("window_end")]
+    atk_cut = False
+
+    def outside(ip, rows):
+        nonlocal atk_cut
+        atk = []
+        for src, (p, back) in rows.items():
+            al = alerts[ip].get(src, [])
+            open_al = [t for t in al if not t.blocked]
+            hit = sorted({port for port, _ in vhits.get((src, ip), ())}) if p else []
+            if p:
+                kind = ("alert" if open_al else "vuln" if hit else "reached" if p.established
+                        else "blocked" if p.blocked else "attempt")
+            else:
+                kind = "alert" if open_al else "outbound"
+            span = [x for x in (p, back) if x]
+            first = min((x.first for x in span if x.first), default=None)
+            last = max((x.last for x in span if x.last), default=None)
+            atk.append({"ip": src, "kind": kind, "dir": "both" if p and back else "in" if p else "out",
+                        "sessions": p.sessions if p else 0, "established": p.established if p else 0,
+                        "blocked": p.blocked if p else 0, "ports": sorted(p.tried)[:8] if p else [],
+                        "vuln_ports": hit,
+                        "out_sessions": back.sessions if back else 0,
+                        "out_established": back.established if back else 0,
+                        "out_ports": sorted(back.tried)[:8] if back else [],
+                        "connection_examples": [],
+                        "alerts": len(open_al), "alerts_blocked": len(al) - len(open_al),
+                        "alerts_in": sum(t.src_ip == src for t in al),
+                        "alert_examples": [{"src_ip": t.src_ip, "dst_ip": t.dst_ip,
+                                            "dst_port": t.dst_port, "name": t.name,
+                                            "blocked": t.blocked} for t in al[:MAX_CONNECTION_EXAMPLES]],
+                        "signatures": sorted({t.name for t in al})[:3],
+                        "returned": _returned(p, back),
+                        "first": _iso(first), "last": _iso(last)})
+        for src, al in alerts[ip].items():           # IPS-only sources with no flow in either direction
+            if ext(src) and src not in rows:
+                open_al = [t for t in al if not t.blocked]
+                atk.append({"ip": src, "kind": "alert" if open_al else "blocked",
+                            "dir": "out" if all(t.src_ip == ip for t in al) else "in", "sessions": 0,
+                            "established": 0, "blocked": 0, "ports": sorted({t.dst_port for t in al if t.dst_port})[:8],
+                            "vuln_ports": [], "out_sessions": 0, "out_established": 0, "out_ports": [],
+                            "connection_examples": [],
+                            "alerts": len(open_al), "alerts_blocked": len(al) - len(open_al),
+                            "alerts_in": sum(t.src_ip == src for t in al),
+                            "alert_examples": [{"src_ip": t.src_ip, "dst_ip": t.dst_ip,
+                                                "dst_port": t.dst_port, "name": t.name,
+                                                "blocked": t.blocked} for t in al[:MAX_CONNECTION_EXAMPLES]],
+                            "signatures": sorted({t.name for t in al})[:3], "returned": False,
+                            "first": None, "last": None})
+        atk.sort(key=lambda a: (KIND_RANK[a["kind"]], -a["alerts"], -a["alerts_blocked"], -a["established"],
+                                -a["sessions"] - a["out_sessions"], a["ip"]))
+        if contacts:
+            contacts.add(ip, "a", atk)
+        for a in atk:
+            inet.add(ip, a)
+        f = focus[ip]
+        ext_stats[ip] = (len(atk), any(a["kind"] == "alert" for a in atk))
+        kept_atk = _cut(atk, cap, lambda a: a["kind"] == "alert")
+        if cap is not None and len(kept_atk) > max(cap, MAX_LIST_ALERTS):
+            kept_atk = kept_atk[:max(cap, MAX_LIST_ALERTS)]
+        f["attackers"], f["attackers_total"] = kept_atk, len(atk)
+        if len(kept_atk) < len(atk):
+            atk_cut = True
+            kinds = Counter(a["kind"] for a in atk)
+            f["capped"] = {"kinds": dict(sorted(kinds.items())), "times": _attack_bins(window, atk),
+                           "vports": sorted({p for a in atk if a["kind"] == "vuln" for p in a["vuln_ports"]})}
+
+    done = set()
+    group, rows = None, {}
+    for host, addr, inbound, outbound in store.outside_contacts():
+        if host != group:
+            if group in focus:
+                outside(group, rows)
+                done.add(group)
+            group, rows = host, {}
+        rows[addr] = (_pair(inbound), _pair(outbound))
+    if group in focus:
+        outside(group, rows)
+        done.add(group)
+    for ip in scanned:
+        if ip not in done:
+            outside(ip, {})
+
     links = {}
-    for (s, d), p in pairs.items():
-        if p.established and s in kept and d in kept:
+    for (s, d), pair in pairs.items():
+        if pair.established and s in kept and d in kept:
             k = tuple(sorted((s, d)))
-            links[k] = links.get(k, 0) + p.established
-    ext_count = {ip: focus[ip]["attackers_total"] for ip in focus}
-    ext_alert = {ip: any(a["kind"] == "alert" for a in focus[ip]["attackers"]) for ip in focus}
+            links[k] = links.get(k, 0) + pair.established
     for n in keep:
-        nodes[n]["ext"] = ext_count.get(n, 0)
-        nodes[n]["alert"] = ext_alert.get(n, False)
-    overview = _overview_summary(pairs, nodes, focus, kept, ext)
+        nodes[n]["ext"], nodes[n]["alert"] = ext_stats.get(n, (0, False))
+    overview = _overview_summary(pairs, nodes, ext_stats, kept, ext, inet)
     ioc_by_host = defaultdict(set)
     for match in res.get("ioc_matches", []):
         for host in match.get("hosts", []):
             if host in focus:
                 ioc_by_host[host].add(match["id"])
-    timeline = _timeline(ds, res, keep, ext, services, pairs, scanners)
+    timeline = _timeline(ds, res, keep, ext, services, scanners)
+
+    # connection examples: every row of the full lists (written beside the flow copies), or only the
+    # rows the page shows them for
+    shown = {ip: f for ip, f in focus.items() if ip in kept}
+    want = set()
+    for ip, f in shown.items():
+        for a in _example_rows(f["attackers"], f["attackers_total"], cap):
+            want |= {(a["ip"], ip), (ip, a["ip"])}
+        for q in _example_rows(f["peers"], f["peers_total"], cap):
+            want |= {(ip, q["ip"]), (q["ip"], ip)}
+    store.pair_examples(None if contacts else want, MAX_CONNECTION_EXAMPLES)
+    ex = store.examples_for(want) if want else {}
+    for ip, f in shown.items():
+        for a in _example_rows(f["attackers"], f["attackers_total"], cap):
+            a["connection_examples"] = ex.get((a["ip"], ip), []) + ex.get((ip, a["ip"]), [])
+        for q in _example_rows(f["peers"], f["peers_total"], cap):
+            q["connection_examples"] = ex.get((ip, q["ip"]), []) + ex.get((q["ip"], ip), [])
+    if contacts:
+        contacts.finish(contacts_path)
     s = res["summary"]
-    return {
+    data = {
         "vulnerability_data_available": not telemetry_only,
         "generated": res["generated"], "report": res.get("report") or {"name": "", "description": ""},
-        "window": [s.get("window_start"), s.get("window_end")],
+        "window": window,
         "counts": {"hosts": len(scanned) if telemetry_only else res["coverage"]["scanned_hosts"], "flows": s["flows"], "p1": s["priority_counts"]["P1"],
                    "alerts": s.get("threat_alerts", 0)},
         "nodes": [nodes[n] for n in keep],
@@ -436,13 +520,96 @@ def build(res: dict, ds, cfg: Config | None = None) -> dict:
         # the page expects every focusable host to be drawn
         "networks": [{"name": e["name"], "type": e["type"], "cloud": e["cloud"], "cidr": e["cidr"]}
                      for e in res.get("network_map", [])],
-        "focus": {ip: f for ip, f in focus.items() if ip in kept}, "ioc_matches": res.get("ioc_matches", []), **overview,
+        "focus": shown, "ioc_matches": res.get("ioc_matches", []), **overview,
         "ioc_counts": {host: len(ids) for host, ids in ioc_by_host.items()},
         "article_briefs": res.get("article_briefs", {}),
         "probed_subnets": dict(res["coverage"].get("probed_only_subnets") or ()),
         "start": (keep[0] if telemetry_only and keep else res["hosts"][0]["host"] if res["hosts"] else None),
         "timeline": timeline,
     }
+    if atk_cut or peers_cut:
+        # Some lists are cut: what the page needs from the full lists, and where they are
+        data["lists"] = {"cap": cap, "file": bool(contacts)}
+        if peers_cut:          # Attack paths: ports other hosts use on each drawn host
+            data["inports"] = {n: [p for p, _ in sorted(inports[n].items(), key=lambda kv: (-kv[1], kv[0]))[:4]]
+                               for n in keep if inports.get(n)}
+        if atk_cut:            # the all-networks map adds up outside addresses over reports
+            data["outside_all"] = inet.compact()
+    return data
+
+
+def _example_rows(rows: list, total: int, cap: int | None) -> list:
+    """The rows of a host's list that carry connection examples on the page: all of them, or the
+    first MAX_LIST_EXAMPLES when the list was cut."""
+    return rows if cap is None or len(rows) >= total else rows[:MAX_LIST_EXAMPLES]
+
+
+class _ContactWriter:
+    """Every host's full lists, rows streamed into DuckDB in batches, then written to Parquet with
+    their connection examples (store.write_contacts)."""
+
+    def __init__(self, store):
+        self.store, self.rows, self.first = store, [], True
+
+    def add(self, host: str, side: str, rows: list):
+        for rank, r in enumerate(rows):
+            body = {k: v for k, v in r.items() if k != "connection_examples"}
+            self.rows.append((host, side, rank, r["ip"], json.dumps(body, separators=(",", ":"), default=str)))
+        if len(self.rows) >= 50_000:
+            self.flush()
+
+    def flush(self):
+        self.store.insert_rows("explore_contacts", {"host": "VARCHAR", "side": "VARCHAR", "rank": "INTEGER",
+                                                    "ip": "VARCHAR", "row": "VARCHAR"},
+                               self.rows, append=not self.first)
+        self.rows, self.first = [], False
+
+    def finish(self, path: str):
+        self.flush()
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        self.store.write_contacts(path)
+
+
+class _InternetTally:
+    """Outside addresses added up over every host's full list (for the overview's internet panel):
+    each keeps its strongest kind, session and alert totals, how many hosts it touched and its
+    MAX_INTERNET_TARGETS strongest drawn hosts."""
+
+    def __init__(self, kept: set):
+        self.kept, self.e = kept, {}
+
+    def add(self, host: str, a: dict):
+        e = self.e.get(a["ip"])
+        if e is None:
+            e = self.e[a["ip"]] = {"ip": a["ip"], "kind": a["kind"], "sessions": 0, "alerts": 0, "targets": [],
+                                   "in_sessions": 0, "out_sessions": 0, "out_hosts": 0, "alerts_in": 0,
+                                   "hosts_total": 0}
+        if KIND_RANK[a["kind"]] < KIND_RANK[e["kind"]]:
+            e["kind"] = a["kind"]
+        e["sessions"] += a["sessions"] + a["out_sessions"]
+        e["in_sessions"] += a["sessions"]
+        e["out_sessions"] += a["out_sessions"]
+        e["out_hosts"] += a["out_sessions"] > 0
+        e["alerts"] += a["alerts"]
+        e["alerts_in"] += a.get("alerts_in", 0)
+        e["hosts_total"] += 1
+        if host in self.kept:
+            # direction of this host's traffic with the address: in (it reached the host), out (the host
+            # connected out to it) or both
+            d = "both" if a["sessions"] and a["out_sessions"] else "out" if a["out_sessions"] else "in"
+            e["targets"].append([host, a["kind"], a["sessions"] + a["out_sessions"], d])
+            if len(e["targets"]) > 8 * MAX_INTERNET_TARGETS:
+                e["targets"] = _top_targets(e["targets"])
+
+    def compact(self) -> list:
+        """Every address as [ip, kind, inbound sessions, outbound sessions, hosts calling out to it,
+        alerts, alerts it set off, hosts], for the all-networks map (combine.py)."""
+        return [[e["ip"], e["kind"], e["in_sessions"], e["out_sessions"], e["out_hosts"], e["alerts"],
+                 e["alerts_in"], e["hosts_total"]] for e in self.e.values()]
+
+
+def _top_targets(targets: list) -> list:
+    return sorted(targets, key=lambda t: (KIND_RANK[t[1]], -t[2], t[0]))[:MAX_INTERNET_TARGETS]
 
 
 def _hours(ts, t0) -> float:
@@ -469,7 +636,7 @@ def _spread(items: list, cap: int, favour=None, key=lambda x: x[0]) -> list:
     return sorted(fav + _even(rest, cap - len(fav)), key=key)
 
 
-def _timeline(ds, res: dict, keep: list, ext, services: dict, pairs: dict, scanners=frozenset()) -> dict | None:
+def _timeline(ds, res: dict, keep: list, ext, services: dict, scanners=frozenset()) -> dict | None:
     """Flows, IPS alerts and IOC lookups in time order for the Timeline view.
 
     Hosts are referenced by their index in ``nodes`` (>= 0), as len(nodes) + i into ``more`` for internal
@@ -483,9 +650,8 @@ def _timeline(ds, res: dict, keep: list, ext, services: dict, pairs: dict, scann
     how many flows a stretch of time really had. Alerts and IOC lookups beyond their caps are thinned
     evenly over the run, keeping alerts that were not blocked first. Alerts with no timestamp of their
     own are listed apart (``untimed``) rather than placed at a guessed time."""
-    con = ds.flow_store().con
-    row = con.execute("SELECT count(*), min(ts), max(ts) FROM flows WHERE ts IS NOT NULL AND src_ip <> dst_ip").fetchone()
-    total, t0, t1 = int(row[0] or 0), utc(row[1]), utc(row[2])
+    store = ds.flow_store()
+    total, t0, t1 = store.flow_span()
     if not total or t0 is None:
         return None
     t0 = t0.replace(microsecond=0)          # t0 is sent to the page to the second; hours are counted from it
@@ -510,49 +676,24 @@ def _timeline(ds, res: dict, keep: list, ext, services: dict, pairs: dict, scann
 
     flagged = {t.src_ip for t in ds.threats if ext(t.src_ip)}
     flagged |= {m["value"] for m in res.get("ioc_matches", []) if m.get("type") == "ip"}
-    cols = "ts, src_ip, dst_ip, dst_port, action, established, proto"
-    base = "FROM flows WHERE ts IS NOT NULL AND src_ip <> dst_ip"
-    hot = "(list_contains(?, src_ip) OR list_contains(?, dst_ip))"
-    fl = sorted(flagged)
-    cur = con.cursor()
-    sampled = total > MAX_TIMELINE_FLOWS
+    rows, sampled = store.timeline_flows(flagged, MAX_TIMELINE_FLOWS)
     hist = None
-    if not sampled:
-        cur.execute(f"SELECT {cols} {base} ORDER BY seq")
-    else:
-        half = MAX_TIMELINE_FLOWS // 2
-        tiers = [(f"{hot}", [fl, fl]), (f"action <> 'allow' AND NOT {hot}", [fl, fl]),
-                 (f"action = 'allow' AND NOT {hot}", [fl, fl])]
-        counts = [int(con.execute(f"SELECT count(*) {base} AND {w}", a).fetchone()[0]) for w, a in tiers]
-        take = [min(counts[0], half)]
-        take.append(min(counts[1], half - take[0]))
-        take.append(min(counts[2], MAX_TIMELINE_FLOWS - take[0] - take[1]))
-        parts, args = [], []
-        for (w, a), n, k in zip(tiers, counts, take):
-            if not k:
-                continue
-            sample = "" if k >= n else f" USING SAMPLE reservoir({k} ROWS) REPEATABLE (7)"
-            parts.append(f"SELECT * FROM (SELECT {cols}, seq {base} AND {w}){sample}")
-            args += a
-        cur.execute(" UNION ALL ".join(parts) + " ORDER BY seq", args)
+    if sampled:
         # every flow, counted per bucket of time, so a window's real total can be shown next to the sample
         hours = (t1 - t0).total_seconds() / 3600
         bw = max(0.25, hours / 2000)
-        rows = con.execute(f"SELECT CAST(floor((epoch(ts) - ?) / ?) AS BIGINT) AS b, count(*) {base} GROUP BY b ORDER BY b",
-                           [t0.timestamp(), bw * 3600]).fetchall()
-        hist = {"bucket": round(bw, 4), "counts": [[int(b), int(n)] for b, n in rows]}
+        hist = {"bucket": round(bw, 4),
+                "counts": [[int(b), int(n)] for b, n in store.timeline_counts(t0, bw * 3600)]}
     flows, hidden = [], 0
-    while rows := cur.fetchmany(10_000):
-        for r in rows:
-            ts, src, dst, port, action, est, proto = r[:7]
-            s, d = ref(src), ref(dst)
-            if s is None or d is None:
-                hidden += 1
-                continue
-            f = (1 if action != "allow" or est is False else 0) | (2 if src in flagged or dst in flagged else 0) \
-                | (4 if port and src not in scanners and _hits_service(services.get(dst, ()), port, proto, utc(ts)) else 0)
-            flows.append([_hours(utc(ts), t0), s, d, port or 0, f])
-    cur.close()
+    for r in rows:
+        ts, src, dst, port, action, est, proto = r[:7]
+        s, d = ref(src), ref(dst)
+        if s is None or d is None:
+            hidden += 1
+            continue
+        f = (1 if action != "allow" or est is False else 0) | (2 if src in flagged or dst in flagged else 0) \
+            | (4 if port and src not in scanners and _hits_service(services.get(dst, ()), port, proto, utc(ts)) else 0)
+        flows.append([_hours(utc(ts), t0), s, d, port or 0, f])
 
     def dst_ref(ip):
         r = ref(ip)
@@ -601,11 +742,12 @@ def _interleave(by_in: list, by_out: list, cap: int) -> list:
     return top
 
 
-def _overview_summary(pairs, nodes, focus, kept, ext) -> dict:
+def _overview_summary(pairs, nodes, ext_stats, kept, ext, tally) -> dict:
     """Overview aggregates. Subnet totals and subnet-to-subnet traffic cover every host and pair,
     so they stay complete when the host graph is capped at MAX_NODES. Host-level links are kept
     only for risky paths (admin/lateral protocols, or completed sessions into a P1 or a host with
-    exploitation evidence), and outside addresses are ranked by how they touched the network."""
+    exploitation evidence), and outside addresses are ranked by how they touched the network
+    (``tally``: every host's full list added up, see _InternetTally)."""
     subnets = {}
     for ip, n in nodes.items():
         if ext(ip):
@@ -621,10 +763,10 @@ def _overview_summary(pairs, nodes, focus, kept, ext) -> dict:
         sn["likely"] += n["ev"] == "likely"
         sn["lead"] += n["ev"] == "lead"
         sn["max_score"] = max(sn["max_score"], n["score"] or 0)
-        f = focus.get(ip)
-        if f and f["attackers_total"]:
+        n_ext, any_alert = ext_stats.get(ip, (0, False))
+        if n_ext:
             sn["exposed"] += 1
-            sn["alert_hosts"] += any(a["kind"] == "alert" for a in f["attackers"])
+            sn["alert_hosts"] += any_alert
     sublinks: dict[tuple, list] = defaultdict(lambda: [0, 0])
     risky = {}
     for (s, d), p in pairs.items():
@@ -641,25 +783,7 @@ def _overview_summary(pairs, nodes, focus, kept, ext) -> dict:
             parts = ([", ".join(lateral)] if lateral else []) + (["into " + (nodes[d]["pri"] or "flagged") + " host"] if hot else [])
             # level 2: admin protocol into a P1/flagged host; 1: either one
             risky[(s, d)] = [s, d, p.established, " · ".join(parts), 2 if lateral and hot else 1]
-    inet = {}
-    for host, f in focus.items():
-        for a in f["attackers"]:
-            e = inet.get(a["ip"])
-            if e is None:
-                e = inet[a["ip"]] = {"ip": a["ip"], "kind": a["kind"], "sessions": 0, "alerts": 0, "targets": [],
-                                     "in_sessions": 0, "out_sessions": 0, "out_hosts": 0, "alerts_in": 0}
-            if KIND_RANK[a["kind"]] < KIND_RANK[e["kind"]]:
-                e["kind"] = a["kind"]
-            e["sessions"] += a["sessions"] + a["out_sessions"]
-            e["in_sessions"] += a["sessions"]
-            e["out_sessions"] += a["out_sessions"]
-            e["out_hosts"] += a["out_sessions"] > 0
-            e["alerts"] += a["alerts"]
-            e["alerts_in"] += a.get("alerts_in", 0)
-            # direction of this host's traffic with the address: in (it reached the host), out (the host
-            # connected out to it) or both
-            d = "both" if a["sessions"] and a["out_sessions"] else "out" if a["out_sessions"] else "in"
-            e["targets"].append([host, a["kind"], a["sessions"] + a["out_sessions"], d])
+    inet = tally.e
     for e in inet.values():
         # an alert only counts as inbound when the outside address set it off (it was the source);
         # a client-side alert such as a bad server certificate is the internal host going out
@@ -668,15 +792,15 @@ def _overview_summary(pairs, nodes, focus, kept, ext) -> dict:
     # Inbound and outbound are ranked separately and interleaved, so internal hosts calling out are not
     # crowded off the overview by inbound scanners (which outnumber them and rank first by kind).
     by_in = sorted((e for e in inet.values() if e["dir"] != "out"),
-                   key=lambda e: (KIND_RANK[e["kind"]], -len(e["targets"]), -e["sessions"], e["ip"]))
+                   key=lambda e: (KIND_RANK[e["kind"]], -e["hosts_total"], -e["sessions"], e["ip"]))
     by_out = sorted((e for e in inet.values() if e["out_sessions"]),
                     key=lambda e: (e["kind"] != "alert", -e["out_hosts"], -e["out_sessions"], e["ip"]))
     top = _interleave(by_in, by_out, MAX_INTERNET)
     internet = []
     for e in top[:MAX_INTERNET]:
-        e["hosts_total"] = len(e["targets"])
-        e["targets"] = sorted((t for t in e["targets"] if t[0] in kept),
-                              key=lambda t: (KIND_RANK[t[1]], -t[2], t[0]))[:MAX_INTERNET_TARGETS]
+        e = {k: e[k] for k in ("ip", "kind", "sessions", "alerts", "targets", "in_sessions", "out_sessions",
+                               "out_hosts", "alerts_in", "dir", "hosts_total")}
+        e["targets"] = _top_targets(e["targets"])
         internet.append(e)
     for sn in subnets.values():          # a subnet belongs to the named network most of its hosts are in
         nets = sn.pop("nets", None)
@@ -698,15 +822,103 @@ def _read(name: str) -> str:
         return fh.read()
 
 
+CONTACTS_FILE = os.path.join("normalized", "explorer_contacts.parquet")
+
+
+def full_lists(path: str, host: str) -> dict:
+    """A host's full lists (outside addresses and internal peers, every row with its connection
+    examples) from the contacts file ``build`` wrote, for the page to show in place of its cut ones."""
+    from .store import contact_rows
+    out: dict[str, list] = {"attackers": [], "peers": []}
+    for side, row, ex in contact_rows(path, host):
+        r = json.loads(row)
+        r["connection_examples"] = ex or []
+        out["attackers" if side == "a" else "peers"].append(r)
+    return out
+
+
+DATA_TAG = '<script id="vf-data" type="application/octet-stream" data-encoding="gzip-base64">'
+_DATA = re.compile(r'<script id="vf-data" type="application/(json|octet-stream)"( data-encoding="gzip-base64")?>(.*?)</script>', re.S)
+MAX_DATA = 2 * 1024 ** 3        # Explorer data larger than this once unpacked is refused (saved pages)
+
+
+def _json_parts(data: dict):
+    """``data`` as compact JSON, in pieces no larger than one host's card (so the whole text is
+    never built in memory at once). Same text as json.dumps(data, separators=(",", ":"))."""
+    dump = lambda v: json.dumps(v, separators=(",", ":"), default=str)
+    yield "{"
+    for n, (k, v) in enumerate(data.items()):
+        yield ("," if n else "") + dump(k) + ":"
+        if k == "focus" and isinstance(v, dict):
+            yield "{"
+            for m, (ip, f) in enumerate(v.items()):
+                yield ("," if m else "") + dump(ip) + ":" + dump(f)
+            yield "}"
+        else:
+            yield dump(v)
+    yield "}"
+
+
+def write_data(fh, data: dict) -> None:
+    """The Explorer data as gzip in base64, written to ``fh`` piece by piece. The page unpacks it
+    itself (vendored fflate), so it still opens offline and straight from disk."""
+    comp = zlib.compressobj(6, zlib.DEFLATED, 31)       # gzip framing, no timestamp
+    pending = b""
+
+    def out(chunk: bytes):
+        nonlocal pending
+        pending += chunk
+        cut = len(pending) - len(pending) % 3 if len(pending) > 1 << 16 else 0
+        if cut:
+            fh.write(base64.b64encode(pending[:cut]).decode("ascii"))
+            pending = pending[cut:]
+    buf, size = [], 0
+    for part in _json_parts(data):
+        buf.append(part)
+        size += len(part)
+        if size >= 1 << 20:
+            out(comp.compress("".join(buf).encode()))
+            buf, size = [], 0
+    out(comp.compress("".join(buf).encode()))
+    out(comp.flush())
+    fh.write(base64.b64encode(pending).decode("ascii"))
+
+
+def read_data(page: str):
+    """The Explorer data inside a page this module wrote (gzip in base64, or plain JSON in pages
+    written before that). Raises ValueError when there is none or it can't be read."""
+    m = _DATA.search(page)
+    if not m:
+        raise LookupError("no Explorer data in the page")
+    if not m.group(2):
+        return json.loads(m.group(3))
+    try:
+        raw = base64.b64decode(m.group(3).strip(), validate=True)
+        d = zlib.decompressobj(31)
+        text = d.decompress(raw, MAX_DATA)
+        if d.unconsumed_tail:
+            raise ValueError("the Explorer data is larger than VulnScope reads back "
+                             f"({MAX_DATA // 1024 ** 3} GB unpacked)")
+    except (ValueError, zlib.error) as exc:
+        raise ValueError(f"the Explorer data is damaged ({exc})") from None
+    return json.loads(text)
+
+
 def html(data: dict, ioc_drawer: list | None = None) -> str:
-    """The Explorer page for ``data``. ``ioc_drawer``: the IOC list for the indicator details drawer,
-    when it should name hosts differently from the map (the all-networks map does)."""
+    """The Explorer page for ``data`` (see write_html)."""
+    buf = io.StringIO()
+    write_html(buf, data, ioc_drawer)
+    return buf.getvalue()
+
+
+def write_html(fh, data: dict, ioc_drawer: list | None = None) -> None:
+    """Write the Explorer page for ``data`` to ``fh``. ``ioc_drawer``: the IOC list for the indicator
+    details drawer, when it should name hosts differently from the map (the all-networks map does)."""
     from . import ioc_archive
     from html import escape
     from .branding import EXPLORER_NAME, icon_data_uri, load as load_branding
     from .report import HTML_OPEN
     from .theme_backgrounds import explorer_background_css
-    blob = json.dumps(data, separators=(",", ":"), default=str).replace("<", "\\u003c")
     brand = load_branding()
     logo = brand.logo_data_uri()
     brand_markup = ((f'<img class="brand-logo{brand.logo_class}" src="{logo}" alt="" aria-hidden="true">' if logo else "")
@@ -715,18 +927,22 @@ def html(data: dict, ioc_drawer: list | None = None) -> str:
     name = report.get("name") or ""
     report_markup = (f'<span id="report-name" title="{escape(report.get("description") or name)}">{escape(name)}</span>'
                      if name else "")
-    return (HTML_OPEN + "<head><meta charset=\"utf-8\">"
-            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            f"<title>{escape(name) + ' · ' if name else ''}{EXPLORER_NAME} · {escape(brand.name)}</title><meta name=\"application-name\" content=\"{escape(brand.name)}\"><link rel=\"icon\" href=\"{icon_data_uri()}\"><style>" + _read("analyst_chat.css") + _read("explorer.css") + _read("attackpaths.css") + _read("timeline3d.css") + explorer_background_css() + ioc_archive.CSS + "</style></head><body>"
-            + _read("explorer.html").replace("<!--BRAND-->", brand_markup, 1).replace("<!--REPORT-->", report_markup, 1)
-            + f'<script id="vf-data" type="application/json">{blob}</script>'
-            # Three.js (MIT, vendored so the page works offline) and the 3D renderer; the Explorer
-            # falls back to its 2D canvas when WebGL is unavailable
-            + "<script>" + _read("vendor/three.min.js") + "</script>"
-            + "<script>" + _read("explorer3d.js") + "</script>"
-            + "<script>" + _read("explorer.js") + "</script>"
-            + "<script>" + _read("attackpaths.js") + "</script>"
-            + "<script>" + _read("timeline3d.js") + "</script>"
-            + "<script>" + _read("analyst_chat.js") + "</script>"
-            + ioc_archive.drawer_html(data["ioc_matches"] if ioc_drawer is None else ioc_drawer,
-                                     data.get("article_briefs")) + "</body></html>\n")
+    fh.write(HTML_OPEN + "<head><meta charset=\"utf-8\">"
+             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+             f"<title>{escape(name) + ' · ' if name else ''}{EXPLORER_NAME} · {escape(brand.name)}</title><meta name=\"application-name\" content=\"{escape(brand.name)}\"><link rel=\"icon\" href=\"{icon_data_uri()}\"><style>" + _read("analyst_chat.css") + _read("explorer.css") + _read("attackpaths.css") + _read("timeline3d.css") + explorer_background_css() + ioc_archive.CSS + "</style></head><body>"
+             + _read("explorer.html").replace("<!--BRAND-->", brand_markup, 1).replace("<!--REPORT-->", report_markup, 1))
+    fh.write(DATA_TAG)
+    write_data(fh, data)
+    fh.write("</script>"
+             # fflate (MIT) unpacks the data and Three.js (MIT) draws the 3D views, both vendored so the
+             # page works offline; the Explorer falls back to its 2D canvas when WebGL is unavailable
+             + "<script>" + _read("vendor/fflate.min.js") + "</script>"
+             + "<script>" + _read("vf_data.js") + "</script>"
+             + "<script>" + _read("vendor/three.min.js") + "</script>"
+             + "<script>" + _read("explorer3d.js") + "</script>"
+             + "<script>" + _read("explorer.js") + "</script>"
+             + "<script>" + _read("attackpaths.js") + "</script>"
+             + "<script>" + _read("timeline3d.js") + "</script>"
+             + "<script>" + _read("analyst_chat.js") + "</script>"
+             + ioc_archive.drawer_html(data["ioc_matches"] if ioc_drawer is None else ioc_drawer,
+                                      data.get("article_briefs")) + "</body></html>\n")

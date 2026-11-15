@@ -36,3 +36,9 @@ The Explorer's 3D view bundles [three.js](https://github.com/mrdoob/three.js) r1
 three.js is distributed under the MIT License; its full text is in `vulnflow/static/vendor/three.LICENSE`:
 
 > Copyright © 2010-2023 three.js authors
+
+The Explorer unpacks its data with [fflate](https://github.com/101arrowz/fflate) 0.8.2, bundled at
+`vulnflow/static/vendor/fflate.min.js` and inlined into `explorer.html` so the page works offline.
+fflate is distributed under the MIT License; its full text is in `vulnflow/static/vendor/fflate.LICENSE`:
+
+> Copyright (c) 2023 Arjun Barrett

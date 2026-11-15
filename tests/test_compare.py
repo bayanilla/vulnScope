@@ -16,7 +16,7 @@ from collections import defaultdict
 from http.server import ThreadingHTTPServer
 from unittest import mock
 
-from vulnflow import cli, combine, compare, sample_compare, sample_gootloader, saved
+from vulnflow import cli, combine, compare, explore, sample_compare, sample_gootloader, saved
 from vulnflow.correlate import Config
 from vulnflow.errors import UserError
 from vulnflow.ioc_archive import Matcher, read_archives
@@ -362,8 +362,7 @@ class CompareTests(unittest.TestCase):
         with open(page, encoding="utf-8") as fh:
             text = fh.read()
         with open(page, "w", encoding="utf-8") as fh:
-            fh.write(text.replace(f'"generated":"{saved.load_results(mixed)["generated"]}"',
-                                  '"generated":"2020-01-01T00:00:00Z"', 1))
+            fh.write(explore.html({**explore.read_data(text), "generated": "2020-01-01T00:00:00Z"}))
         result = compare.compare(self.reports(NOV) + [compare.describe(gone, "dec"), compare.describe(mixed, "seg")])
         with mock.patch.object(combine, "DRAWER_HOSTS", 10 ** 6):
             data, drawer, notes = combine.build(result)
@@ -419,7 +418,7 @@ class CompareTests(unittest.TestCase):
         self.assertNotIn("<script>alert(1)", page)
         self.assertIn('<span id="report-name"', page)
         self.assertIn("<title>All networks · ", page)
-        blob = json.loads(re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', page, re.S)[1])
+        blob = explore.read_data(page)
         with open(paths["explorer.json"], encoding="utf-8") as fh:
             self.assertEqual(json.load(fh), blob)
         self.assertEqual(blob["report"]["name"], "All networks")

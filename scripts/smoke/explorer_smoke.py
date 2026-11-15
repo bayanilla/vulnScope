@@ -115,7 +115,7 @@ def check(page_path: Path, browser, shots: Path) -> list[str]:
             problems.append(f"3d-overview: {s['hosts']} hosts in the data, {s['bodies']} bodies added, "
                             f"{s['bodiesDrawable']} drawable")
 
-    first = page.evaluate("JSON.parse(document.getElementById('vf-data').textContent).nodes.map(n => n.id)[0] ?? null")
+    first = page.evaluate("window.VF_DATA.nodes.map(n => n.id)[0] ?? null")
     if first is not None:
         page.evaluate("id => VFExplorer.focus(id)", first)
         step("3d-focus")

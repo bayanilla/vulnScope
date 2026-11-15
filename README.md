@@ -371,13 +371,22 @@ hosts and sessions may be missing; fix the capture before relying on counts.
 Each run writes to its output folder (`vulnflow_runs/<id>/out/` on the upload page):
 
 - **Executive summary** and **technical report**, as Markdown and standalone HTML.
-- **Explorer**: `explorer.html`, a single offline file.
+- **Explorer**: `explorer.html`, a single offline file. Its data is packed (gzip) inside the page,
+  which unpacks it itself, so it still opens straight from disk with no network. On busy networks
+  each host keeps its top 200 outside addresses and 200 internal peers in the page (addresses with
+  IPS alerts always stay); every count and view still uses the full lists. Opened through the upload
+  page (a new run or **Open report**), the Explorer loads a host's full lists when you click it,
+  from `normalized/explorer_contacts.parquet`. Opened from disk, a **LISTS CAPPED** badge and a note
+  in the host's card say so.
 - **CSV and JSON:** `correlated_findings.csv` for ticketing; `results.json` for automation.
 - **Normalized inputs:** `normalized/flows.csv`, `findings.csv`, `threats.csv` (IPS/IDS alerts),
   `zeek_events.jsonl`, `ot_events.jsonl`. [Compare reports](#compare-reports) searches them again.
+  The flows are also in `normalized/flows.parquet` (compressed, quick to query with DuckDB or
+  pandas), and every host's full Explorer lists in `normalized/explorer_contacts.parquet`.
   The flows and Zeek event copies are about as large as the input; for large runs tick
   **Skip full copies of flows and Zeek events** (or `--no-normalized-copies`,
-  `VULNSCOPE_NORMALIZED_COPIES=0`) to leave them out.
+  `VULNSCOPE_NORMALIZED_COPIES=0`) to leave them out. Without them the Explorer keeps only the
+  top 200 rows of a busy host's lists, also when opened through the upload page.
   `normalized/probed_addresses.csv` lists every internal address that was probed and never
   answered (who probed it, ports, attempts, whether a firewall blocked it); these are not hosts.
 - **Hostile activity diagram** as `hostile_activity.svg`.

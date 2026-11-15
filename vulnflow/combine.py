@@ -139,6 +139,13 @@ def _island(data: dict, k: int, shared: dict, iocs: dict) -> dict:
             d = "both" if a["sessions"] and a["out_sessions"] else "out" if a["out_sessions"] else "in"
             e.targets.append([_sid(ip, k), a["kind"], a["sessions"] + a["out_sessions"], d])
             e.islands.add(k)
+    # a report whose busy hosts' lists were cut carries the totals of the full lists
+    for row in data.get("outside_all") or ():
+        ip, kind, ins, outs, out_hosts, alerts = row[:6]
+        e = inet.get(ip) or inet.setdefault(ip, _Inet(ip))
+        e.kind, e.in_sessions, e.out_sessions, e.out_hosts, e.alerts = kind, ins, outs, out_hosts, alerts
+        e.sessions = ins + outs
+        e.islands.add(k)
     return {"hosts": hosts, "levels": levels, "inet": inet,
             "links": [[_sid(a, k), _sid(b, k), w] for a, b, w in data["links"]],
             "risky": [[_sid(a, k), _sid(b, k), w, why, lvl] for a, b, w, why, lvl in data.get("risky_links") or []],

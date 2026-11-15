@@ -25,6 +25,8 @@ from .schema import Flow, OTEvent, ZeekEvent
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 DEFAULT_BATCH = 100_000
 DEFAULT_SKEW_SECONDS = 2.0
+# Connection examples for the Explorer are worked out over at most this many flows at a time.
+EXAMPLE_SLICE_ROWS = 1_000_000
 # Records are numbered (file number << FID_SHIFT) | position in the file, so the order is the
 # order the files were given in, whichever process parsed them.
 FID_SHIFT = 40
@@ -237,10 +239,11 @@ class Store:
             FROM flows""").fetchone()
         return int(n or 0), int(a or 0)
 
-    def insert_rows(self, table: str, columns: dict[str, str], rows) -> None:
-        """Create ``table`` and bulk-load rows through a CSV file (fast, needs no numpy/arrow)."""
+    def insert_rows(self, table: str, columns: dict[str, str], rows, append: bool = False) -> None:
+        """Create ``table`` and bulk-load rows through a CSV file (fast, needs no numpy/arrow).
+        ``append`` adds the rows to the table when it already exists."""
         cols = ", ".join(f"{k} {v}" for k, v in columns.items())
-        self.con.execute(f"CREATE OR REPLACE TABLE {table} ({cols})")
+        self.con.execute(f"CREATE {'TABLE IF NOT EXISTS' if append else 'OR REPLACE TABLE'} {table} ({cols})")
         rows = list(rows)
         if not rows:
             return
@@ -251,6 +254,231 @@ class Store:
         finally:
             os.remove(path)
 
+
+    # -- Explorer queries (explore.py) ---------------------------------------------------------
+    # The Explorer reads flows only through these methods. Per-pair rollups stream in batches, and
+    # the outside addresses of each host come grouped by host, so the Explorer never holds every
+    # host-to-internet pair in memory at once.
+    def explorer_tables(self, ext, hosts) -> None:
+        """Tables the Explorer queries join on: every address in the flows and whether it is
+        outside (``ext(ip)``), and the hosts that get a card (``hosts``)."""
+        ips = [r[0] for r in self.con.execute(
+            "SELECT src_ip FROM flows UNION SELECT dst_ip FROM flows").fetchall()]
+        self.insert_rows("explore_ip", {"ip": "VARCHAR", "ext": "BOOLEAN"}, ((ip, bool(ext(ip))) for ip in ips))
+        self.insert_rows("explore_hosts", {"ip": "VARCHAR"}, ((ip,) for ip in set(hosts)))
+
+    def inner_pairs(self):
+        """Per (source, destination) rollup of every pair that is not a host's contact with an
+        outside address: both ends inside, or a host with a card at an outside end. Rows:
+        (src, dst) + PAIR_STATS, in the order the pairs first appear in the flows."""
+        cur = self.con.cursor()
+        cur.execute(f"""
+            SELECT f.src_ip, f.dst_ip, {PAIR_STATS}
+            FROM flows f JOIN explore_ip s ON s.ip = f.src_ip JOIN explore_ip d ON d.ip = f.dst_ip
+            WHERE f.src_ip <> f.dst_ip
+              AND (NOT s.ext OR f.src_ip IN (SELECT ip FROM explore_hosts))
+              AND (NOT d.ext OR f.dst_ip IN (SELECT ip FROM explore_hosts))
+            GROUP BY f.src_ip, f.dst_ip ORDER BY min(f.seq)""")
+        try:
+            while rows := cur.fetchmany(10_000):
+                yield from rows
+        finally:
+            cur.close()
+
+    def outside_contacts(self):
+        """Every (host with a card, outside address) that exchanged traffic, grouped by host:
+        (host, address, inbound stats, outbound stats), each stats a PAIR_STATS tuple (all None
+        when there was no traffic that way). DuckDB sorts on disk, so memory stays flat."""
+        n = len(_split_stats())
+        cols = ", ".join(f"i.c{k}" for k in range(n)) + ", " + ", ".join(f"o.c{k}" for k in range(n))
+        stats = ", ".join(f"{expr} AS c{k}" for k, expr in enumerate(_split_stats()))
+        cur = self.con.cursor()
+        cur.execute(f"""
+            WITH p AS (
+                SELECT f.src_ip, f.dst_ip, s.ext AS s_ext, d.ext AS d_ext, {stats}
+                FROM flows f JOIN explore_ip s ON s.ip = f.src_ip JOIN explore_ip d ON d.ip = f.dst_ip
+                WHERE f.src_ip <> f.dst_ip AND (s.ext OR d.ext)
+                  AND (f.src_ip IN (SELECT ip FROM explore_hosts) OR f.dst_ip IN (SELECT ip FROM explore_hosts))
+                GROUP BY ALL),
+            i AS (SELECT * FROM p WHERE s_ext AND dst_ip IN (SELECT ip FROM explore_hosts)),
+            o AS (SELECT * FROM p WHERE d_ext AND src_ip IN (SELECT ip FROM explore_hosts))
+            SELECT coalesce(i.dst_ip, o.src_ip) AS host, coalesce(i.src_ip, o.dst_ip) AS addr, {cols}
+            FROM i FULL JOIN o ON i.dst_ip = o.src_ip AND i.src_ip = o.dst_ip
+            ORDER BY host""")
+        try:
+            while rows := cur.fetchmany(10_000):
+                for r in rows:
+                    yield r[0], r[1], r[2:2 + n], r[2 + n:]
+        finally:
+            cur.close()
+
+    def vuln_hits(self, services: list[tuple], scanners=()) -> list[tuple]:
+        """(source, host, port, proto) of completed sessions onto a vulnerable service: ``services``
+        rows are (host, port, proto, window start, window end), a None window meaning any time.
+        Sessions the vulnerability scanner started are not counted."""
+        if not services:
+            return []
+        self.insert_rows("explore_vkeys", {"host": "VARCHAR", "port": "INTEGER", "proto": "VARCHAR",
+                                           "lo": "TIMESTAMP", "hi": "TIMESTAMP"}, set(services))
+        try:
+            return self.con.execute("""
+                SELECT DISTINCT f.src_ip, f.dst_ip, f.dst_port, f.proto FROM flows f JOIN explore_vkeys k
+                  ON f.dst_ip = k.host AND f.dst_port = k.port AND f.proto = k.proto
+                 AND (k.lo IS NULL OR f.ts IS NULL OR f.ts BETWEEN k.lo AND k.hi)
+                WHERE f.action = 'allow' AND f.established AND f.src_ip <> f.dst_ip
+                  AND NOT list_contains(?, f.src_ip)""", [list(scanners)]).fetchall()
+        finally:
+            self.con.execute("DROP TABLE explore_vkeys")
+
+    def pair_examples(self, pairs=None, n: int = 6) -> None:
+        """Table ``explore_ex`` (src_ip, dst_ip, ex): for each pair, its first ``n`` distinct
+        connections (ports, protocol, app, action, outcome, source) in the order seen. ``pairs``
+        limits it to those (source, destination) pairs; None means every pair. Large runs are done
+        in slices of source addresses, so DuckDB's memory limit holds."""
+        join = ""
+        if pairs is not None:
+            self.insert_rows("explore_exkeys", {"src": "VARCHAR", "dst": "VARCHAR"}, set(pairs))
+            join = "JOIN explore_exkeys k ON k.src = f.src_ip AND k.dst = f.dst_ip"
+        flows = self.con.execute("SELECT count(*) FROM flows").fetchone()[0]
+        slices = max(1, -(-int(flows) // EXAMPLE_SLICE_ROWS))
+        self.con.execute("CREATE OR REPLACE TABLE explore_ex (src_ip VARCHAR, dst_ip VARCHAR, ex STRUCT("
+                         "src_ip VARCHAR, src_port INTEGER, dst_ip VARCHAR, dst_port INTEGER, proto VARCHAR, "
+                         "app VARCHAR, action VARCHAR, established BOOLEAN, source VARCHAR)[])")
+        for part in range(slices):
+            where = f"AND hash(f.src_ip) % {slices} = {part}" if slices > 1 else ""
+            self.con.execute(f"""
+                INSERT INTO explore_ex
+                WITH d AS (SELECT f.src_ip, f.src_port, f.dst_ip, f.dst_port, f.proto, f.app, f.action,
+                                  f.established, f.source, min(f.seq) AS s
+                           FROM flows f {join} WHERE f.src_ip <> f.dst_ip {where} GROUP BY ALL),
+                r AS (SELECT * FROM d QUALIFY row_number() OVER (PARTITION BY src_ip, dst_ip ORDER BY s) <= {int(n)})
+                SELECT src_ip, dst_ip,
+                       list({{'src_ip': src_ip, 'src_port': src_port, 'dst_ip': dst_ip, 'dst_port': dst_port,
+                              'proto': proto, 'app': app, 'action': action, 'established': established,
+                              'source': source}} ORDER BY s) AS ex
+                FROM r GROUP BY src_ip, dst_ip""")
+        if pairs is not None:
+            self.con.execute("DROP TABLE explore_exkeys")
+
+    def examples_for(self, pairs) -> dict[tuple, list[dict]]:
+        """{(src, dst): examples} from ``explore_ex`` (see pair_examples) for ``pairs``."""
+        self.insert_rows("explore_exkeys", {"src": "VARCHAR", "dst": "VARCHAR"}, set(pairs))
+        try:
+            return {(s, d): ex for s, d, ex in self.con.execute("""
+                SELECT e.src_ip, e.dst_ip, e.ex FROM explore_ex e
+                JOIN explore_exkeys k ON k.src = e.src_ip AND k.dst = e.dst_ip""").fetchall()}
+        finally:
+            self.con.execute("DROP TABLE explore_exkeys")
+
+    def write_contacts(self, path: str) -> None:
+        """Write ``explore_contacts`` (host, side, rank, ip, row) to Parquet with each row's
+        connection examples (from ``explore_ex``): for outside addresses ('a') the inbound pair's
+        then the outbound pair's, for internal peers ('p') the host's own then the peer's."""
+        self.con.execute(f"""
+            COPY (SELECT c.host, c.side, c.rank, c.ip, c.row,
+                         coalesce(e1.ex, []) || coalesce(e2.ex, []) AS ex
+                  FROM explore_contacts c
+                  LEFT JOIN explore_ex e1 ON e1.src_ip = CASE c.side WHEN 'a' THEN c.ip ELSE c.host END
+                                         AND e1.dst_ip = CASE c.side WHEN 'a' THEN c.host ELSE c.ip END
+                  LEFT JOIN explore_ex e2 ON e2.src_ip = CASE c.side WHEN 'a' THEN c.host ELSE c.ip END
+                                         AND e2.dst_ip = CASE c.side WHEN 'a' THEN c.ip ELSE c.host END
+                  ORDER BY c.host, c.side, c.rank)
+            TO '{_q(path)}' (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 100000)""")
+
+    def flow_span(self) -> tuple[int, datetime | None, datetime | None]:
+        """(timed flows between two addresses, first, last)."""
+        row = self.con.execute("SELECT count(*), min(ts), max(ts) FROM flows "
+                               "WHERE ts IS NOT NULL AND src_ip <> dst_ip").fetchone()
+        return int(row[0] or 0), utc(row[1]), utc(row[2])
+
+    def timeline_flows(self, flagged: list[str], cap: int):
+        """Timed flows (ts, src, dst, dst_port, action, established, proto) in time order, at most
+        ``cap``: when there are more, flows to or from a ``flagged`` address first, then blocked
+        flows, up to half of ``cap``, each tier a random sample over the whole run, and the rest a
+        random sample of everything else. Returns (rows iterator, sampled)."""
+        cols = "ts, src_ip, dst_ip, dst_port, action, established, proto"
+        base = "FROM flows WHERE ts IS NOT NULL AND src_ip <> dst_ip"
+        hot = "(list_contains(?, src_ip) OR list_contains(?, dst_ip))"
+        con, fl = self.con, sorted(flagged)
+        total = self.flow_span()[0]
+        cur = con.cursor()
+        sampled = total > cap
+        if not sampled:
+            cur.execute(f"SELECT {cols} {base} ORDER BY seq")
+        else:
+            half = cap // 2
+            tiers = [(f"{hot}", [fl, fl]), (f"action <> 'allow' AND NOT {hot}", [fl, fl]),
+                     (f"action = 'allow' AND NOT {hot}", [fl, fl])]
+            counts = [int(con.execute(f"SELECT count(*) {base} AND {w}", a).fetchone()[0]) for w, a in tiers]
+            take = [min(counts[0], half)]
+            take.append(min(counts[1], half - take[0]))
+            take.append(min(counts[2], cap - take[0] - take[1]))
+            parts, args = [], []
+            for (w, a), n, k in zip(tiers, counts, take):
+                if not k:
+                    continue
+                sample = "" if k >= n else f" USING SAMPLE reservoir({k} ROWS) REPEATABLE (7)"
+                parts.append(f"SELECT * FROM (SELECT {cols}, seq {base} AND {w}){sample}")
+                args += a
+            cur.execute(" UNION ALL ".join(parts) + " ORDER BY seq", args)
+
+        def rows():
+            try:
+                while batch := cur.fetchmany(10_000):
+                    yield from batch
+            finally:
+                cur.close()
+        return rows(), sampled
+
+    def timeline_counts(self, t0: datetime, bucket_seconds: float) -> list[tuple[int, int]]:
+        """Every timed flow counted per bucket of ``bucket_seconds`` from ``t0``: [(bucket, flows)]."""
+        return self.con.execute(
+            "SELECT CAST(floor((epoch(ts) - ?) / ?) AS BIGINT) AS b, count(*) FROM flows "
+            "WHERE ts IS NOT NULL AND src_ip <> dst_ip GROUP BY b ORDER BY b",
+            [t0.timestamp(), bucket_seconds]).fetchall()
+
+    def export_flows_parquet(self, path: str) -> None:
+        """The cleaned flows, in the order read, as one zstd Parquet file (the columns of
+        normalized/flows.csv)."""
+        self.con.execute(f"""
+            COPY (SELECT ts, src_ip, src_port, dst_ip, dst_port, proto, action, established,
+                         bytes_out, bytes_in, app, src_zone, dst_zone, source FROM flows ORDER BY seq)
+            TO '{_q(path)}' (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 122880)""")
+
+
+def contact_rows(path: str, host: str) -> list[tuple]:
+    """One host's rows from an Explorer contacts file (Store.write_contacts): (side, row JSON,
+    connection examples), outside addresses ('a') then internal peers ('p'), each in rank order."""
+    con = duckdb.connect()
+    try:
+        con.execute("SET threads = 2")
+        return con.execute("SELECT side, row, ex FROM read_parquet(?) WHERE host = ? ORDER BY side, rank",
+                           [path, host]).fetchall()
+    finally:
+        con.close()
+
+# Per (source, destination) rollup columns read into explore._Pair: sessions, completed, blocked,
+# ports tried, ports with completed sessions, bytes, first, last, first completed, last completed.
+PAIR_STATS = """count(*), count(*) FILTER (action = 'allow' AND established),
+    count(*) FILTER (action <> 'allow'),
+    list(DISTINCT dst_port) FILTER (dst_port IS NOT NULL),
+    list(DISTINCT dst_port) FILTER (dst_port IS NOT NULL AND action = 'allow' AND established),
+    coalesce(sum(bytes_out + bytes_in), 0), min(ts), max(ts),
+    min(ts) FILTER (action = 'allow' AND established), max(ts) FILTER (action = 'allow' AND established)"""
+
+
+def _split_stats() -> list[str]:
+    """PAIR_STATS as its separate column expressions."""
+    out, depth, cur = [], 0, ""
+    for ch in PAIR_STATS:
+        if ch == "," and depth == 0:
+            out.append(cur.strip())
+            cur = ""
+            continue
+        depth += (ch == "(") - (ch == ")")
+        cur += ch
+    out.append(cur.strip())
+    return out
 
 class FlowWriter:
     """Buffers flows and writes one Parquet batch per ``batch_size`` rows."""

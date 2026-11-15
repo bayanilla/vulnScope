@@ -24,6 +24,10 @@ button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px so
 #subtitle{color:var(--muted);font-size:12px;margin-top:4px}
 #report-name{color:var(--fg);font-size:13px;font-weight:600;letter-spacing:.02em;text-transform:none;border-left:1px solid var(--line);
 padding-left:9px;margin-left:3px;max-width:min(360px,40vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:auto;cursor:default}
+.lists-cut{font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--med);border:1px solid currentColor;border-radius:4px;
+padding:1px 6px;margin-left:8px;pointer-events:auto;cursor:help;white-space:nowrap}
+.lists-cut[hidden]{display:none}
+.ip-list-count.list-cut{border-left:2px solid var(--med);padding-left:8px;line-height:1.45}
 #about{position:fixed;left:var(--about-left,18px);right:var(--about-right,18px);bottom:var(--about-bottom,64px);margin:0 auto;z-index:6;width:max-content;
 max-width:min(620px,calc(100vw - var(--about-left,18px) - var(--about-right,18px)));
 font-size:12.5px;line-height:1.45;color:#c4d2e4;background:rgba(10,18,32,.9);border:1px solid var(--line);border-top:2px solid var(--cyan);

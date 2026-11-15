@@ -4,7 +4,7 @@
 // where to look; they are estimates, never a confirmed compromise.
 (function () {
 'use strict';
-const D = JSON.parse(document.getElementById('vf-data').textContent);
+const D = window.VF_DATA;
 const root = document.getElementById('attack-paths'), openBtn = document.getElementById('btn-paths');
 // not on the all-networks map (combine.py): its chains are drawn per report, in each report's own Explorer
 if (!root || !openBtn || D.combined) return;
@@ -20,21 +20,22 @@ const BRAND_LOGO = (BRAND_IMG || {}).src || '';
 const BRAND_SMALL = !!(BRAND_IMG && BRAND_IMG.classList.contains('logo-small'));
 
 // ---------------------------------------------------------------- data from the Explorer blob
+// A host whose list was cut in the page (F.capped, D.inports) brings the figures from its full lists.
 const H = {}, IOC = {}, inports = {};
-for (const F of Object.values(D.focus || {})) for (const p of F.peers || []) {
+if (!D.inports) for (const F of Object.values(D.focus || {})) for (const p of F.peers || []) {
   const c = inports[p.ip] = inports[p.ip] || {};
   for (const port of p.ports_out || []) c[port] = (c[port] || 0) + 1;
 }
 for (const n of D.nodes || []) {
-  const F = (D.focus || {})[n.id] || {}, att = F.attackers || [], kinds = {};
-  for (const a of att) kinds[a.kind] = (kinds[a.kind] || 0) + 1;
+  const F = (D.focus || {})[n.id] || {}, att = F.attackers || [], cap = F.capped, kinds = {};
+  if (cap) Object.assign(kinds, cap.kinds); else for (const a of att) kinds[a.kind] = (kinds[a.kind] || 0) + 1;
   H[n.id] = {
     n: n.name ? n.name.split('.')[0] : '', sub: n.subnet || 'other', pri: n.pri, sev: n.sev, score: n.score || 0,
     os: n.os, ext: n.ext || 0, ev: n.ev, kinds,
     alerts: att.filter(a => a.kind === 'alert').map(a => ({ip: a.ip, first: a.first, sig: (a.signatures || [''])[0], blocked: (a.alerts_blocked || 0) > 0, out: a.out_ports || []})),
-    vports: [...new Set(att.filter(a => a.kind === 'vuln').flatMap(a => a.vuln_ports || []))].sort((a, b) => a - b),
-    inports: Object.entries(inports[n.id] || {}).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => +e[0]),
-    times: att.filter(a => a.first).map(a => [a.kind[0], a.first]),
+    vports: cap ? cap.vports : [...new Set(att.filter(a => a.kind === 'vuln').flatMap(a => a.vuln_ports || []))].sort((a, b) => a - b),
+    inports: D.inports ? D.inports[n.id] || [] : Object.entries(inports[n.id] || {}).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => +e[0]),
+    times: cap ? null : att.filter(a => a.first).map(a => [a.kind[0], a.first]), bars: cap ? cap.times : null,
     find: (F.findings || []).slice(0, 4), nfind: (F.findings || []).length,
     peers: F.peers || [], hop2: F.hop2 || [], ot: F.ot_events_total || 0,
   };
@@ -428,7 +429,10 @@ function renderTimeline() {
   if (!(t1 > t0)) { q('tlsub').textContent = 'no time window in this run'; return; }
   const BIN = Math.max(3600e3, Math.ceil((t1 - t0) / 56 / 3600e3) * 3600e3), nb = Math.ceil((t1 - t0) / BIN), bins = Array.from({length: nb}, () => ({v: 0, b: 0, o: 0}));
   const entries = new Set(CHAINS.map(c => c.hops[0])); let tot = 0;
-  for (const ip of entries) for (const [k, ts] of H[ip].times) { const i = Math.floor((new Date(ts) - t0) / BIN); if (i >= 0 && i < nb && bins[i][k] != null) { bins[i][k]++; tot++; } }
+  for (const ip of entries) {
+    if (H[ip].bars) { for (const [i, v, b, o] of H[ip].bars) if (i >= 0 && i < nb) { bins[i].v += v; bins[i].b += b; bins[i].o += o; tot += v + b + o; } continue; }
+    for (const [k, ts] of H[ip].times) { const i = Math.floor((new Date(ts) - t0) / BIN); if (i >= 0 && i < nb && bins[i][k] != null) { bins[i][k]++; tot++; } }
+  }
   const max = Math.max(1, ...bins.map(b => b.v + b.b + b.o));
   const x = t => 8 + (t - t0) / (t1 - t0) * (W - 16), base = 78, bh = 58, bw = Math.max(2, (W - 16) / nb - 1.5);
   bins.forEach((b, i) => { let y = base; for (const k of ['b', 'v', 'o']) { const h = b[k] / max * bh; if (h > 0) { el('rect', {x: x(t0 + i * BIN), y: y - h, width: bw, height: h, fill: `var(--ap-bar-${k})`}, svg); y -= h; } } });

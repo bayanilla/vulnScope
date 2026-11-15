@@ -11,7 +11,7 @@ import unittest.mock
 import urllib.parse
 from http.server import ThreadingHTTPServer
 
-from vulnflow import saved
+from vulnflow import explore, saved
 from vulnflow.correlate import RESULTS_SCHEMA_VERSION, Config
 from vulnflow.pipeline import run
 from vulnflow.samples import generate
@@ -81,8 +81,8 @@ class SavedRunTests(unittest.TestCase):
         with open(os.path.join(self.out, "normalized", "flows.csv"), encoding="utf-8", newline="") as fh:
             self.assertEqual(self.request("GET", here + "normalized/flows.csv")[1], fh.read())
         page = self.request("GET", here + "explorer.html")[1]
-        old = json.loads(re.search(r'id="vf-data" type="application/json">(.*?)</script>', self.explorer.decode(), re.S)[1])
-        new = json.loads(re.search(r'id="vf-data" type="application/json">(.*?)</script>', page, re.S)[1])
+        old = explore.read_data(self.explorer.decode())
+        new = explore.read_data(page)
         self.assertEqual(old["nodes"], new["nodes"])
         self.assertEqual(old["links"], new["links"])
         self.assertEqual(json.loads(self.request("GET", here + "results.json")[1]), json.loads(self.results))
@@ -128,6 +128,31 @@ class SavedRunTests(unittest.TestCase):
         self.assertIn(message, page)
         self.assertEqual(set(os.listdir(runs)) - before if os.path.isdir(runs) else set(), set())   # nothing left behind
 
+    def test_reopened_explorer_loads_full_host_lists(self):
+        # A busy host's lists are cut in the page; the server hands the page the full ones, also to a
+        # reopened report's page in its opaque origin, and only with this server's token.
+        data = explore.read_data(self.explorer.decode())
+        host = next(ip for ip, f in data["focus"].items() if len(f["attackers"]) < f["attackers_total"])
+        cut = data["focus"][host]
+        here = self.opened(self.out)
+        page = self.request("GET", here + "explorer.html")[1]
+        where = re.search(r'<meta name="vulnscope-contacts" content="(contacts/[0-9a-f]{32}/)">', page)[1]
+        status, body, resp = self.request("GET", here + where + host, headers={"Origin": "null"})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(resp.getheader("Access-Control-Allow-Origin"), "null")
+        full = json.loads(body)
+        self.assertEqual(len(full["attackers"]), cut["attackers_total"])
+        self.assertEqual(len(full["peers"]), cut["peers_total"])
+        n = explore.MAX_LIST
+        self.assertEqual([a["ip"] for a in full["attackers"][:n]], [a["ip"] for a in cut["attackers"][:n]])
+        self.assertEqual(full["attackers"][:explore.MAX_LIST_EXAMPLES], cut["attackers"][:explore.MAX_LIST_EXAMPLES])
+        self.assertTrue(any(a["connection_examples"] for a in full["attackers"][n:]))
+        self.assertEqual(self.request("GET", here + "contacts/" + "0" * 32 + "/" + host)[0], 404)
+        # saved without the flow copies: the page is told the full lists are not there
+        bare = self.copy("no-contacts", lambda f: os.remove(os.path.join(f, explore.CONTACTS_FILE)))
+        page = self.request("GET", self.opened(bare) + "explorer.html")[1]
+        self.assertIn('<meta name="vulnscope-contacts" content="">', page)
+
     def test_bad_folders_are_refused_with_a_reason(self):
         res = json.loads(self.results)
 
@@ -145,7 +170,7 @@ class SavedRunTests(unittest.TestCase):
         self.assertRefused(self.copy("b3", results({**res, "schema_version": RESULTS_SCHEMA_VERSION + 1})), "newer VulnScope")
         self.assertRefused(self.copy("b4", results({**res, "hosts": "x"})), "&quot;hosts&quot; is missing")
         self.assertRefused(self.copy("b5", results({**res, "findings": [{"host": "10.0.0.1"}]})), "can&#x27;t be drawn")
-        other = self.explorer.replace(res["generated"].encode(), b"2001-01-01T00:00:00Z")
+        other = explore.html({**explore.read_data(self.explorer.decode()), "generated": "2001-01-01T00:00:00Z"}).encode()
         self.assertRefused(self.copy("b6", explorer(other)), "different analysis")
         self.assertRefused(self.copy("b7", explorer(b"<!doctype html><p>hi")), "not a VulnScope Explorer page")
 

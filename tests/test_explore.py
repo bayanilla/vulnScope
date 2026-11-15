@@ -4,6 +4,7 @@ import os
 import re
 import tempfile
 import unittest
+from collections import Counter
 from datetime import datetime, timezone
 
 from vulnflow import explore
@@ -50,7 +51,7 @@ class ExploreTests(unittest.TestCase):
     def test_all_traffic_both_directions(self):
         # every outside and internal address that exchanged flows with a host appears, whatever the direction
         net_ext = lambda ip: not ip.startswith("10.")
-        for host, f in self.data["focus"].items():
+        for host, f in explore.build(self.res, self.ds, cap=None)["focus"].items():
             seen = {x for fl in self.ds.flows if host in (fl.src_ip, fl.dst_ip)
                     for x in (fl.src_ip, fl.dst_ip) if x != host}
             self.assertEqual({a["ip"] for a in f["attackers"] if a["sessions"] or a["out_sessions"]},
@@ -59,10 +60,11 @@ class ExploreTests(unittest.TestCase):
 
     def test_html_embeds_data_safely(self):
         page = explore.html(self.data)
-        m = re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', page, re.S)
+        m = re.search(r'<script id="vf-data" type="application/octet-stream" data-encoding="gzip-base64">(.*?)</script>',
+                      page, re.S)
         self.assertIsNotNone(m)
-        self.assertNotIn("</", m.group(1))
-        self.assertIn("10.10.1.10", json.loads(m.group(1))["focus"])
+        self.assertRegex(m.group(1), r"^[A-Za-z0-9+/=]+$")       # base64 only: nothing can close the tag
+        self.assertEqual(explore.read_data(page), json.loads(json.dumps(self.data, default=str)))
         self.assertIn("not confirmed compromise", page)
 
     def test_ioc_host_hints_count_distinct_matches(self):
@@ -76,7 +78,7 @@ class ExploreTests(unittest.TestCase):
         self.assertEqual(data["ioc_counts"], {"10.10.1.10": 2, "10.10.2.25": 1})
         page = explore.html(data)
         self.assertIn('id="ioc-filter"', page)
-        self.assertIn('"ioc_counts":{"10.10.1.10":2,"10.10.2.25":1}', page)
+        self.assertEqual(explore.read_data(page)["ioc_counts"], {"10.10.1.10": 2, "10.10.2.25": 1})
 
     def test_write_all_includes_explorer(self):
         out = os.path.join(self.tmp, "out")
@@ -131,7 +133,7 @@ class ExploreTests(unittest.TestCase):
                  [Flow(None, host, dst, 445, "tcp") for dst in peers])
         # An alert on an address that only has outbound flows must not add a duplicate IP row.
         ds = Dataset(flows=flows, threats=[ThreatEvent(None, outside[-1], host, 443, "IPS signature")])
-        data = explore.build(correlate(ds), ds)
+        data = explore.build(correlate(ds), ds, cap=None)
         focus = data["focus"][host]
         self.assertEqual(focus["attackers_total"], 405)
         self.assertEqual(focus["peers_total"], 405)
@@ -139,7 +141,35 @@ class ExploreTests(unittest.TestCase):
         self.assertEqual(len({p["ip"] for p in focus["peers"]}), 405)
         self.assertEqual({a["ip"] for a in focus["attackers"]}, set(outside))
         self.assertEqual({p["ip"] for p in focus["peers"]}, set(peers))
-        self.assertIn(outside[-1], explore.html(data))
+        self.assertIn(outside[-1], explore.read_data(explore.html(data))["focus"][host]["attackers"][0]["ip"])
+
+    def test_long_lists_are_cut_with_exact_totals(self):
+        # Past MAX_LIST a host's lists keep their first rows (alerts always), but every count, the
+        # internet panel and the Attack paths figures still come from the full lists.
+        host = "10.70.1.10"
+        outside = [str(ipaddress.IPv4Address("198.18.0.1") + i) for i in range(260)]
+        peers = [str(ipaddress.IPv4Address("10.71.0.1") + i) for i in range(230)]
+        late = outside[-1]                    # the quietest address, but it set off an IPS alert
+        flows = ([Flow(None, src, host, 443, "tcp", established=True) for src in outside[:-1] for _ in range(3)] +
+                 [Flow(None, host, late, 443, "tcp", established=False, action="deny")] +
+                 [Flow(None, host, dst, 445, "tcp") for dst in peers])
+        ds = Dataset(flows=flows, threats=[ThreatEvent(None, late, host, 443, "IPS signature")])
+        res = correlate(ds)
+        full, cut = explore.build(res, ds, cap=None), explore.build(res, ds, cap=50)
+        f, c = full["focus"][host], cut["focus"][host]
+        self.assertEqual((c["attackers_total"], c["peers_total"]), (260, 230))
+        self.assertEqual(c["attackers"][0]["ip"], late)                     # the alert ranks first and stays
+        self.assertEqual(c["attackers"], f["attackers"][:50][:explore.MAX_LIST_EXAMPLES] + [
+            {**a, "connection_examples": []} for a in f["attackers"][explore.MAX_LIST_EXAMPLES:50]])
+        self.assertEqual([p["ip"] for p in c["peers"]], [p["ip"] for p in f["peers"][:50]])
+        self.assertEqual(c["blast"], f["blast"])
+        for key in ("internet", "internet_total", "internet_in_total", "internet_out_total", "subnets", "nodes", "links"):
+            self.assertEqual(cut[key], full[key], key)
+        self.assertEqual(c["capped"]["kinds"], dict(sorted(Counter(a["kind"] for a in f["attackers"]).items())))
+        self.assertEqual(cut["lists"], {"cap": 50, "file": False})
+        self.assertNotIn("lists", full)
+        self.assertEqual({row[0] for row in cut["outside_all"]}, set(outside))
+        self.assertTrue(all(row[-1] == 1 for row in cut["outside_all"]))        # one host each
 
     def test_overview_keeps_outbound_internet_traffic(self):
         # Many inbound scanners must not crowd hosts calling out off the overview's internet arc.

@@ -25,6 +25,7 @@ CSRF token: a `csrf` form field, a `csrf` JSON field, or an `X-CSRF-Token` heade
 | `POST /runs/<id>/brief` | Writes the Security Assistant brief for the run. |
 | `POST /runs/<id>/ask` | Asks the Security Assistant a question (JSON). |
 | `POST /runs/<id>/article-briefs` | Generates OpenAI article briefs for matched source articles. |
+| `GET /runs/<id>/contacts/<token>/<host>` | One host's full Explorer lists (JSON `attackers`, `peers`) from the run's `normalized/explorer_contacts.parquet`. The token is made by this server and given to the Explorer page it sends (`<meta name="vulnscope-contacts">`); it changes when the server restarts. |
 | `GET /runs/<id>/radar-status` | Whether a Cloudflare Radar token is configured. |
 | `POST /runs/<id>/radar` | Looks up one matched IP or domain IOC on Cloudflare Radar (JSON `type`, `value`). |
 | `GET /compare` | The Compare reports page: saved runs to choose from, and earlier comparisons. |

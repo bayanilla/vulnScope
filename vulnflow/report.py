@@ -747,11 +747,21 @@ def write_all(res: dict, ds, outdir: str, copies: bool = True) -> dict[str, str]
     paths = write_reports(res, outdir)
     from . import explore
     p = os.path.join(outdir, "explorer.html")
+    # with the flow copies go every host's full Explorer lists, which the page loads one host at a
+    # time when the report is opened through the upload server
+    contacts = os.path.join(outdir, explore.CONTACTS_FILE) if copies else None
+    data = explore.build(res, ds, contacts_path=contacts)
     with open(p, "w", encoding="utf-8") as fh:
-        fh.write(explore.html(explore.build(res, ds)))
+        explore.write_html(fh, data)
+    del data
     paths["explorer.html"] = p
+    if contacts and os.path.exists(contacts):
+        paths["normalized/explorer_contacts.parquet"] = contacts
 
     if copies:
+        p = os.path.join(outdir, "normalized", "flows.parquet")
+        ds.flow_store().export_flows_parquet(p)
+        paths["normalized/flows.parquet"] = p
         p = os.path.join(outdir, "normalized", "flows.csv")
         with open(p, "w", newline="", encoding="utf-8") as fh:
             cw = csv.writer(fh)
@@ -834,10 +844,10 @@ def save_article_briefs(res: dict, outdir: str) -> None:
     if os.path.exists(explorer_path):           # a run reopened from results.json alone has none
         with open(explorer_path, encoding="utf-8") as fh:
             previous = fh.read()
-        match = re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', previous, re.S)
-        if not match:
-            raise ValueError("Cannot find the saved Explorer data for this run.")
-        explorer_data = json.loads(match.group(1))
+        try:
+            explorer_data = explore.read_data(previous)
+        except LookupError:
+            raise ValueError("Cannot find the saved Explorer data for this run.") from None
         explorer_data["article_briefs"] = res.get("article_briefs", {})
         explorer_data["ioc_matches"] = res.get("ioc_matches", [])
         pages["explorer.html"] = explore.html(explorer_data)
