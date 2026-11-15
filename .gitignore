@@ -19,3 +19,10 @@ vulnscope-out/
 .vulnscope/
 **/.vulnscope/
 branding.json
+
+# coverage (pip install -r requirements-dev.txt)
+.coverage
+.coverage.*
+coverage-html/
+htmlcov/
+.hypothesis/

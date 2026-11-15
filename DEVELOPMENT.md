@@ -15,6 +15,47 @@ python3 -m unittest discover -s tests
 
 `tests/test_pcap.py` runs Zeek when it is installed and skips those cases otherwise.
 
+## Code checks
+
+```sh
+python3 -m pip install -r requirements-dev.txt         # ruff, mypy, coverage, hypothesis (pinned)
+ruff check .                                           # lint
+mypy                                                   # type check against Python 3.10
+coverage run -m unittest discover -s tests && coverage combine && coverage report
+FUZZ_PROFILE=long python3 -m unittest tests.test_fuzz_parsers     # longer fuzzing (about 10 minutes)
+python3 scripts/perf/perf_check.py                     # performance check (about 1 minute)
+```
+
+Settings for ruff, mypy and coverage are in `pyproject.toml`.
+
+- **Lint**: ruff's default rules (undefined names, unused imports and variables, syntax problems).
+  Short lambdas assigned to names and `l` as a variable name are allowed on purpose.
+- **Type check**: mypy with `python_version = 3.10`, so a call to something only newer Pythons have
+  fails before it ships. It starts lenient: the error codes listed in `pyproject.toml` are off
+  because un-annotated code trips them constantly. Switch them on one at a time as code gets types.
+- **Coverage**: CI's Python 3.13 test run measures which lines and branches of `vulnflow/` the tests
+  reach and shows the table on the run's summary page; the HTML report is kept as the
+  `coverage-html` artifact. It reports only and fails nothing.
+- **Fuzz tests**: `tests/test_fuzz_parsers.py` (Hypothesis) feeds every reader thousands of generated
+  files: valid records with hostile values (NaN, huge numbers, wrong JSON types, control characters,
+  impossible dates), random byte damage to real-looking sample files, truncated gzip, XML entity
+  bombs, a whole damaged folder through `load()` and `correlate()`. A reader may stop on a broken file
+  (UserError, bad XML/gzip/CSV/JSON) but nothing else, must finish within a time limit, and every
+  record it yields must be well formed. CI runs the short, repeatable profile; `.github/workflows/fuzz.yml`
+  runs the long profile with fresh random inputs every Monday and on demand. A failure prints the
+  smallest breaking input and a `@reproduce_failure` line to replay it.
+- **Correlation accuracy kit**: `tests/test_accuracy_kit.py` generates three hand-checked datasets
+  (`tests/accuracy/correlation/make_round1.py`, `make_round2.py`: 34 cases across two Zeek taps,
+  `.nessus` and Nessus CSV, Palo Alto, plus a telemetry-only folder), runs `vulnflow analyze` on each
+  and compares every finding with `expected.json`. Cases with `label_truth` are known gaps (today: a
+  host scanned by name only).
+- **Performance check**: `scripts/perf/perf_check.py` analyzes the same synthetic dataset every time
+  (40 MB of Zeek, Palo Alto and a Nessus CSV, seed 7) with fixed DuckDB memory, threads and parse
+  workers, and compares time (scaled by a short CPU calibration run), peak memory, `explorer.html`
+  and `results.json` size and the main counts with `scripts/perf/baseline.json`. It fails when time
+  is over 1.6x, memory over 1.35x or a page over 1.25x the baseline, or when a count changes. After a
+  deliberate change run it with `--update` and commit the new baseline with a note on why.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`:
@@ -23,7 +64,10 @@ python3 -m unittest discover -s tests
   `.env` files, packet captures, executables and archives (by name and by their first bytes), private or
   API keys, files over 5 MB, and images outside `screenshots/`, `vulnflow/static/` and `example_output/`.
   Run it before committing, or install it as a pre-commit hook (the script's header shows how).
-- **Tests**: the suite above on Python 3.10 (the oldest supported) and 3.13 (the Docker image's).
+- **Lint and type check**: `ruff check .` and `mypy` (see [Code checks](#code-checks)).
+- **Tests**: the suite above on Python 3.10 (the oldest supported) and 3.13 (the Docker image's),
+  with the short fuzz run and the accuracy kit; the 3.13 run also reports coverage.
+- **Performance check**: `scripts/perf/perf_check.py` against `scripts/perf/baseline.json`.
 - **Explorer pages**: `scripts/smoke/explorer_smoke.py --samples WORK` analyzes the bundled samples, an
   edge case (IOCs with no article link) and the two-company comparison, opens each `explorer.html` in
   headless Chromium and walks 3D, a focused host, Flat, Attack paths and Timeline. It fails on any page
@@ -48,6 +92,8 @@ failing step's log is one click away under **Details**.
 
 | Test file | Covers |
 | --- | --- |
+| `test_fuzz_parsers.py` | Fuzzing every reader, format detection and the PCAP hand-off with hostile and damaged files |
+| `test_accuracy_kit.py`, `test_correlation_accuracy.py` | Hand-checked correlation answers: the three-round kit and targeted regression cases |
 | `test_workflow.py` | Parsing, normalization, correlation, scoring and reports end to end; the bundled samples; the Docker entry point |
 | `test_scale.py`, `test_resources.py` | Streaming, Parquet/DuckDB de-duplication, memory/thread/disk sizing |
 | `test_pcap.py`, `test_filebeat.py` | Packet capture conversion; Filebeat CSV/NDJSON back to Zeek |
