@@ -61,7 +61,7 @@ failing step's log is one click away under **Details**.
 | `test_saved.py`, `test_report_name.py` | Reopening a saved report; report names, networks and timestamped run folders |
 | `test_compare.py` | Compare reports: counts per report and network, the re-hunt over saved data, the all-networks Explorer (islands, shared-item highlights, fair trimming), command line and page, the two-company sample |
 | `test_web_errors.py` | Which analysis errors the upload page shows, and which go to the server console |
-| `test_release.py` | The ready-made image's `compose.release.yaml` matches `compose.yaml` apart from the image; `.env.example` does not pin an image |
+| `test_release.py` | The ready-made image's `compose.release.yaml` matches `compose.yaml` apart from the image and project name; default port 8765 on the host; `.env.example` does not pin an image |
 
 ## Samples
 

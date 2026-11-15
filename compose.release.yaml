@@ -3,7 +3,7 @@
 #
 #   docker compose pull                  # download the image (first time and to update)
 #   docker compose up -d                 # start the upload page
-#   open http://127.0.0.1:8080/          # Windows: start http://127.0.0.1:8080/
+#   open http://127.0.0.1:8765/          # Windows: start http://127.0.0.1:8765/
 #   docker compose run --rm vulnscope analyze /data/case1 -o /runs/case1
 #   docker compose down
 #
@@ -11,7 +11,8 @@
 # Offline: `docker load -i vulnscope-max-<version>-image-<arch>.tar.gz`, then `docker compose up -d`.
 # The services below must stay the same as compose.yaml apart from image/build/pull_policy
 # (tests/test_release.py checks this).
-name: vulnscope
+# Its own project name, so it never replaces a container started from a source checkout.
+name: vulnscope-release
 
 services:
   vulnscope:
@@ -21,9 +22,9 @@ services:
     ports:
       # Loopback only: the upload page can read every folder mounted below and has no login.
       # Do not change this to 0.0.0.0; for a shared server see "Upload page security" in ARCHITECTURE.md.
-      - "127.0.0.1:${VULNSCOPE_PORT:-8080}:8080"
+      - "127.0.0.1:${VULNSCOPE_PORT:-8765}:8080"   # this computer : inside the container (keep 8080)
     environment:
-      VULNSCOPE_PUBLIC_PORT: "${VULNSCOPE_PORT:-8080}"
+      VULNSCOPE_PUBLIC_PORT: "${VULNSCOPE_PORT:-8765}"
       VULNSCOPE_OFFLINE: "${VULNSCOPE_OFFLINE:-0}"
       VULNSCOPE_DUCKDB_MEMORY: "${VULNSCOPE_DUCKDB_MEMORY:-}"
       VULNSCOPE_PARSE_WORKERS: "${VULNSCOPE_PARSE_WORKERS:-}"

@@ -20,7 +20,9 @@ Nothing in this bundle reaches the internet, and the container needs no internet
 
 4. Start it without building or pulling anything:
      docker compose up -d --no-build
-   Open http://127.0.0.1:8080/ in a browser on this computer.
+   Open http://127.0.0.1:8765/ in a browser on this computer.
+   "port is already allocated": another program uses 8765; set VULNSCOPE_PORT=<another port>
+   in .env and run the same command again.
 
 5. Command line instead of the upload page:
      docker compose run --rm vulnscope analyze /data/case1 -o /runs/case1

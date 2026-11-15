@@ -171,12 +171,13 @@ docker compose run --rm vulnscope zeek -C -r /data/capture.pcap local     # Zeek
 ```
 
 Without Compose:
-`docker run --rm -p 127.0.0.1:8080:8080 -v "$PWD/data:/data:ro" -v "$PWD/out:/runs" vulnscope-max`.
+`docker run --rm -p 127.0.0.1:8765:8080 -e VULNSCOPE_PUBLIC_PORT=8765 -v "$PWD/data:/data:ro" -v "$PWD/out:/runs" vulnscope-max`
+(`VULNSCOPE_PUBLIC_PORT` must match the port on the left, or the page refuses the browser's address).
 
 **Isolation.** The port is published on the host's `127.0.0.1` only. Inside the container the server
 listens on all of the container's interfaces (`VULNSCOPE_CONTAINER=1`) but still refuses any request
 whose Host header is not `localhost`/`127.0.0.1`, so DNS rebinding stays blocked. Always publish with
-`127.0.0.1:` in front of the port; `-p 8080:8080` alone would expose the page to your network. The
+`127.0.0.1:` in front of the port; `-p 8765:8080` alone would expose the page to your network. The
 container runs with a read-only root filesystem and no added privileges; the entry point fixes the
 `/runs` owner, then the analysis runs as that owner (uid 1000 if it belongs to root), never as root.
 
