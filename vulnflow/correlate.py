@@ -49,6 +49,10 @@ class Config:
     # holds the parsed entries.
     known_scanners: str | None = None
     known_scanner_list: list = field(default_factory=list)
+    # Write the full normalized copies of the input (normalized/flows.csv, zeek_events.jsonl,
+    # ot_events.jsonl). They are about as large as the input itself; turning them off saves that
+    # much disk on large runs. The small normalized files (findings, alerts, probed) are always written.
+    normalized_copies: bool = True
 
 
 class _Net:

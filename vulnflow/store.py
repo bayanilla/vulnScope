@@ -1,9 +1,10 @@
 """Disk-backed storage for large telemetry sets.
 
-Parsers stream records into this module in batches. Flows are written to Parquet
-partitioned by sensor and day inside a local working directory, then de-duplicated
-and sorted with DuckDB SQL into a single on-disk table that the correlator queries.
-Zeek and OT events are spooled to JSONL. Nothing here holds the whole input in memory.
+Parsers stream records into this module in batches. Flows are written to Parquet files
+inside a local working directory, then de-duplicated and sorted with DuckDB SQL into a single
+on-disk table that the correlator queries. Zeek and OT events are written to compressed Parquet
+too. Each input file gets its own ``PartWriter``, so files can be parsed in separate processes
+(see normalize.py) and write their parts side by side. Nothing here holds the whole input in memory.
 """
 from __future__ import annotations
 
@@ -24,6 +25,12 @@ from .schema import Flow, OTEvent, ZeekEvent
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 DEFAULT_BATCH = 100_000
 DEFAULT_SKEW_SECONDS = 2.0
+# Records are numbered (file number << FID_SHIFT) | position in the file, so the order is the
+# order the files were given in, whichever process parsed them.
+FID_SHIFT = 40
+EVENT_COLUMNS = {"ord": "BIGINT", "ts": "BIGINT", "stream": "VARCHAR", "uid": "VARCHAR",
+                 "src_ip": "VARCHAR", "dst_ip": "VARCHAR", "source": "VARCHAR", "fields": "JSON",
+                 "protocol": "VARCHAR", "operation": "VARCHAR", "direction": "VARCHAR"}
 # When two different sensors record the same session, keep the record from the sensor that
 # knows the most about it: the firewall knows the policy action and zones, Zeek the byte counts.
 SENSOR_RANK = {"paloalto": 0, "zeek": 1, "suricata": 2, "generic": 3}
@@ -104,21 +111,10 @@ class Store:
                 f"escape='\"', nullstr='', auto_detect=false, strict_mode=false)")
 
     def write_flow_batch(self, rows: list[tuple]):
-        """Append one batch of flow rows (FLOW_COLUMNS order) as Parquet partitions."""
-        if not rows:
-            return
-        self._batches += 1
-        path = self._write_csv(rows, f"batch_{self._batches}.csv")
-        try:
-            # Empty strings are read back as NULL by nullstr=''; restore them for text columns.
-            text = {"app", "src_zone", "dst_zone", "source"}
-            select = ", ".join(f"coalesce({c}, '') AS {c}" if c in text else c for c in FLOW_COLUMNS)
-            self.con.execute(
-                f"COPY (SELECT {select} FROM {self._read_csv_sql(path, _CSV_TYPES)}) "
-                f"TO '{_q(self.parquet_dir)}' (FORMAT parquet, PARTITION_BY (sensor, day), "
-                f"OVERWRITE_OR_IGNORE true, FILENAME_PATTERN 'batch{self._batches}_{{i}}')")
-        finally:
-            os.remove(path)
+        """Append one batch of flow rows (FLOW_COLUMNS order) as a Parquet file."""
+        if rows:
+            self._batches += 1
+            write_flow_parquet(self.con, self.dir, rows, f"main_{self._batches}")
 
     def finalize_flows(self, skew_seconds: float | None = DEFAULT_SKEW_SECONDS) -> tuple[int, int]:
         """Build the clean ``flows`` table from the Parquet partitions.
@@ -132,19 +128,19 @@ class Store:
         Returns (exact duplicates removed, cross-sensor duplicates removed).
         """
         con = self.con
-        if not self._batches:
+        if not self._batches and not _has_parquet(self.parquet_dir):
             con.execute("CREATE OR REPLACE TABLE flows (seq BIGINT, ts TIMESTAMP, src_ip VARCHAR, "
                         "dst_ip VARCHAR, src_port INTEGER, dst_port INTEGER, proto VARCHAR, "
                         "action VARCHAR, established BOOLEAN, bytes_out BIGINT, bytes_in BIGINT, "
                         "app VARCHAR, src_zone VARCHAR, dst_zone VARCHAR, source VARCHAR, sensor VARCHAR)")
             return 0, 0
         rank = " ".join(f"WHEN '{k}' THEN {v}" for k, v in SENSOR_RANK.items())
-        glob = _q(os.path.join(self.parquet_dir, "**", "*.parquet"))
+        glob = _q(os.path.join(self.parquet_dir, "*.parquet"))
         con.execute(f"""
             CREATE OR REPLACE TABLE flows_exact AS
             SELECT * EXCLUDE (ts_us, day), make_timestamp(ts_us) AS ts,
                    CASE sensor {rank} ELSE 9 END AS sensor_rank
-            FROM read_parquet('{glob}', hive_partitioning = true, hive_types_autocast = false)
+            FROM read_parquet('{glob}', hive_partitioning = false)
             -- keep the most complete copy: preferred sensor, then a completed session (one tap may have
             -- seen only the SYN at the same instant), then most bytes, then the one read first
             QUALIFY row_number() OVER (PARTITION BY ts_us, src_ip, src_port, dst_ip, dst_port, proto, action
@@ -189,6 +185,10 @@ class Store:
             writer.add(f, "list")
         writer.flush()
         self.finalize_flows(skew_seconds=None)
+
+    def events(self, name: str, ot: bool, count: int) -> "EventSpool":
+        """The ``name`` events (zeek_events / ot_events) that PartWriters wrote for this run."""
+        return EventSpool(self, name, ot, count)
 
     def answering_ips(self) -> set[str]:
         """Addresses that exist: they started a session, or answered one (completed, refused with a
@@ -262,17 +262,7 @@ class FlowWriter:
     def add(self, f: Flow, sensor: str, fid: int = 0):
         """``fid`` numbers the input file, so sessions repeated by a second sensor of the same
         kind (another Zeek tap) can be told apart from records inside one file."""
-        us = _us(f.ts)
-        if us is None:
-            day = "untimed"
-        else:
-            d = us // 86_400_000_000
-            day = self._days.get(d)
-            if day is None:
-                day = self._days[d] = (EPOCH + timedelta(days=d)).strftime("%Y-%m-%d")
-        self.rows.append((self.ord, us, f.src_ip, f.dst_ip, f.src_port, f.dst_port, f.proto, f.action,
-                          f.established, f.bytes_out or 0, f.bytes_in or 0, f.app, f.src_zone,
-                          f.dst_zone, f.source, sensor, fid, day))
+        self.rows.append(flow_row(self.ord, f, sensor, fid, self._days))
         self.ord += 1
         if len(self.rows) >= self.batch_size:
             self.flush()
@@ -327,26 +317,104 @@ class FlowView:
     __hash__ = None
 
 
-class EventSpool:
-    """Append-only JSONL spool of Zeek / OT events with a sequence-like read view."""
+class PartWriter:
+    """Writes one input file's flows and events as Parquet files into a run's working directory.
 
-    def __init__(self, store: Store, name: str, ot: bool):
-        self.path = os.path.join(store.dir, f"{name}.jsonl")
-        self.ot = ot
-        self._fh = open(self.path, "w", encoding="utf-8")
-        self._len = 0
+    It has its own small in-memory DuckDB connection, so it works the same inside a parse worker
+    process as in the main process. File names carry the file number, so writers for different
+    files never touch the same file."""
 
-    def add(self, e: ZeekEvent):
-        row = {"ts": _us(e.ts), "stream": e.stream, "uid": e.uid, "src_ip": e.src_ip,
+    def __init__(self, workdir: str, fid: int, batch_size: int = DEFAULT_BATCH):
+        self.dir, self.fid, self.batch_size = workdir, fid, batch_size
+        self.con = None
+        self.flows, self.events = [], {"zeek_events": [], "ot_events": []}
+        self.n_flows = self.n_events = 0
+        self.base = fid << FID_SHIFT
+        self._batch = 0
+        self._days: dict[int, str] = {}
+        self.counts = {"zeek_events": 0, "ot_events": 0}
+
+    def _con(self):
+        if self.con is None:
+            self.con = duckdb.connect()
+            # one batch at a time: little memory, no threads competing with the other workers
+            self.con.execute("SET threads = 1")
+            self.con.execute("SET memory_limit = '512MiB'")
+            self.con.execute(f"SET temp_directory = '{_q(os.path.join(self.dir, 'duckdb_tmp'))}'")
+        return self.con
+
+    def add_flow(self, f: Flow, sensor: str):
+        self.flows.append(flow_row(self.base + self.n_flows, f, sensor, self.fid, self._days))
+        self.n_flows += 1
+        if len(self.flows) >= self.batch_size:
+            self._flush_flows()
+
+    def add_event(self, e: ZeekEvent):
+        """A Zeek event; an OT event is also written to the OT event set (as before)."""
+        ord_ = self.base + self.n_events
+        self.n_events += 1
+        row = {"ord": ord_, "ts": _us(e.ts), "stream": e.stream, "uid": e.uid, "src_ip": e.src_ip,
                "dst_ip": e.dst_ip, "source": e.source, "fields": e.fields}
-        if self.ot:
-            row.update(protocol=e.protocol, operation=e.operation, direction=e.direction)
-        self._fh.write(json.dumps(row, default=str, ensure_ascii=False) + "\n")
-        self._len += 1
+        self._add_event("zeek_events", row)
+        if isinstance(e, OTEvent):
+            self._add_event("ot_events", dict(row, protocol=e.protocol, operation=e.operation,
+                                              direction=e.direction))
+
+    def _add_event(self, name, row):
+        self.events[name].append(row)
+        self.counts[name] += 1
+        if len(self.events[name]) >= self.batch_size:
+            self._flush_events(name)
+
+    def _flush_flows(self):
+        if self.flows:
+            self._batch += 1
+            write_flow_parquet(self._con(), self.dir, self.flows, f"f{self.fid}_{self._batch}")
+            self.flows = []
+
+    def _flush_events(self, name):
+        rows = self.events[name]
+        if not rows:
+            return
+        self._batch += 1
+        out = os.path.join(self.dir, name)
+        os.makedirs(out, exist_ok=True)
+        tmp = os.path.join(self.dir, f"{name}_f{self.fid}_{self._batch}.jsonl")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, default=str, ensure_ascii=False) + "\n")
+        try:
+            cols = ", ".join(f"'{k}': '{v}'" for k, v in EVENT_COLUMNS.items())
+            self._con().execute(
+                f"COPY (SELECT * FROM read_json('{_q(tmp)}', format = 'newline_delimited', "
+                f"columns = {{{cols}}})) TO '{_q(os.path.join(out, f'f{self.fid}_{self._batch}.parquet'))}' "
+                f"(FORMAT parquet, COMPRESSION zstd)")
+        finally:
+            os.remove(tmp)
+        self.events[name] = []
 
     def close(self):
-        if not self._fh.closed:
-            self._fh.close()
+        """Write what is left and release the connection."""
+        try:
+            self._flush_flows()
+            for name in self.events:
+                self._flush_events(name)
+        finally:
+            if self.con is not None:
+                self.con.close()
+                self.con = None
+
+
+class EventSpool:
+    """Sequence-like read view of the Zeek / OT events PartWriters wrote, in input order.
+    Events are read back in batches, so memory stays flat however many there are."""
+
+    def __init__(self, store: Store, name: str, ot: bool, count: int = 0):
+        self.store, self.ot, self._len = store, ot, count
+        self.path = os.path.join(store.dir, name)
+
+    def close(self):
+        pass
 
     def __len__(self):
         return self._len
@@ -355,18 +423,23 @@ class EventSpool:
         return self._len > 0
 
     def __iter__(self):
-        self.close()
-        with open(self.path, encoding="utf-8") as fh:
-            for line in fh:
-                r = json.loads(line)
-                ts = EPOCH + timedelta(microseconds=r["ts"]) if r["ts"] is not None else None
-                common = dict(ts=ts, stream=r["stream"], uid=r["uid"], src_ip=r["src_ip"],
-                              dst_ip=r["dst_ip"], fields=r["fields"], source=r["source"])
-                if self.ot:
-                    yield OTEvent(**common, protocol=r["protocol"], operation=r["operation"],
-                                  direction=r["direction"])
-                else:
-                    yield ZeekEvent(**common)
+        if not self._len or not _has_parquet(self.path):
+            return
+        cols = "ts, stream, uid, src_ip, dst_ip, source, fields" + (", protocol, operation, direction" if self.ot else "")
+        cur = self.store.con.cursor()
+        try:
+            cur.execute(f"SELECT {cols} FROM read_parquet('{_q(os.path.join(self.path, '*.parquet'))}') ORDER BY ord")
+            while rows := cur.fetchmany(10_000):
+                for r in rows:
+                    ts = EPOCH + timedelta(microseconds=r[0]) if r[0] is not None else None
+                    common = dict(ts=ts, stream=r[1], uid=r[2], src_ip=r[3], dst_ip=r[4],
+                                  fields=json.loads(r[6]) if r[6] is not None else {}, source=r[5])
+                    if self.ot:
+                        yield OTEvent(**common, protocol=r[7], operation=r[8], direction=r[9])
+                    else:
+                        yield ZeekEvent(**common)
+        finally:
+            cur.close()
 
     def __getitem__(self, i):
         if isinstance(i, slice):
@@ -376,6 +449,49 @@ class EventSpool:
         if not 0 <= i < self._len:
             raise IndexError(i)
         return next(islice(iter(self), i, None))
+
+
+def flow_row(ord_: int, f: Flow, sensor: str, fid: int, days: dict) -> tuple:
+    """One flow as a row in FLOW_COLUMNS order. ``days`` caches day names."""
+    us = _us(f.ts)
+    if us is None:
+        day = "untimed"
+    else:
+        d = us // 86_400_000_000
+        day = days.get(d)
+        if day is None:
+            day = days[d] = (EPOCH + timedelta(days=d)).strftime("%Y-%m-%d")
+    return (ord_, us, f.src_ip, f.dst_ip, f.src_port, f.dst_port, f.proto, f.action,
+            f.established, f.bytes_out or 0, f.bytes_in or 0, f.app, f.src_zone,
+            f.dst_zone, f.source, sensor, fid, day)
+
+
+def write_flow_parquet(con, workdir: str, rows: list[tuple], name: str) -> None:
+    """Write flow rows (FLOW_COLUMNS order) to ``flows_parquet/<name>.parquet`` through a CSV file
+    (fast, needs no numpy/arrow)."""
+    out = os.path.join(workdir, "flows_parquet")
+    os.makedirs(out, exist_ok=True)
+    path = os.path.join(workdir, f"{name}.csv")
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(rows)
+    try:
+        cols = ", ".join(f"'{k}': '{v}'" for k, v in _CSV_TYPES.items())
+        source = (f"read_csv('{_q(path)}', columns={{{cols}}}, header=false, delim=',', quote='\"', "
+                  f"escape='\"', nullstr='', auto_detect=false, strict_mode=false)")
+        # Empty strings are read back as NULL by nullstr=''; restore them for text columns.
+        text = {"app", "src_zone", "dst_zone", "source"}
+        select = ", ".join(f"coalesce({c}, '') AS {c}" if c in text else c for c in FLOW_COLUMNS)
+        con.execute(f"COPY (SELECT {select} FROM {source}) TO '{_q(os.path.join(out, name + '.parquet'))}' "
+                    f"(FORMAT parquet)")
+    finally:
+        os.remove(path)
+
+
+def _has_parquet(path: str) -> bool:
+    try:
+        return any(n.endswith(".parquet") for n in os.listdir(path))
+    except OSError:
+        return False
 
 
 def _q(s: str) -> str:

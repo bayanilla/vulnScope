@@ -2,14 +2,17 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field
+from multiprocessing import get_context
 
 from . import resources
 from .errors import UserError
 from .parsers import FORMATS, detect
 from .schema import Finding, Flow, OTEvent, ParseStats, ThreatEvent, ZeekEvent
 from .store import (DEFAULT_BATCH, DEFAULT_SKEW_SECONDS, SENSOR_RANK, EventSpool, FlowView,
-                    FlowWriter, Store)
+                    PartWriter, Store)
 
 
 @dataclass
@@ -17,7 +20,7 @@ class Dataset:
     """Normalized inputs.
 
     ``load`` fills ``flows`` with a disk-backed FlowView and the Zeek/OT event lists with
-    JSONL spools, so memory stays flat as inputs grow. Plain lists still work (tests and
+    Parquet-backed spools, so memory stays flat as inputs grow. Plain lists still work (tests and
     small callers build Datasets by hand); ``flow_store`` loads them into DuckDB on demand.
     """
     flows: list[Flow] | FlowView = field(default_factory=list)
@@ -65,9 +68,9 @@ def load(paths: list[str], overrides: dict[str, str] | None = None, *,
          batch_size: int = DEFAULT_BATCH, budget: resources.Budget | None = None) -> Dataset:
     """overrides maps a file path or basename to a format name.
 
-    Records stream from each parser in batches: flows go to Parquet (partitioned by sensor
-    and day) under ``workdir`` and are de-duplicated with DuckDB; other Zeek streams are
-    spooled to JSONL. ``skew_seconds`` is the clock-skew tolerance used to recognise the same
+    Files are parsed in parallel worker processes (see ``parse_workers``). Records stream from
+    each parser in batches: flows go to Parquet under ``workdir`` and are de-duplicated with
+    DuckDB; other Zeek streams go to compressed Parquet too. ``skew_seconds`` is the clock-skew tolerance used to recognise the same
     session seen by two sensors (None disables cross-sensor matching).
     """
     overrides = overrides or {}
@@ -76,57 +79,40 @@ def load(paths: list[str], overrides: dict[str, str] | None = None, *,
         return _load(store, paths, overrides, skew_seconds, batch_size)
     except Exception as exc:
         store.close()
-        friendly = resources.explain(exc, store.budget)
+        friendly = None if isinstance(exc, resources.ResourceError) else resources.explain(exc, store.budget)
         if friendly is not None:
             raise friendly from exc
         raise
 
 
+# Inputs smaller than this are parsed in the main process: starting worker processes would take
+# longer than the parsing itself.
+PARALLEL_MIN_BYTES = 64 * 1024 * 1024
+
+
 def _load(store, paths, overrides, skew_seconds, batch_size) -> Dataset:
     ds = Dataset(store=store)
-    writer = FlowWriter(store, batch_size)
-    zeek_spool = EventSpool(store, "zeek_events", ot=False)
-    ot_spool = EventSpool(store, "ot_events", ot=True)
-    raw_findings: list[Finding] = []
-    threats: dict[tuple, ThreatEvent] = {}
+    jobs = []
     for fid, path in enumerate(paths):
         name = os.path.basename(path)
         fmt = overrides.get(path) or overrides.get(name) or detect(path)
         if fmt not in FORMATS:
             raise UserError(f"{name}: unknown format '{fmt}' (choose from {', '.join(FORMATS)})")
-        kind, parser = FORMATS[fmt]
-        sensor = _sensor(fmt)
-        stats = ParseStats(file=name, fmt=fmt)
-        kept = n_threats = 0
-        try:
-            for r in parser(path, stats):
-                r.source = name
-                kept += 1
-                if kind == "findings":
-                    raw_findings.append(r)
-                elif isinstance(r, Flow):
-                    writer.add(r, sensor, fid)
-                elif isinstance(r, ThreatEvent):
-                    n_threats += 1
-                    threats[r.key()] = r      # first position, last record wins (as before)
-                elif isinstance(r, ZeekEvent):
-                    zeek_spool.add(r)        # OT events are Zeek events too (as before)
-                    if isinstance(r, OTEvent):
-                        ot_spool.add(r)
-        except Exception as exc:  # a broken file should not sink the whole run
-            if resources.explain(exc, store.budget) is not None:
-                raise                    # out of memory or disk: stop, don't report a "broken file"
-            # Records parsed before the error (e.g. a truncated .gz) are kept.
-            stats.note(f"file could not be parsed: {exc}"
-                       + (f" (kept {kept} record(s) read before the error)" if kept else ""))
-        stats.kept = kept
-        if n_threats:
-            stats.note(f"{n_threats} IPS/IDS alert(s) used as exploitation evidence")
+        jobs.append((fid, path, fmt, store.dir, batch_size))
+    raw_findings: list[Finding] = []
+    threats: dict[tuple, ThreatEvent] = {}
+    counts = {"zeek_events": 0, "ot_events": 0}
+    for stats, records, threat_list, part_counts, fatal in _parse_all(jobs, store.budget):
+        if fatal:
+            raise RuntimeError(fatal)       # out of memory or disk in a worker: resources.explain words it
+        raw_findings.extend(records)
+        for t in threat_list:
+            threats[t.key()] = t            # first position, last record wins (as before)
+        for k in counts:
+            counts[k] += part_counts[k]
         ds.stats.append(stats)
-    writer.flush()
-    zeek_spool.close()
-    ot_spool.close()
-    ds.zeek_events, ds.ot_events = zeek_spool, ot_spool
+    ds.zeek_events = store.events("zeek_events", ot=False, count=counts["zeek_events"])
+    ds.ot_events = store.events("ot_events", ot=True, count=counts["ot_events"])
 
     # Exact duplicates are removed; a session seen by two sensors (e.g. Zeek and the
     # firewall) is counted once. Both steps run in DuckDB over the Parquet batches.
@@ -160,3 +146,93 @@ def _load(store, paths, overrides, skew_seconds, batch_size) -> Dataset:
         f.os = f.os or ds.scanned_hosts[f.host_ip]["os"]
     ds.findings = sorted(best.values(), key=lambda f: (-f.severity, f.host_ip, f.port))
     return ds
+
+
+def parse_workers(jobs: list, budget: resources.Budget | None) -> int:
+    """How many processes parse files at once: one per CPU, at most one per input file and one
+    per GiB of the analysis' memory ceiling (each worker holds about half a GiB at peak).
+    VULNSCOPE_PARSE_WORKERS overrides it (1 parses everything in the main process). Small inputs
+    are parsed in the main process unless the variable is set."""
+    raw = os.environ.get("VULNSCOPE_PARSE_WORKERS", "").strip()
+    if raw:
+        try:
+            return max(1, min(int(raw), len(jobs)))
+        except ValueError:
+            raise UserError(f"VULNSCOPE_PARSE_WORKERS must be a whole number, not '{raw}'.") from None
+    size = 0
+    for job in jobs:
+        try:
+            size += os.path.getsize(job[1])
+        except OSError:
+            pass
+    if len(jobs) < 2 or size < PARALLEL_MIN_BYTES:
+        return 1
+    cpus = budget.machine.cpus if budget else resources.cpu_count()
+    by_memory = max(1, (budget.ceiling if budget else resources.GiB) // resources.GiB)
+    return max(1, min(cpus, len(jobs), by_memory))
+
+
+def _parse_all(jobs: list, budget):
+    """Parse every file, yielding results in input order. Files are spread over worker
+    processes when there is more than one worker (see ``parse_workers``)."""
+    workers = parse_workers(jobs, budget)
+    if workers == 1:
+        for job in jobs:
+            yield parse_file(job)
+        return
+    # "spawn" (not fork): the main process has DuckDB threads running, and spawn is what macOS
+    # and Windows use anyway, so every platform behaves the same.
+    pool = ProcessPoolExecutor(max_workers=workers, mp_context=get_context("spawn"))
+    try:
+        # map() keeps input order; results are small (findings, alerts, counts), since flows and
+        # events go straight to Parquet in the worker.
+        yield from pool.map(parse_file, jobs)
+    except BrokenProcessPool:
+        raise resources.ResourceError(
+            "A file-parsing process stopped unexpectedly, most likely because the machine ran out of "
+            "memory. Set VULNSCOPE_PARSE_WORKERS to a lower number (1 parses one file at a time).") from None
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
+
+
+def parse_file(job):
+    """Parse one input file (in a worker process or the main one). Flows and Zeek/OT events are
+    written to Parquet in the run's working directory; findings and IPS/IDS alerts, which are
+    small, are returned. Returns (stats, findings, alerts, event counts, fatal error or None)."""
+    fid, path, fmt, workdir, batch_size = job
+    name = os.path.basename(path)
+    kind, parser = FORMATS[fmt]
+    sensor = _sensor(fmt)
+    stats = ParseStats(file=name, fmt=fmt)
+    writer = PartWriter(workdir, fid, batch_size)
+    findings, alerts = [], []
+    kept = 0
+    try:
+        try:
+            for r in parser(path, stats):
+                r.source = name
+                kept += 1
+                if kind == "findings":
+                    findings.append(r)
+                elif isinstance(r, Flow):
+                    writer.add_flow(r, sensor)
+                elif isinstance(r, ThreatEvent):
+                    alerts.append(r)
+                elif isinstance(r, ZeekEvent):
+                    writer.add_event(r)              # OT events are Zeek events too (as before)
+        except Exception as exc:  # a broken file should not sink the whole run
+            if resources.explain(exc, None) is not None:
+                raise                    # out of memory or disk: stop, don't report a "broken file"
+            # Records parsed before the error (e.g. a truncated .gz) are kept.
+            stats.note(f"file could not be parsed: {exc}"
+                       + (f" (kept {kept} record(s) read before the error)" if kept else ""))
+        writer.close()
+    except Exception as exc:
+        if resources.explain(exc, None) is None:
+            raise
+        writer.con = None
+        return stats, [], [], writer.counts, str(exc) or repr(exc)
+    stats.kept = kept
+    if alerts:
+        stats.note(f"{len(alerts)} IPS/IDS alert(s) used as exploitation evidence")
+    return stats, findings, alerts, writer.counts, None

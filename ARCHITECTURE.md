@@ -67,7 +67,8 @@ The same path in text:
 Folder path, Browse, upload, or command line
   → format detection by content (PCAP → Zeek logs; Filebeat export → Zeek records)
   → streaming parsers, batches of records
-  → Parquet partitioned by sensor and day, in a temporary working directory
+  → Parquet (flows; Zeek/OT events zstd-compressed), one process per input file in parallel,
+    in a temporary working directory
   → DuckDB: sort, de-duplicate across sensors, join with scan findings
   → correlation: exposure, blast radius, indicators, score, coverage
   → reports: Markdown / HTML / CSV / JSON / SVG, Explorer HTML
@@ -101,9 +102,21 @@ Folder path, Browse, upload, or command line
 ## Large inputs and resource sizing
 
 Inputs are streamed, not loaded into memory. Each parser yields records in batches; network
-sessions are written to Parquet files partitioned by sensor and day in a temporary working
-directory, then sorted, de-duplicated and correlated with DuckDB SQL. The working directory is
-deleted when the run ends.
+sessions are written to Parquet files in a temporary working directory, then sorted,
+de-duplicated and correlated with DuckDB SQL. Other Zeek streams (DNS, HTTP, ...) and industrial
+protocol events go to zstd-compressed Parquet in the same directory, about a third of the space
+JSONL took. The working directory is deleted when the run ends.
+
+- Files are parsed in parallel, one worker process per CPU (at most one per file and one per GiB
+  of the memory ceiling; inputs under 64 MB stay in one process). Each worker writes its own
+  Parquet files; records keep the order the files were given in, so results are identical to a
+  one-process run. `VULNSCOPE_PARSE_WORKERS=N` sets the number (1 = one file at a time). A large
+  single file is still parsed by one worker.
+- The full normalized copies of the input in the output folder (`normalized/flows.csv`,
+  `zeek_events.jsonl`, `ot_events.jsonl`) are about as large as the input. Skip them with the
+  upload page's "Skip full copies" box, `--no-normalized-copies`, or
+  `VULNSCOPE_NORMALIZED_COPIES=0` (Docker `.env`). Compare reports then can't search that run's
+  domains, URLs and hashes; it says so.
 
 - `--workdir DIR` (or `VULNSCOPE_WORKDIR`) puts the temporary files on a disk with room for them;
   plan for roughly the size of the uncompressed session logs. The upload page uses its run folder.
