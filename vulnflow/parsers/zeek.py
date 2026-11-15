@@ -6,7 +6,7 @@ import os
 import re
 
 from ..schema import Flow, OTEvent, ParseStats, ThreatEvent, ZeekEvent
-from ._util import clean_ip, clean_port, clean_proto, open_text, parse_ts, to_int
+from ._util import clean_ip, clean_port, clean_proto, count, open_text, parse_ts, text
 
 ESTABLISHED_STATES = {"SF", "S1", "S2", "S3", "RSTO", "RSTR"}
 # REJ: the responder answered the SYN with a reset. Usually the host itself refused (closed port or
@@ -41,7 +41,7 @@ def _two_way(rec: dict, state: str, proto: str) -> bool:
         hist = str(rec.get("history") or "").replace("^", "")
         return (state in ("OTH", "SH", "SHR") and any(c in hist for c in "AD")
                 and any(c in hist for c in "ad"))
-    return to_int(rec.get("orig_pkts"), 0) > 0 and to_int(rec.get("resp_pkts"), 0) > 0
+    return count(rec.get("orig_pkts")) > 0 and count(rec.get("resp_pkts")) > 0
 
 
 def _to_flow(rec: dict, stats: ParseStats) -> Flow | None:
@@ -52,10 +52,10 @@ def _to_flow(rec: dict, stats: ParseStats) -> Flow | None:
     if not src or not dst:
         stats.drop("missing or invalid IP")
         return None
-    state = (rec.get("conn_state") or "").upper()
+    state = text(rec.get("conn_state")).upper()
     # Filebeat drops orig_bytes/resp_bytes; fall back to the IP-level counts only when absent.
-    b_out = to_int(rec["orig_bytes"] if "orig_bytes" in rec else rec.get("orig_ip_bytes"), 0)
-    b_in = to_int(rec["resp_bytes"] if "resp_bytes" in rec else rec.get("resp_ip_bytes"), 0)
+    b_out = count(rec["orig_bytes"] if "orig_bytes" in rec else rec.get("orig_ip_bytes"))
+    b_in = count(rec["resp_bytes"] if "resp_bytes" in rec else rec.get("resp_ip_bytes"))
     ts = parse_ts(rec.get("ts"))
     if ts is None:
         stats.note("some rows had no parseable timestamp (kept, untimed)")
@@ -67,7 +67,7 @@ def _to_flow(rec: dict, stats: ParseStats) -> Flow | None:
         action="reject" if state in REJECTED_STATES else "allow",
         established=(state in ESTABLISHED_STATES or (b_out > 0 and b_in > 0)
                      or _two_way(rec, state, proto)),
-        bytes_out=b_out, bytes_in=b_in, app=rec.get("service") or "",
+        bytes_out=b_out, bytes_in=b_in, app=text(rec.get("service")),
     )
 
 
@@ -82,11 +82,10 @@ def _notice(rec: dict, stats: ParseStats) -> ThreatEvent | ZeekEvent | None:
         stats.drop("notice without source/destination IP")
         return None
     actions = rec.get("actions") or ""
-    if isinstance(actions, list):
-        actions = ",".join(actions)
+    actions = ",".join(map(text, actions)) if isinstance(actions, list) else text(actions)
     return ThreatEvent(ts=parse_ts(rec.get("ts")), src_ip=src, dst_ip=dst,
                        dst_port=clean_port(rec.get("p") or rec.get("id.resp_p")),
-                       name=" - ".join(x for x in (rec.get("note"), rec.get("msg")) if x) or "Zeek notice",
+                       name=" - ".join(text(x) for x in (rec.get("note"), rec.get("msg")) if x) or "Zeek notice",
                        action="block" if "DROP" in actions.upper() else "alert")
 
 
@@ -97,7 +96,7 @@ def _brimcap_alert(rec: dict, stats: ParseStats) -> ThreatEvent | None:
         return None
     return ThreatEvent(ts=parse_ts(rec.get("ts") or rec.get("timestamp")), src_ip=src, dst_ip=dst,
                        dst_port=clean_port(rec.get("dest_port")),
-                       name=rec.get("alert.signature") or "Suricata alert",
+                       name=text(rec.get("alert.signature")) or "Suricata alert",
                        severity=str(rec.get("alert.severity") or ""),
                        action="block" if rec.get("alert.action") == "blocked" else "alert")
 
@@ -219,7 +218,7 @@ def parse(path: str, stats: ParseStats):
                     continue
                 if line.startswith("#"):
                     if line.startswith("#separator "):
-                        sep = _decode_separator(line.split(" ", 1)[1])
+                        sep = _decode_separator(line.split(" ", 1)[1]) or sep     # an empty one is unusable
                     elif sep in line:
                         key, value = line.split(sep, 1)
                         if key == "#fields":

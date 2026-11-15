@@ -8,7 +8,7 @@ from __future__ import annotations
 import csv
 
 from ..schema import Flow, ParseStats, ThreatEvent
-from ._util import clean_ip, clean_port, clean_proto, norm_header, open_text, parse_ts, to_int
+from ._util import clean_ip, clean_port, clean_proto, count, norm_header, open_text, parse_ts
 
 # Offsets relative to the "Type" column (which holds TRAFFIC) in syslog CSV.
 SYSLOG_OFFSETS = {
@@ -45,7 +45,7 @@ def _flow(get, stats: ParseStats) -> Flow | None:
         return None
     action_raw = (get("action") or "").strip().lower()
     action = "deny" if action_raw.startswith(DENY_ACTIONS) else "allow"
-    b_out, b_in = to_int(get("bytes_sent"), 0), to_int(get("bytes_received"), 0)
+    b_out, b_in = count(get("bytes_sent")), count(get("bytes_received"))
     ts = parse_ts(get("ts"))
     if ts is None:
         stats.note("some rows had no parseable timestamp (kept, untimed)")

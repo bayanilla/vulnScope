@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 
 from ..schema import Flow, ParseStats
-from ._util import clean_ip, clean_port, clean_proto, norm_header, open_text, parse_ts, to_int
+from ._util import clean_ip, clean_port, clean_proto, count, norm_header, open_text, parse_ts
 
 ALIASES = {
     "src_ip": ["src_ip", "src", "source", "source_ip", "sa", "srcaddr", "src_addr",
@@ -60,7 +60,7 @@ def parse(path: str, stats: ParseStats):
                 stats.drop("missing or invalid IP")
                 continue
             action = "deny" if (get("action") or "").strip().lower().startswith(DENY) else "allow"
-            b_out, b_in = to_int(get("bytes_out"), 0), to_int(get("bytes_in"), 0)
+            b_out, b_in = count(get("bytes_out")), count(get("bytes_in"))
             ts = parse_ts(get("ts"))
             if ts is None:
                 stats.note("some rows had no parseable timestamp (kept, untimed)")
