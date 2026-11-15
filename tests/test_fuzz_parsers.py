@@ -55,6 +55,20 @@ SAMPLES = os.path.join(os.path.dirname(HERE), "samples")
 # table and keeps the records read before the error; anything else escaping a reader is a bug.
 BROKEN_FILE = (UserError, ParseError, EOFError, gzip.BadGzipFile, zlib.error, csv.Error,
                UnicodeDecodeError, json.JSONDecodeError)
+# Python 3.10's csv writer refuses NUL characters, which hostile files certainly contain. Test
+# files are written with a stand-in that FuzzCase.write() turns back into a real NUL.
+NUL = "\uf8ffNUL\uf8ff"
+
+
+def csv_writer(buf, **kw):
+    w = csv.writer(buf, **kw)
+
+    class Writer:
+        def writerow(self, row):
+            w.writerow([c.replace("\x00", NUL) if isinstance(c, str) else c for c in row])
+    return Writer()
+
+
 TIME_LIMIT = 20          # seconds for one file; a reader that takes longer is treated as hung
 
 if st is not None:
@@ -160,7 +174,7 @@ class FuzzCase(unittest.TestCase):
     def write(self, name, data: bytes | str, gz=False):
         self.n += 1
         if isinstance(data, str):
-            data = data.encode("utf-8", "surrogatepass")
+            data = data.replace(NUL, "\x00").encode("utf-8", "surrogatepass")
         path = os.path.join(self.tmp, f"{self.n}_{name}" + (".gz" if gz else ""))
         with open(path, "wb") as fh:
             fh.write(gzip.compress(data, mtime=0) if gz else data)
@@ -354,7 +368,7 @@ class FilebeatFuzz(FuzzCase):
                st.sampled_from([",", ";", "\t"]), st.booleans())
         def test_kibana_csv(self, rows, delim, gz):
             buf = io.StringIO()
-            w = csv.writer(buf, delimiter=delim, quoting=csv.QUOTE_ALL)
+            w = csv_writer(buf, delimiter=delim, quoting=csv.QUOTE_ALL)
             w.writerow(self.COLS)
             for r in rows:
                 w.writerow([v if isinstance(v, str) else json.dumps(v) for v in (r[c] for c in self.COLS)])
@@ -376,7 +390,7 @@ class FilebeatFuzz(FuzzCase):
         @given(st.lists(hostile_json, min_size=1, max_size=6))
         def test_zeek_json_inside_message_column(self, recs):
             buf = io.StringIO()
-            w = csv.writer(buf)
+            w = csv_writer(buf)
             w.writerow(["@timestamp", "message"])
             for r in recs:
                 rec = {"_path": "conn", "ts": 1.0, "id.orig_h": "10.0.0.1", "id.resp_h": r, "id.resp_p": r}
@@ -397,7 +411,7 @@ class PaloAltoFuzz(FuzzCase):
             with open(os.path.join(SAMPLES, "scan_and_telemetry/paloalto_traffic.csv"), encoding="utf-8") as fh:
                 header = fh.readline()
             buf = io.StringIO()
-            w = csv.writer(buf)
+            w = csv_writer(buf)
             for r in rows:
                 w.writerow(r[:2] + ["THREAT" if len(r) % 2 else "TRAFFIC"] + r[2:])
             path = self.write("pa.csv", header + buf.getvalue())
@@ -406,7 +420,7 @@ class PaloAltoFuzz(FuzzCase):
         @given(st.lists(st.lists(hostile_text, min_size=30, max_size=50), min_size=1, max_size=6))
         def test_headerless_syslog_csv(self, rows):
             buf = io.StringIO()
-            w = csv.writer(buf)
+            w = csv_writer(buf)
             for r in rows:
                 r[3] = "TRAFFIC" if len(r) % 2 else "THREAT"
                 w.writerow(r)
@@ -468,7 +482,7 @@ class NessusFuzz(FuzzCase):
         @given(st.lists(st.lists(hostile_text, min_size=0, max_size=12), min_size=1, max_size=8))
         def test_hostile_nessus_csv_rows(self, rows):
             buf = io.StringIO()
-            w = csv.writer(buf)
+            w = csv_writer(buf)
             w.writerow(["Plugin ID", "CVE", "CVSS v3.0 Base Score", "Risk", "Host", "Protocol", "Port", "Name",
                         "Synopsis", "Solution", "IP Address", "Plugin Output"])
             for r in rows:
@@ -512,7 +526,7 @@ class GenericFlowFuzz(FuzzCase):
                st.lists(st.lists(hostile_text, max_size=14), min_size=1, max_size=8))
         def test_any_header_any_rows(self, header, rows):
             buf = io.StringIO()
-            w = csv.writer(buf)
+            w = csv_writer(buf)
             w.writerow(header)
             for r in rows:
                 w.writerow(r)
