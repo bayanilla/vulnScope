@@ -21,6 +21,8 @@ services:
       VULNSCOPE_PUBLIC_PORT: "${VULNSCOPE_PORT:-8080}"
       VULNSCOPE_OFFLINE: "${VULNSCOPE_OFFLINE:-0}"
       VULNSCOPE_DUCKDB_MEMORY: "${VULNSCOPE_DUCKDB_MEMORY:-}"
+      VULNSCOPE_PARSE_WORKERS: "${VULNSCOPE_PARSE_WORKERS:-}"
+      VULNSCOPE_NORMALIZED_COPIES: "${VULNSCOPE_NORMALIZED_COPIES:-1}"
       # Folders the Browse button may show: the shared computer folder first, then /data.
       VULNSCOPE_DATA_ROOT: "${VULNSCOPE_BROWSE_AT:-${VULNSCOPE_BROWSE:-${HOME:-/host}}}:/data"
       # The same folder as the computer names it, so pasted paths (C:\Users\you\...) also work.

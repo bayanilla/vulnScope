@@ -460,6 +460,10 @@ def technical_report(res: dict) -> str:
           "- `normalized/threats.csv`: IPS/IDS alerts (signature, action and addresses)",
           "- `normalized/zeek_events.jsonl`: other Zeek streams with stream identity and source fields",
           "- `normalized/ot_events.jsonl`: industrial protocol records with operation and message direction"]
+    if not res.get("config", {}).get("normalized_copies", True):
+        L[-4] = "- `normalized/findings.csv`: cleaned scan findings in the common schema"
+        L[-2:] = ["- Full copies of the flows and Zeek events (`normalized/flows.csv`, `zeek_events.jsonl`, "
+                  "`ot_events.jsonl`) were not written for this run, to save disk."]
     report = "\n".join(L) + "\n"
     if "ioc_matches" in res:
         from .ioc_archive import markdown_section
@@ -737,7 +741,9 @@ def write_reports(res: dict, outdir: str) -> dict[str, str]:
     return paths
 
 
-def write_all(res: dict, ds, outdir: str) -> dict[str, str]:
+def write_all(res: dict, ds, outdir: str, copies: bool = True) -> dict[str, str]:
+    """Write every output. ``copies`` False skips the full normalized copies of the input
+    (flows.csv, zeek_events.jsonl, ot_events.jsonl), which are about as large as the input."""
     os.makedirs(os.path.join(outdir, "normalized"), mode=0o700, exist_ok=True)
     paths = write_reports(res, outdir)
     from . import explore
@@ -746,15 +752,16 @@ def write_all(res: dict, ds, outdir: str) -> dict[str, str]:
         fh.write(explore.html(explore.build(res, ds)))
     paths["explorer.html"] = p
 
-    p = os.path.join(outdir, "normalized", "flows.csv")
-    with open(p, "w", newline="", encoding="utf-8") as fh:
-        cw = csv.writer(fh)
-        cols = ["ts", "src_ip", "src_port", "dst_ip", "dst_port", "proto", "action", "established",
-                "bytes_out", "bytes_in", "app", "src_zone", "dst_zone", "source"]
-        cw.writerow(cols)
-        for f in ds.flows:
-            cw.writerow(csv_row((f.ts.isoformat() if f.ts else "") if c == "ts" else getattr(f, c) for c in cols))
-    paths["normalized/flows.csv"] = p
+    if copies:
+        p = os.path.join(outdir, "normalized", "flows.csv")
+        with open(p, "w", newline="", encoding="utf-8") as fh:
+            cw = csv.writer(fh)
+            cols = ["ts", "src_ip", "src_port", "dst_ip", "dst_port", "proto", "action", "established",
+                    "bytes_out", "bytes_in", "app", "src_zone", "dst_zone", "source"]
+            cw.writerow(cols)
+            for f in ds.flows:
+                cw.writerow(csv_row((f.ts.isoformat() if f.ts else "") if c == "ts" else getattr(f, c) for c in cols))
+        paths["normalized/flows.csv"] = p
 
     # every internal address that was probed and never answered: not a host, but nothing is dropped
     from .correlate import _Net
@@ -795,6 +802,8 @@ def write_all(res: dict, ds, outdir: str) -> dict[str, str]:
             cw.writerow(csv_row((t.ts.isoformat() if t.ts else "") if c == "ts" else getattr(t, c) for c in cols))
     paths["normalized/threats.csv"] = p
     for name, events in (("zeek_events.jsonl", ds.zeek_events), ("ot_events.jsonl", ds.ot_events)):
+        if not copies:
+            break
         p = os.path.join(outdir, "normalized", name)
         with open(p, "w", encoding="utf-8") as fh:
             for e in events:

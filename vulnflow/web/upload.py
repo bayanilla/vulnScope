@@ -55,6 +55,8 @@ folder name plus the date and time.</div></section>
 <div class="hint">{folder_hint}The files are read where they are, including subfolders; nothing is copied or uploaded. Hidden files are skipped.</div>
 <label for="nets2">Internal networks (optional)</label>
 <input id="nets2" type="text" name="internal_nets" placeholder="10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16">
+<label class="check"><input type="checkbox" id="skip2" name="skip_copies" value="1"{skip_copies}> Skip full copies of flows and Zeek events</label>
+<div class="hint">For large inputs: leaves out <code>normalized/flows.csv</code> and the Zeek event files, which are about as large as the input. Reports and the Explorer are the same.</div>
 <div class="btnrow"><button type="submit" id="analyze-folder">Analyze folder</button></div>
 <div class="hint">To see a completed report again, choose its output folder (the one with <code>results.json</code>
 and <code>explorer.html</code>): the button changes to Open report, and nothing is reanalyzed.</div>
@@ -77,6 +79,8 @@ and <code>explorer.html</code>): the button changes to Open report, and nothing 
 <label for="nets">Internal networks (optional)</label>
 <input id="nets" type="text" name="internal_nets" placeholder="10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16">
 <div class="hint">Anything outside these ranges is treated as the internet. Leave blank for private ranges.</div>
+<label class="check"><input type="checkbox" id="skip1" name="skip_copies" value="1"{skip_copies}> Skip full copies of flows and Zeek events</label>
+<div class="hint">For large inputs: leaves out <code>normalized/flows.csv</code> and the Zeek event files, which are about as large as the input. Reports and the Explorer are the same.</div>
 <button type="submit">Analyze</button>
 </form>
 <p class="hint">Formats are detected automatically: {formats}. Folder selection is supported by Chrome and other compatible browsers. Files stay on this machine.
@@ -109,6 +113,7 @@ def page(req, error: str = ""):
                      "Your browser may ask twice to upload (the folder window's Upload button, "
                      "then &ldquo;Upload files to this site?&rdquo;): click Upload both times. "
                      "Nothing is sent; VulnScope only uses it to find the folder. ") if container else "",
+        skip_copies=" checked" if not req.app.base_cfg.normalized_copies else "",
         busy=busy_overlay(),
         config=page_config({"csrf": app.csrf, "native": folders.NATIVE_PICKER, "dialog": bool(folders.BROWSE_ROOTS)}),
         busy_js=asset("busy.js"), picker_js=asset("folder_picker.js"), upload_js=asset("upload.js")))
@@ -118,22 +123,25 @@ def _report_details(fields: dict) -> dict:
     return runname.clean(fields.get("report_name"), fields.get("report_description"), fields.get("report_network"))
 
 
-def _config(req, nets: str):
-    """The server's analysis settings, with the internal networks typed on the form (if any)."""
+def _config(req, nets: str, skip_copies: bool = False):
+    """The server's analysis settings, with the internal networks typed on the form (if any) and
+    the form's choice to skip the full normalized copies."""
     base = req.app.base_cfg
     cfg = dataclasses.replace(base, internal_nets=list(base.internal_nets))
+    if skip_copies:
+        cfg.normalized_copies = False
     nets = nets.strip()
     if nets:
         cfg.internal_nets = [n.strip() for n in re.split(r"[,\s]+", nets) if n.strip()]
     return cfg
 
 
-def _analyze(req, run_id: str, files: list[str], nets: str, report: dict):
+def _analyze(req, run_id: str, files: list[str], nets: str, report: dict, skip_copies: bool = False):
     """Analyze ``files`` into run ``run_id`` and open its page; on a problem the person can fix,
     show it on the upload page and drop the run folder."""
     root = req.app.run_root(run_id)
     try:
-        run(files, os.path.join(root, "out"), _config(req, nets), workdir=root, report=report)
+        run(files, os.path.join(root, "out"), _config(req, nets, skip_copies), workdir=root, report=report)
     except UserError as exc:
         shutil.rmtree(root, ignore_errors=True)
         return page(req, str(exc))
@@ -181,7 +189,8 @@ def analyze_upload(req):
     os.rmdir(app.run_root(run_id))
     os.rename(tmp_root, app.run_root(run_id))
     files = [os.path.join(app.run_root(run_id), os.path.relpath(path, tmp_root)) for _, path in parts]
-    return _analyze(req, run_id, files, fields.get("internal_nets", ""), report)
+    return _analyze(req, run_id, files, fields.get("internal_nets", ""), report,
+                    fields.get("skip_copies") == "1")
 
 
 def analyze_folder(req):
@@ -213,7 +222,8 @@ def analyze_folder(req):
     os.makedirs(os.path.join(app.run_root(run_id), "in"))
     with open(os.path.join(app.run_root(run_id), "in", "SOURCE.txt"), "w", encoding="utf-8") as fh:
         fh.write(f"Read in place from {folder}\n" + "\n".join(files) + "\n")
-    return _analyze(req, run_id, files, form.get("internal_nets", ""), report)
+    return _analyze(req, run_id, files, form.get("internal_nets", ""), report,
+                    form.get("skip_copies") == "1")
 
 
 def _open_report(req, folder: str):

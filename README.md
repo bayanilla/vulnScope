@@ -285,6 +285,9 @@ Each run writes to its output folder (`vulnflow_runs/<id>/out/` on the upload pa
 - **CSV and JSON:** `correlated_findings.csv` for ticketing; `results.json` for automation.
 - **Normalized inputs:** `normalized/flows.csv`, `findings.csv`, `threats.csv` (IPS/IDS alerts),
   `zeek_events.jsonl`, `ot_events.jsonl`. [Compare reports](#compare-reports) searches them again.
+  The flows and Zeek event copies are about as large as the input; for large runs tick
+  **Skip full copies of flows and Zeek events** (or `--no-normalized-copies`,
+  `VULNSCOPE_NORMALIZED_COPIES=0`) to leave them out.
   `normalized/probed_addresses.csv` lists every internal address that was probed and never
   answered (who probed it, ports, attempts, whether a firewall blocked it); these are not hosts.
 - **Hostile activity diagram** as `hostile_activity.svg`.
@@ -387,7 +390,7 @@ colours, steel blue for hosts connecting out and stronger lines.
 | API keys | Held in the server's memory only; never written to disk, logs or reports. Cleared when the server stops. |
 | Memory and disk | DuckDB takes up to about 60% of RAM (or the container limit) and spills to disk. Roughly 1 GB of DuckDB memory per GB of Zeek logs for de-duplication; free disk of about the uncompressed log size. Docker Desktop's VM memory cap also applies. |
 | Input size | 1 GB per upload by default; folders are read in place with no size cap. A `.gz` may expand to 200× its size (minimum 256 MB). |
-| Concurrency | One analysis at a time per process unless `VULNSCOPE_MAX_JOBS` is raised. |
+| Concurrency | One analysis at a time per process unless `VULNSCOPE_MAX_JOBS` is raised. Within a run, files are parsed in parallel, one process per CPU (`VULNSCOPE_PARSE_WORKERS`). |
 | Local retention | Run folders and reports stay on disk, readable by your account only, until you delete them. Temporary Parquet/DuckDB/Zeek files are deleted when the run ends. |
 | Deployment | Intended for local use. A shared server needs `--allow-remote` behind your SSO proxy and its own security review. |
 

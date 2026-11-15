@@ -25,3 +25,4 @@ button:disabled{opacity:.5;cursor:not-allowed;filter:none}
 @keyframes busy-spin{from{transform:rotateY(0deg)}to{transform:rotateY(360deg)}}
 @media (prefers-reduced-motion:reduce){.busy-logo{animation:busy-pulse 2s ease-in-out infinite}
 @keyframes busy-pulse{50%{opacity:.55}}}
+label.check{display:flex;gap:8px;align-items:center;font-weight:400}

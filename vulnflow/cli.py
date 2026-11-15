@@ -15,7 +15,13 @@ def _cfg(a) -> Config:
                   scan_window_days=a.scan_window_days or None,
                   dedup_skew_seconds=None if a.dedup_skew < 0 else a.dedup_skew,
                   network_map=getattr(a, "network_map", None),
-                  known_scanners=getattr(a, "known_scanners", None))
+                  known_scanners=getattr(a, "known_scanners", None),
+                  normalized_copies=getattr(a, "normalized_copies", True))
+
+
+def _copies_default() -> bool:
+    """VULNSCOPE_NORMALIZED_COPIES=0 turns the full normalized copies off by default (Docker .env)."""
+    return os.environ.get("VULNSCOPE_NORMALIZED_COPIES", "").strip().lower() not in ("0", "false", "no", "off")
 
 
 def _llm_cfg(a, required=True):
@@ -162,6 +168,11 @@ def main(argv=None) -> int:
         p.add_argument("--workdir", metavar="DIR",
                        help="where to write temporary Parquet/DuckDB files (default: system temp "
                             "or $VULNSCOPE_WORKDIR); use a disk with room for large inputs")
+        p.add_argument("--no-normalized-copies", dest="normalized_copies", action="store_false",
+                       default=_copies_default(),
+                       help="don't write normalized/flows.csv, zeek_events.jsonl and ot_events.jsonl "
+                            "(full copies of the input, about as large as it; saves that much disk). "
+                            "Default from $VULNSCOPE_NORMALIZED_COPIES")
 
     a = sub.add_parser("analyze", help="run the workflow on local files")
     a.add_argument("files", nargs="+")

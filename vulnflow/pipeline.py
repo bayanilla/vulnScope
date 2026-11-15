@@ -143,7 +143,8 @@ def _run(ds, archive_paths, outdir, cfg, article_previews, article_preview_cache
             add_previews(res["ioc_matches"], cached)
         res["ioc_archive"] = {"files": [s.file for s in archive_stats],
                               "indicators": len(archive), "matches": len(res["ioc_matches"])}
-    return res, write_all(res, ds, outdir)
+    res["config"]["normalized_copies"] = cfg.normalized_copies
+    return res, write_all(res, ds, outdir, copies=cfg.normalized_copies)
 
 
 def _apply_networks(res, ds, networks):
