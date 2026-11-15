@@ -1,6 +1,6 @@
 (function () {
 'use strict';
-const D = JSON.parse(document.getElementById('vf-data').textContent);
+const D = window.VF_DATA;
 const telemetryOnly = D.vulnerability_data_available === false;
 // subnet -> addresses that were probed and never answered (not hosts, so not drawn)
 const PROBED = D.probed_subnets || {};
@@ -351,6 +351,7 @@ function peerNode(ip) {
 function focus(id, push = true) {
   const F = D.focus[id];
   if (!F) return;
+  loadFullLists(id);
   if (push && state.focus && state.focus !== id) state.history.push(state.focus);
   stopSpin();
   state.mode = 'focus'; state.focus = id;
@@ -730,14 +731,15 @@ function sideTitles() {
   const lx = cx - 30, rx = cx + 30;
   ctx.globalAlpha = 0.9;
   // the all-networks map keeps only the top of each list: the rest is in the report's own Explorer
-  const more = (n, drawn) => n > drawn ? `  (+${n - drawn} in ${COMBINED ? 'its report\'s Explorer' : 'panel'})` : '';
+  const more = (n, drawn, listed) => COMBINED ? (n > drawn ? `  (+${n - drawn} in its report's Explorer)` : '') :
+    (listed > drawn ? `  (+${listed - drawn} in panel)` : '') + (n > listed ? `  (+${n - listed} not in this page)` : '');
   ctx.textAlign = 'right';
-  const lt = `◀ NORTH / SOUTH · ${F.attackers_total} OUTSIDE ADDRESS${F.attackers_total === 1 ? '' : 'ES'}${more(F.attackers_total, Math.min(SIDE_MAX, F.attackers.length))}`;
+  const lt = `◀ NORTH / SOUTH · ${F.attackers_total} OUTSIDE ADDRESS${F.attackers_total === 1 ? '' : 'ES'}${more(F.attackers_total, Math.min(SIDE_MAX, F.attackers.length), F.attackers.length)}`;
   const minL = (W > 900 ? 290 : 10) + ctx.measureText(lt).width;
   const lxe = Math.max(lx, minL);
   ctx.fillText(lt, lxe, Math.max(90, ly));
   ctx.textAlign = 'left';
-  ctx.fillText(`EAST / WEST · ${F.peers_total} INTERNAL HOST${F.peers_total === 1 ? '' : 'S'}${more(F.peers_total, Math.min(SIDE_MAX, F.peers.length))} ▶`, Math.max(rx, lxe + 28), Math.max(90, ly));
+  ctx.fillText(`EAST / WEST · ${F.peers_total} INTERNAL HOST${F.peers_total === 1 ? '' : 'S'}${more(F.peers_total, Math.min(SIDE_MAX, F.peers.length), F.peers.length)} ▶`, Math.max(rx, lxe + 28), Math.max(90, ly));
   ctx.globalAlpha = 1;
 }
 
@@ -1514,7 +1516,8 @@ function renderIpList(kind) {
   const rows = filtered.slice(start, end).map(x => ipRow(kind, x)).join('') ||
     `<div class="ip-empty">${query ? 'No matching ' + label + '.' : 'No ' + label + ' recorded for this host.'}</div>`;
   document.querySelector(`[data-ip-results="${kind}"]`).innerHTML =
-    `<div class="ip-list-count">${filtered.length ? `Showing ${start + 1}–${end} of ${filtered.length}` : '0'} ${label}${query ? ` matching “${esc(s.query)}”` : ''}</div>` + rows +
+    `<div class="ip-list-count">${filtered.length ? `Showing ${start + 1}–${end} of ${filtered.length}` : '0'} ${label}${query ? ` matching “${esc(s.query)}”` : ''}</div>` +
+    (!COMBINED && list.length < total ? `<div class="ip-list-count list-cut" role="note">${cutNote(state.focus, kind, list.length, total)}</div>` : '') + rows +
     (!expanded && filtered.length > IP_PREVIEW ? `<button type="button" class="ip-list-action" data-ip-expand="${kind}">Show all ${filtered.length} ${label}</button>` : '') +
     (expanded && pages > 1 ? `<div class="ip-pager"><button type="button" data-ip-page="${kind}" data-step="-1" ${s.page ? '' : 'disabled'}>Previous</button>` +
       `<span>Page ${s.page + 1} of ${pages}</span><button type="button" data-ip-page="${kind}" data-step="1" ${s.page + 1 < pages ? '' : 'disabled'}>Next</button></div>` : '') +
@@ -1522,10 +1525,64 @@ function renderIpList(kind) {
     (COMBINED && list.length < total ? `<div class="ip-list-count">The top ${list.length} of ${total.toLocaleString()} are kept on this map; ` +
       `${ownLink(state.focus, 'its report\'s own Explorer')} lists them all.</div>` : '');
 }
+// ---------------------------------------------------------------- full lists of a host
+// On busy networks the page keeps only the top rows of a host's lists (D.lists; IPS alerts are always
+// kept, and every count is from the full lists). Opened through VulnScope, the page loads the host's
+// full lists when it is focused, from the address VulnScope gives it in <meta name="vulnscope-contacts">
+// (empty when the report was saved without its flow copies); opened from disk, it says the lists are cut.
+const CONTACTS = (() => { const m = document.querySelector('meta[name="vulnscope-contacts"]'); return m ? m.content : null; })();
+const fullLists = {};                    // host -> 'loading' | 'done' | 'error: <reason>'
+const isCut = F => F.attackers.length < F.attackers_total || F.peers.length < F.peers_total;
+function loadFullLists(id) {
+  const F = D.focus[id];
+  if (COMBINED || !CONTACTS || !F || !isCut(F) || fullLists[id]) return;
+  fullLists[id] = 'loading';
+  fetch(CONTACTS + encodeURIComponent(id), {credentials: 'include', cache: 'no-store'})
+    .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t.slice(0, 160) || 'HTTP ' + r.status))))
+    .then(full => {
+      if (!full || !Array.isArray(full.attackers) || !Array.isArray(full.peers)) throw new Error('unexpected reply');
+      F.attackers = full.attackers; F.peers = full.peers; fullLists[id] = 'done';
+    })
+    .catch(err => { fullLists[id] = 'error: ' + ((err && err.message) || err); })
+    .then(() => { if (state.mode === 'focus' && state.focus === id) refreshFocus(id); });
+}
+// redraw the focused host with its full lists, keeping what the analyst set in the panel
+function refreshFocus(id) {
+  const keep = JSON.parse(JSON.stringify(panelLists)), top = $('panel').scrollTop;
+  focus(id, 'resize');
+  for (const k of ['atk', 'peer']) {
+    Object.assign(panelLists[k], keep[k]);
+    const q = document.querySelector(`[data-ip-search="${k}"]`), so = document.querySelector(`[data-ip-sort="${k}"]`);
+    if (q) q.value = panelLists[k].query;
+    if (so) so.value = panelLists[k].sort;
+    renderIpList(k);
+  }
+  $('panel').scrollTop = top;
+}
+function cutNote(id, kind, n, total) {
+  const label = kind === 'atk' ? 'outside addresses' : 'internal peers', st = fullLists[id] || '';
+  if (st === 'loading') return `Loading all ${total.toLocaleString()} ${label} from VulnScope…`;
+  const head = `This page keeps the top ${n.toLocaleString()} of ${total.toLocaleString()} ${label}` +
+    (kind === 'atk' ? ' (addresses with IPS alerts are always kept)' : '') + '; the counts above cover them all. ';
+  if (st.startsWith('error: ')) return head + `VulnScope could not send the full list: ${esc(st.slice(7))}`;
+  if (CONTACTS === null) return head + 'Open this report in VulnScope (Open report) to list every one.';
+  return head + 'This report was saved without full copies of the flows, so the full list is not available. ' +
+    'Analyze again without “Skip full copies of flows and Zeek events” to list every one.';
+}
+// header badge: some lists are cut and this copy of the page can't load them
+(() => {
+  const b = $('lists-cut');
+  if (!b || COMBINED || !D.lists || CONTACTS) return;
+  b.hidden = false;
+  b.textContent = 'LISTS CAPPED';
+  b.title = `Busy hosts keep their top ${D.lists.cap} outside addresses and internal peers in this page; counts and views use the full lists. ` +
+    (CONTACTS === null ? 'Opened from disk: open this report in VulnScope (Open report) to list every contact.'
+      : 'This report was saved without full copies of the flows, so the full lists are not available.');
+})();
 function renderPanel(id) {
   const F = D.focus[id], d = nodes.get(id).d, p = $('panel');
   for (const kind of ['atk', 'peer']) panelLists[kind] = {query: '', sort: 'priority', expanded: false, page: 0};
-  const nAlert = F.attackers.filter(a => a.kind === 'alert').length;
+  const nAlert = F.capped ? F.capped.kinds.alert || 0 : F.attackers.filter(a => a.kind === 'alert').length;
   const ipSection = (kind, title) => `<section class="ip-section"><h3>${title}</h3><div class="ip-list-tools">` +
     `<input type="search" data-ip-search="${kind}" aria-label="Search ${kind === 'atk' ? 'outside addresses' : 'internal peers'}" placeholder="Search IP${kind === 'peer' ? ' or name' : ''}">` +
     `<select data-ip-sort="${kind}" aria-label="Sort ${kind === 'atk' ? 'outside addresses' : 'internal peers'}"><option value="priority">Priority</option>` +

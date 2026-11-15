@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 
 from .correlate import RESULTS_SCHEMA_VERSION
 from .errors import UserError
@@ -25,7 +24,6 @@ from .errors import UserError
 MAX_SAVED_FILE = 256 * 1024 * 1024       # results.json is parsed in memory (~10x its size)
 MARKER = "REOPENED.json"                  # in the run folder (next to out/): how the run was made
 
-_VF_DATA = re.compile(r'<script id="vf-data" type="application/json">(.*?)</script>', re.S)
 
 
 class SavedRunError(UserError):
@@ -80,10 +78,15 @@ def check_results(res) -> dict:
 def explorer_blob(text: str, generated: str) -> dict:
     """The Explorer data embedded in a saved explorer.html, checked to be from the analysis made
     at ``generated`` (results.json's "generated")."""
-    m = _VF_DATA.search(text)
-    if not m:
-        raise SavedRunError("explorer.html in that folder is not a VulnScope Explorer page (no Explorer data inside).")
-    data = _load_json(m.group(1), "The Explorer data in explorer.html")
+    from .explore import read_data
+    try:
+        data = read_data(text)
+    except LookupError:
+        raise SavedRunError("explorer.html in that folder is not a VulnScope Explorer page (no Explorer data inside).") from None
+    except RecursionError:
+        raise SavedRunError("The Explorer data in explorer.html is nested too deeply to be a VulnScope file.") from None
+    except ValueError as exc:
+        raise SavedRunError(f"The Explorer data in explorer.html is not valid ({exc}).") from None
     if not isinstance(data, dict):
         raise SavedRunError("The Explorer data in explorer.html is not an object.")
     for key, kind in (("generated", str), ("nodes", list), ("links", list), ("focus", dict)):
@@ -106,7 +109,8 @@ def explorer_data(text: str, res: dict) -> dict:
 
 # Files served from the original folder when the rebuilt run doesn't have its own copy.
 SOURCE_FILES = ("correlated_findings.csv", "hostile_activity.svg", "ai_analyst_brief.html", "ai_chat_log.md",
-                "normalized/flows.csv", "normalized/findings.csv", "normalized/threats.csv",
+                "normalized/flows.csv", "normalized/flows.parquet", "normalized/explorer_contacts.parquet",
+                "normalized/findings.csv", "normalized/threats.csv",
                 "normalized/probed_addresses.csv",
                 "normalized/zeek_events.jsonl", "normalized/ot_events.jsonl")
 
@@ -168,9 +172,8 @@ def write(res: dict, data: dict | None, outdir: str, source: str, shown: str = "
     try:
         write_reports(res, outdir)
         if data is not None:
-            page = explore.html(data)
             with open(os.path.join(outdir, "explorer.html"), "w", encoding="utf-8") as fh:
-                fh.write(page)
+                explore.write_html(fh, data)
     except SavedRunError:
         raise
     except (KeyError, TypeError, ValueError, AttributeError, IndexError) as exc:

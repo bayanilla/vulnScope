@@ -4,7 +4,7 @@
 // explore.py adds to the Explorer blob; large runs are sampled there, and the side panel says so.
 (function () {
 'use strict';
-const D = JSON.parse(document.getElementById('vf-data').textContent);
+const D = window.VF_DATA;
 const T = D.timeline, root = document.getElementById('timeline-view'), openBtn = document.getElementById('btn-timeline');
 if (!root || !openBtn) return;
 const supported = (() => { try { const c = document.createElement('canvas'); return !!(window.THREE && (c.getContext('webgl2') || c.getContext('webgl'))); } catch (_) { return false; } })();

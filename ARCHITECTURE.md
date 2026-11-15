@@ -294,8 +294,14 @@ many networks still load as one page.
 
 - Parsers yield normalized records and never decide scores; correlation consumes only normalized
   records and the scan window.
-- The Explorer, Attack paths and Timeline read one data blob written with the report; presentation
-  limits draw a subset but never change counts or scores.
+- The Explorer, Attack paths and Timeline read one data blob written with the report (gzip in base64
+  inside `explorer.html`, unpacked by the page); presentation limits draw a subset but never change
+  counts or scores. A busy host's lists are cut to their top rows in the blob, with every count
+  worked out from the full lists first; the full lists go to `normalized/explorer_contacts.parquet`,
+  which the upload server sends the page one host at a time (`/runs/<id>/contacts/<token>/<host>`).
+- The Explorer reads flows only through `store.py` (`Store.inner_pairs`, `outside_contacts`,
+  `vuln_hits`, `pair_examples`, the timeline queries): a host's contacts with outside addresses
+  stream from DuckDB one host at a time, so building the page does not hold every pair in memory.
 - The Security Assistant reads correlated results only, never raw logs, and is never on the scoring
   path.
 - Local HTTP routes have no authentication beyond loopback, Host and CSRF checks (and the access

@@ -1,7 +1,7 @@
 {
-  "wall_s": 13.55,
-  "peak_rss_mb": 867.1,
-  "explorer_mb": 69.49,
+  "wall_s": 16.7,
+  "peak_rss_mb": 763.0,
+  "explorer_mb": 4.28,
   "results_mb": 3.99,
   "counts": {
     "flows": 164746,
@@ -16,8 +16,8 @@
       "P4": 630
     }
   },
-  "calibration_s": 0.355,
-  "time_ratio": 38.13,
+  "calibration_s": 0.482,
+  "time_ratio": 34.64,
   "dataset": {
     "size": "40M",
     "hours": 4,

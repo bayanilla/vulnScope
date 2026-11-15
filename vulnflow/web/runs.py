@@ -2,11 +2,13 @@
 calls made from those pages."""
 from __future__ import annotations
 
+import hashlib
+import hmac
 import html
 import json
 import os
 
-from .. import saved
+from .. import explore, saved
 from ..article_brief import generate_article_briefs
 from ..llm import Analyst, LLMConfig, LLMError, load_results, log_qa, write_brief
 from ..radar import RadarError, lookup as radar_lookup
@@ -104,8 +106,10 @@ def get(req, run_id: str, rest: str):
         }), "application/json", {"Cache-Control": "no-store"})
     if not rest:
         return index(req, run_id, run_dir)
-    target = os.path.realpath(os.path.join(run_dir, rest))
     marker = saved.read_marker(os.path.dirname(run_dir))
+    if rest.startswith("contacts/"):
+        return contacts(req, run_id, run_dir, marker, rest[len("contacts/"):])
+    target = os.path.realpath(os.path.join(run_dir, rest))
     if not (target.startswith(run_dir + os.sep) and os.path.isfile(target)):
         # a reopened report's raw data stays in its folder (allow-listed names only)
         target = saved.source_file(marker, rest) if marker is not None else None
@@ -113,7 +117,62 @@ def get(req, run_id: str, rest: str):
             return req.send_text(404, "Not found")
     # Pages of a reopened report carry text from files outside this server's control: run them
     # in an opaque origin so crafted content can't read or drive the rest of it.
-    req.send_file(target, {"Content-Security-Policy": SAVED_SANDBOX} if marker is not None else None)
+    headers = {"Content-Security-Policy": SAVED_SANDBOX} if marker is not None else None
+    if rest == "explorer.html":
+        return explorer_page(req, run_id, run_dir, marker, target, headers)
+    req.send_file(target, headers)
+
+
+# -- the Explorer's full host lists ----------------------------------------------------------
+# A busy host's lists are cut in explorer.html; its full lists are in the run's contacts file
+# (explore.CONTACTS_FILE, written with the flow copies). The page is told where to load them with a
+# <meta name="vulnscope-contacts"> added when this server sends it: an address with a token only this
+# server makes, so the reply can be read by the page even when it runs in the opaque origin of a
+# reopened report, and by nothing that did not get the page from here.
+CONTACTS_META = '<meta name="vulnscope-contacts" content="{}">'
+MAX_INJECT = 512 * 1024 * 1024         # older, unpacked pages above this are sent as they are
+
+
+def contacts_token(app, run_id: str) -> str:
+    return hmac.new(app.csrf.encode(), b"contacts:" + run_id.encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def contacts_file(run_dir: str, marker: dict | None) -> str | None:
+    """The run's contacts file: its own, or the original folder's for a reopened report."""
+    own = os.path.join(run_dir, explore.CONTACTS_FILE)
+    if os.path.isfile(own):
+        return own
+    return saved.source_file(marker, explore.CONTACTS_FILE.replace(os.sep, "/")) if marker is not None else None
+
+
+def explorer_page(req, run_id: str, run_dir: str, marker, target: str, headers):
+    if os.path.getsize(target) > MAX_INJECT:
+        return req.send_file(target, headers)
+    with open(target, "rb") as fh:
+        page = fh.read()
+    where = f"contacts/{contacts_token(req.app, run_id)}/" if contacts_file(run_dir, marker) else ""
+    page = page.replace(b"<head>", b"<head>" + CONTACTS_META.format(where).encode(), 1)
+    req.send(200, page, "text/html; charset=utf-8", headers)
+
+
+def contacts(req, run_id: str, run_dir: str, marker, rest: str):
+    """GET /runs/<id>/contacts/<token>/<host>: that host's full Explorer lists (JSON)."""
+    token, _, host = rest.partition("/")
+    if not (hmac.compare_digest(token, contacts_token(req.app, run_id)) and host and len(host) <= 64):
+        return req.send_text(404, "Not found")
+    headers = {"Cache-Control": "no-store"}
+    if req.headers.get("Origin") == "null":       # a reopened report's page, in its opaque origin
+        headers.update({"Access-Control-Allow-Origin": "null", "Access-Control-Allow-Credentials": "true",
+                        "Vary": "Origin"})
+    path = contacts_file(run_dir, marker)
+    if not path:
+        return req.send(404, "This report has no full host lists (it was saved without full copies of the flows).",
+                        "text/plain", headers)
+    try:
+        lists = explore.full_lists(path, host)
+    except Exception as exc:                       # a damaged or unreadable file: say so on the page
+        return req.send(500, f"The full lists could not be read ({type(exc).__name__}).", "text/plain", headers)
+    req.send(200, json.dumps(lists, separators=(",", ":"), default=str), "application/json", headers)
 
 
 def index(req, run_id: str, run_dir: str):

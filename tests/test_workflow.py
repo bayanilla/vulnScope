@@ -15,6 +15,7 @@ import uuid
 from email.message import Message
 from http.server import ThreadingHTTPServer
 
+from vulnflow import explore
 from vulnflow.correlate import Config, correlate
 from vulnflow.normalize import load
 from vulnflow.parsers import detect
@@ -308,7 +309,7 @@ class EndToEndTests(Base):
             self.assertNotIn("No vulnerability reached Priority 1", text)
         with open(paths["explorer.html"], encoding="utf-8") as fh:
             page = fh.read()
-        data = json.loads(re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', page, re.S)[1])
+        data = explore.read_data(page)
         self.assertIn("10.10.1.10", data["focus"])
         self.assertEqual(data["focus"]["10.10.1.10"]["findings"], [])
         self.assertEqual(data["focus"]["10.10.1.10"]["peers"][0]["band"], "Unknown")
@@ -583,7 +584,7 @@ class BundledSamplesTests(unittest.TestCase):
                                 {"10.10.6.13", "10.10.6.14"} for event in ds.ot_events))
             with open(paths["explorer.html"], encoding="utf-8") as fh:
                 page = fh.read()
-            data = json.loads(re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', page, re.S)[1])
+            data = explore.read_data(page)
             self.assertEqual(data["focus"]["10.10.6.10"]["ot_events_total"], 4)
             self.assertIn("No vulnerability data", page)
 
@@ -603,7 +604,7 @@ class BundledSamplesTests(unittest.TestCase):
             res, paths = run(files, os.path.join(tmp, "out"), article_previews=False)
             with open(paths["explorer.html"], encoding="utf-8") as fh:
                 page = fh.read()
-        data = json.loads(re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', page, re.S)[1])
+        data = explore.read_data(page)
         drawn = {n["id"] for n in data["nodes"]}
         self.assertEqual(len(drawn), 2000)                     # capped, riskiest first
         self.assertLessEqual(set(data["focus"]), drawn)          # the host list only offers drawn hosts
@@ -663,7 +664,7 @@ class BundledSamplesTests(unittest.TestCase):
                          ("domain", "blog.lilianpraskova.cz")} <= matched)
         self.assertEqual(sum(t == "hash" for t, _ in matched), 12)                    # 4 beacons x md5/sha1/sha256
         self.assertIn(g.DC1, res["summary"]["hosts_to_investigate"])
-        data = json.loads(re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', page, re.S)[1])
+        data = explore.read_data(page)
         tl = data["timeline"]
         self.assertEqual(len(tl["alerts"]), len(ds.threats))                       # none dropped for lack of time
         t0 = datetime.fromisoformat(tl["t0"].replace("Z", "+00:00"))
@@ -685,7 +686,7 @@ class BundledSamplesTests(unittest.TestCase):
                 page = fh.read()
             with open(paths["technical_report.md"], encoding="utf-8") as fh:
                 report = fh.read()
-        data = json.loads(re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', page, re.S)[1])
+        data = explore.read_data(page)
         files = {i["file"] for i in res["inputs"]}
         self.assertIn("README.md", os.listdir(root))
         self.assertFalse(files & {"README.md", "article_previews.json"})     # notes, not telemetry
@@ -756,7 +757,7 @@ class BundledSamplesTests(unittest.TestCase):
         self.assertNotIn("networks", res)
         self.assertFalse(any("network" in h for h in res["hosts"]))
         self.assertNotIn("## Networks", summary)
-        data = json.loads(re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', page, re.S)[1])
+        data = explore.read_data(page)
         self.assertEqual(data["networks"], [])
         self.assertFalse(any("net" in n for n in data["nodes"]) or any("net" in s for s in data["subnets"]))
 
