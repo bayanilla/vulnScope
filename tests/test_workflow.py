@@ -719,7 +719,6 @@ class BundledSamplesTests(unittest.TestCase):
             self.assertIn("api.deepseek.com", fh.read())
 
     def test_cyberstrike_sample_tells_the_story(self):
-        from datetime import timedelta
         from vulnflow import sample_cyberstrike as c
         res, data, report = self._agentic_sample(c)
         self.assertEqual(res["coverage"]["scanned_hosts"], 79)

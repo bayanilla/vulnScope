@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import csv
+import math
 import re
 import xml.etree.ElementTree as ET
 
 from ..errors import UserError
 from ..schema import Finding, ParseStats
-from ._util import clean_ip, norm_header, open_gzip_binary, open_text, parse_ts, to_int
+from ._util import clean_ip, clean_port, norm_header, open_gzip_binary, open_text, parse_ts, to_int
 
 RISK_TO_SEV = {"none": 0, "info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 FRAMEWORKS = {"exploit_framework_metasploit": "Metasploit",
@@ -27,9 +28,15 @@ def scanner_ip(plugin_output: str) -> str:
 
 def _float(v):
     try:
-        return float(v)
+        f = float(v)
     except (TypeError, ValueError):
         return None
+    return f if math.isfinite(f) else None      # "nan"/"inf" would end up as invalid JSON in results.json
+
+
+def _severity(n: int) -> int:
+    """Nessus severity 0 (Info) to 4 (Critical); anything else in a damaged file reads as Info."""
+    return n if 0 <= n <= 4 else 0
 
 
 def _refuse_dtd(path: str) -> None:
@@ -73,8 +80,8 @@ def parse_xml(path: str, stats: ParseStats):
             findings.append(Finding(
                 host_ip=ip, hostname=hostname, os=props.get("operating-system", ""),
                 plugin_id=item.get("pluginID", ""), plugin_name=item.get("pluginName", ""),
-                severity=to_int(item.get("severity"), 0),
-                port=to_int(item.get("port"), 0), proto=(item.get("protocol") or "tcp").lower(),
+                severity=_severity(to_int(item.get("severity"), 0)),
+                port=clean_port(item.get("port")) or 0, proto=(item.get("protocol") or "tcp").lower(),
                 service=item.get("svc_name", ""),
                 cvss=cvss3 if cvss3 is not None else cvss2,
                 cvss_version="3" if cvss3 is not None else ("2" if cvss2 is not None else ""),
@@ -100,8 +107,8 @@ def parse_csv(path: str, stats: ParseStats):
             if not ip:
                 stats.drop("host is not an IP address")
                 continue
-            sev = RISK_TO_SEV.get(row.get("risk", "").lower(), to_int(row.get("severity"), 0))
-            key = (ip, to_int(row.get("port"), 0), row.get("protocol", "tcp").lower(), row.get("plugin_id", ""))
+            sev = RISK_TO_SEV.get(row.get("risk", "").lower(), _severity(to_int(row.get("severity"), 0)))
+            key = (ip, clean_port(row.get("port")) or 0, row.get("protocol", "tcp").lower(), row.get("plugin_id", ""))
             f = merged.get(key)
             if f is None:
                 cvss3 = _float(row.get("cvss_v3.0_base_score"))

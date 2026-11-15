@@ -1,5 +1,4 @@
 """Regression tests for the security review findings (web server, settings, parsers, exports)."""
-import csv
 import gzip
 import http.client
 import json

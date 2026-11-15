@@ -1,6 +1,10 @@
-# Runs on every pull request and every push to main. Five jobs run side by side:
+# Runs on every pull request and every push to main. Seven jobs run side by side:
 #   hygiene       scripts/check_repo.py: no local branding, captures, executables, keys or files over 5 MB
-#   tests         the unit test suite on Python 3.10 (oldest supported) and 3.13 (the Docker image's)
+#   lint          ruff (unused/undefined names, syntax) and mypy checked against Python 3.10 (pyproject.toml)
+#   tests         the unit test suite on Python 3.10 (oldest supported) and 3.13 (the Docker image's),
+#                 including the parser fuzz tests (short profile) and the correlation accuracy kit;
+#                 the 3.13 run measures coverage and shows it on the run's summary page
+#   performance   scripts/perf/perf_check.py: a fixed dataset, fails on a big slowdown, memory or page-size growth
 #   explorer      scripts/smoke/explorer_smoke.py: opens each sample's Explorer in headless Chromium, walks
 #                 3D, focus, Flat, Attack paths and Timeline, fails on page errors or hosts/flows not drawn
 #   docker-image  builds the Docker image and analyzes a bundled sample inside it
@@ -34,6 +38,23 @@ jobs:
       - uses: actions/checkout@v4
       - run: python3 scripts/check_repo.py
 
+  lint:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+      - name: ruff
+        run: ruff check --output-format=github .
+      - name: mypy (Python 3.10 rules)
+        run: mypy
+
   tests:
     name: Tests (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
@@ -51,10 +72,41 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+      - name: Run tests
+        if: matrix.python != '3.13'
+        run: python -m unittest discover -s tests
+      - name: Run tests with coverage
+        if: matrix.python == '3.13'
+        run: |
+          coverage run -m unittest discover -s tests
+          coverage combine
+          coverage report
+          { echo "### Test coverage (vulnflow/)"; echo; coverage report --format=markdown; } >> "$GITHUB_STEP_SUMMARY"
+          coverage html -d coverage-html
+      - name: Keep the coverage report
+        if: matrix.python == '3.13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage-html/
+          retention-days: 14
+
+  performance:
+    name: Performance check (fixed dataset)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
           cache-dependency-path: requirements.txt
       - run: python -m pip install --disable-pip-version-check -r requirements.txt
-      - name: Run tests
-        run: python -m unittest discover -s tests
+      - name: Analyze the fixed dataset and compare with scripts/perf/baseline.json
+        run: python scripts/perf/perf_check.py
 
   explorer:
     name: Explorer pages open and draw (headless Chromium)

@@ -45,8 +45,28 @@ def to_int(value, default=None):
         return default
     try:
         return int(float(s))
-    except ValueError:
+    except (ValueError, OverflowError):   # OverflowError: "inf", "1e999" in a hostile or damaged file
         return default
+
+
+def count(value, default: int = 0) -> int:
+    """A byte or packet count: a whole number from 0 up to what a 64-bit column holds. A negative
+    or absurd value from a damaged or hostile file becomes ``default``."""
+    n = to_int(value)
+    return n if n is not None and 0 <= n < 2 ** 63 else default
+
+
+def text(value) -> str:
+    """A field meant to be text. JSON logs can hold any type where a string is expected
+    (true, 5, a list); those become their string form instead of breaking ``.upper()`` and co."""
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else str(value)
+
+
+def obj(value) -> dict:
+    """A field meant to be a JSON object; anything else (a list, a number) reads as empty."""
+    return value if isinstance(value, dict) else {}
 
 
 def clean_port(value):
@@ -79,6 +99,8 @@ def parse_ts(value) -> datetime | None:
         return datetime.fromtimestamp(f, tz=timezone.utc)
     except ValueError:
         pass
+    except (OverflowError, OSError):  # a number, but no real time ("1e999", a year past 9999)
+        return None
     try:
         # Python 3.10's fromisoformat needs "+00:00", not "Z" or Suricata's "+0000".
         dt = datetime.fromisoformat(_TZ_NO_COLON.sub(r"\1:\2", s.replace("Z", "+00:00")))

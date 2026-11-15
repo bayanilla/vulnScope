@@ -26,6 +26,7 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
+from typing import IO
 
 from ..schema import ParseStats
 from . import zeek
@@ -396,7 +397,7 @@ def parse(path: str, stats: ParseStats):
 def export(paths: list[str], outdir: str, log=None) -> dict[str, int]:
     """Write clean Zeek JSON logs (conn.log, dns.log, ...) to ``outdir``; return rows per log."""
     os.makedirs(outdir, exist_ok=True)
-    handles: dict[str, object] = {}
+    handles: dict[str, IO[str]] = {}
     counts: dict[str, int] = {}
     try:
         for path in paths:
