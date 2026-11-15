@@ -194,7 +194,6 @@ def executive_summary(res: dict) -> str:
     p1_hosts = sorted({r["host"] for r in F if r["priority"] == "P1"})
     exposed = [r for r in F if r["exposure"]["scope"] == "port" and r["exposure"]["external_sources"]]
     exposed_expl = [r for r in exposed if r["exploit_available"]]
-    ind_hosts = s["hosts_with_indicators"]
     corr, inv, spread = s["hosts_corroborated"], s["hosts_to_investigate"], s["hosts_possible_spread"]
     flagged = corr + inv
     names = {h["host"]: _name(h["host"], h["hostname"]) for h in H}
@@ -383,7 +382,7 @@ def technical_report(res: dict) -> str:
         L += [f"### {_name(h['host'], h['hostname'])} - {PRIORITY_LABELS[h['priority']]}", "",
               f"- Operating system: {h['os'] or 'unknown'}",
               *([f"- Network: {h['network']}"] if h.get("network") else []),
-              f"- Findings: " + ", ".join(f"{n} {k}" for k, n in h["by_severity"].items()),
+              "- Findings: " + ", ".join(f"{n} {k}" for k, n in h["by_severity"].items()),
               f"- Seen in telemetry: {'yes' if h['telemetry_seen'] else 'no'} "
               f"({h['inbound_flows']} inbound, {h['outbound_flows']} outbound sessions)",
               f"- Internet-exposed vulnerable service: {'yes' if h['internet_exposed'] else 'no'}", ""]
@@ -807,12 +806,12 @@ def write_all(res: dict, ds, outdir: str, copies: bool = True) -> dict[str, str]
         p = os.path.join(outdir, "normalized", name)
         with open(p, "w", encoding="utf-8") as fh:
             for e in events:
-                row = {"ts": e.ts.isoformat() if e.ts else None,
+                rec = {"ts": e.ts.isoformat() if e.ts else None,
                        "stream": e.stream, "uid": e.uid, "src_ip": e.src_ip,
                        "dst_ip": e.dst_ip, "source": e.source, "fields": e.fields}
                 if name == "ot_events.jsonl":
-                    row.update(protocol=e.protocol, operation=e.operation, direction=e.direction)
-                fh.write(json.dumps(row, default=str, ensure_ascii=False) + "\n")
+                    rec.update(protocol=e.protocol, operation=e.operation, direction=e.direction)
+                fh.write(json.dumps(rec, default=str, ensure_ascii=False) + "\n")
         paths["normalized/" + name] = p
     return paths
 

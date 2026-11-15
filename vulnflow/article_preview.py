@@ -103,7 +103,7 @@ def fetch_article_text(url: str) -> dict:
         host, port, address, path = target
         conn_type = http.client.HTTPSConnection if urlsplit(current).scheme == "https" else http.client.HTTPConnection
         conn = conn_type(host, port, timeout=8)
-        conn._create_connection = lambda _dest, timeout, source_address=None: socket.create_connection(
+        conn._create_connection = lambda _dest, timeout, source_address=None: socket.create_connection(  # type: ignore[attr-defined]
             (address, port), timeout, source_address)
         try:
             conn.request("GET", path, headers={"Host": host, "User-Agent": "Mucaro-VulnScope-ArticleBrief/1.0",
@@ -176,7 +176,7 @@ def fetch_preview(url: str) -> dict:
         conn_type = http.client.HTTPSConnection if urlsplit(current).scheme == "https" else http.client.HTTPConnection
         conn = conn_type(host, port, timeout=5)
         # Connect to the checked public address; TLS still verifies the original hostname.
-        conn._create_connection = lambda _dest, timeout, source_address=None: socket.create_connection(
+        conn._create_connection = lambda _dest, timeout, source_address=None: socket.create_connection(  # type: ignore[attr-defined]
             (address, port), timeout, source_address)
         try:
             conn.request("GET", path, headers={"Host": host, "User-Agent": "vulnScope-SourcePreview/1.0",

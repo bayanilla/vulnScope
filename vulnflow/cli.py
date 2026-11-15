@@ -28,7 +28,7 @@ def _llm_cfg(a, required=True):
     """Resolve the AI provider from flags/env. No AI vendor is assumed: without a choice the
     built-in offline assistant is used (``required`` False leaves the config unset instead).
     When the chosen provider needs a key and none is set, ask for it without echoing."""
-    from .llm import KEY_ENV, PROVIDER_NAMES, LLMConfig, LLMError
+    from .llm import KEY_ENV, PROVIDER_NAMES, LLMConfig
     cfg = LLMConfig.from_env(provider=a.llm_provider, model=a.llm_model, base_url=a.llm_base_url,
                              redact=True if a.redact else None)
     if not cfg.ready:

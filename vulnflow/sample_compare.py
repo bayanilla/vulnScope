@@ -326,7 +326,6 @@ def _branch(folder, net, prefix, seed, hours, uid, ws_count, scan_name):
 
 def _sweep(s, start, servers, workstations, printers):
     """dc01's Advanced IP Scanner sweep, after the head office: every host, six ports each."""
-    rng = s.rng
     every = servers + workstations + printers
     for k, d in enumerate(every):
         for j, port in enumerate(SWEEP_PORTS):

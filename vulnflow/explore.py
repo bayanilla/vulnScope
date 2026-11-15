@@ -83,7 +83,7 @@ def _pairs(ds) -> dict[tuple, _Pair]:
     cur.execute("""
         SELECT src_ip, dst_ip, src_port, dst_port, proto, app, action, established, source
         FROM flows WHERE src_ip <> dst_ip ORDER BY src_ip, dst_ip, seq""")
-    p = None
+    p, p_key = None, None
     while rows := cur.fetchmany(10_000):
         for src, dst, sport, dport, proto, app, action, est, source in rows:
             if p is None or p_key != (src, dst):

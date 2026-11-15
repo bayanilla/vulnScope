@@ -61,7 +61,6 @@ def multipart_stream(paths, boundary):
     """Yield (total_length, generator) for a multipart body without loading files in memory."""
     parts = []
     for p in paths:
-        name = os.path.relpath(p).replace('"', "_")
         head = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"files\"; "
                 f"filename=\"{os.path.basename(p)}\"\r\nContent-Type: application/octet-stream\r\n\r\n").encode()
         parts.append((head, p))

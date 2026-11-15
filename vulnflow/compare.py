@@ -20,8 +20,7 @@ import os
 import re
 import shutil
 import tempfile
-from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
 from . import resources, saved
