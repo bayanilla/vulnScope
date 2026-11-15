@@ -7,7 +7,9 @@ Opens each report's explorer.html in headless Chromium and walks every view the 
   * the page throws or logs a console error (any view), or
   * 3D draws fewer host bodies than there are hosts in the data, or three.js would draw fewer than it holds
     (the >1,024-host bug fixed in PR #23), or
-  * the Timeline draws fewer chords than it has flows, or puts a chord end at no position.
+  * the Timeline draws fewer chords than it has flows, or puts a chord end at no position, or
+  * on the all-networks map (a comparison), a network's reports stick out of its ring, or two networks'
+    rings or reports overlap.
 
 Usage:
   python scripts/smoke/explorer_smoke.py --samples WORKDIR   analyze the bundled samples, one edge case (IOCs
@@ -23,6 +25,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import itertools
+import math
 import shutil
 import subprocess
 import sys
@@ -86,6 +90,29 @@ def explorer_file(run: Path) -> Path:
     return page
 
 
+def layout_problems(s: dict) -> list[str]:
+    """The all-networks map's layout from VFExplorer.stats() (only that map lists islands and nets):
+    every report of a network inside the network's ring, and nothing of one network on another's."""
+    if "nets" not in s:
+        return []
+    out: list[str] = []
+    islands = {i["k"]: i for i in s["islands"]}
+    dist = lambda a, b: math.hypot(a["x"] - b["x"], a["y"] - b["y"])
+    for n in s["nets"]:
+        for i in s["islands"]:
+            if i["k"] in n["ks"] and dist(i, n) + i["r"] > n["r"] + 1e-6:
+                out.append(f"report {i['k']} sticks out of the {n['name']} ring")
+            elif i["k"] not in n["ks"] and dist(i, n) < n["r"] + i["r"]:
+                out.append(f"report {i['k']} ({i['net']}) is on the {n['name']} ring")
+    for a, b in itertools.combinations(islands.values(), 2):
+        if dist(a, b) < a["r"] + b["r"]:
+            out.append(f"reports {a['k']} and {b['k']} overlap")
+    for a, b in itertools.combinations(s["nets"], 2):
+        if dist(a, b) < a["r"] + b["r"]:
+            out.append(f"the {a['name']} and {b['name']} rings overlap")
+    return out
+
+
 def check(page_path: Path, browser, shots: Path) -> list[str]:
     problems: list[str] = []
     label = page_path.parent.name if page_path.parent.name != "out" else page_path.parent.parent.name
@@ -119,6 +146,7 @@ def check(page_path: Path, browser, shots: Path) -> list[str]:
         elif s["bodies"] < s["hosts"] or s["bodiesDrawable"] < s["bodies"]:
             problems.append(f"3d-overview: {s['hosts']} hosts in the data, {s['bodies']} bodies added, "
                             f"{s['bodiesDrawable']} drawable")
+        problems += [f"3d-overview: {p}" for p in layout_problems(s)]
 
     first = page.evaluate("window.VF_DATA.nodes.map(n => n.id)[0] ?? null")
     if first is not None:

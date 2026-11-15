@@ -100,12 +100,13 @@ const hash01 = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h =
 // big subnets pack their hosts a little tighter so one large subnet cannot crowd out the rest
 const SP = 48, GAP = 180, GAP_K = 0.3, spacing = n => SP / Math.pow(Math.max(1, n / 30), 0.25);
 const golden = Math.PI * (3 - Math.sqrt(5));
-// the first spot on an outward spiral (`step` world units per radian) clearing every placed circle
-function spiralSpot(placed, r, gap, step = 6) {
+// the first spot on an outward spiral (`step` world units per radian) clearing every placed circle by
+// `gap` plus `k` times both radii
+function spiralSpot(placed, r, gap, step = 6, k = GAP_K) {
   for (let t = 0; t < 20000; t++) {
     const a = t * 0.12, rr = step * a;
     const x = rr * Math.cos(a), y = rr * Math.sin(a) * 0.8;
-    if (placed.every(p => Math.hypot(p.x - x, p.y - y) >= (p.r + r) * (1 + GAP_K) + gap)) return [x, y];
+    if (placed.every(p => Math.hypot(p.x - x, p.y - y) >= (p.r + r) * (1 + k) + gap)) return [x, y];
   }
   return [0, 0];
 }
@@ -142,32 +143,74 @@ function placeSubnet(g, ox, oy, clusters, island) {
 }
 // room the host list takes on the left (none on narrow screens, where it is hidden)
 function railWidth() { if (W <= 900) return 0; const r = $('rail').getBoundingClientRect(); return r.width ? Math.max(280, r.right + 2) : 280; }
-const islands = [];   // all-networks map: one per report, {k, x, y, r, info}
+const islands = [];   // all-networks map: one per report, {k, x, y, r, info, lit, grouped}
+// all-networks map: one per network that has more than one compared report (a company's sites), drawn
+// as a solid ring round its reports' islands with the network's name under it: {name, x, y, r, ks, ...}
+const nets = [];
+// one network's islands sit ISLAND_GAP plus ISLAND_K of both radii apart; its ring is NET_PAD times the
+// smallest circle round them (room for their labels); networks sit at least NET_GAP_MIN apart, more for big ones
+const ISLAND_GAP = 260, ISLAND_K = 0.06, NET_PAD = 1.12, NET_GAP_MIN = 900;
 const ZOOM_MIN = COMBINED ? 0.01 : 0.12;   // how far out the wheel and the overview fit may zoom
 function overviewLayout() {
   const clusters = [];
   if (!COMBINED) { packSubnets(D.nodes).forEach(g => placeSubnet(g, 0, 0, clusters)); return clusters; }
-  // each report's subnets packed as in its own Explorer, then the reports packed the same way as
-  // islands: one network's reports side by side, the network with the most hosts first
+  // Each report's subnets are packed as in its own Explorer into an island. One network's islands are
+  // then packed together, the largest first, so each company's sites form one group, and the groups sit
+  // side by side, the network with the most hosts first (a spiral of them when there are more than
+  // three), with a gap between networks well over the gap between one network's sites.
   const by = new Map();
   D.nodes.forEach(n => { const k = n.net || 0; if (!by.has(k)) by.set(k, []); by.get(k).push(n); });
-  const R = COMBINED.reports, netSize = new Map();
-  by.forEach((list, k) => { const key = netKey(R[k].network); netSize.set(key, (netSize.get(key) || 0) + list.length); });
+  const R = COMBINED.reports, groups = new Map();
   const packs = [...by.entries()].map(([k, list]) => {
     const subs = packSubnets(list);
-    return {k, subs, r: subs.reduce((m, g) => Math.max(m, Math.hypot(g.x, g.y) + g.cr + 18), 0) + 60};
-  }).sort((a, b) => {
-    const A = R[a.k], B = R[b.k], na = netKey(A.network), nb = netKey(B.network);
-    return (netSize.get(nb) - netSize.get(na)) || na.localeCompare(nb) || A.generated.localeCompare(B.generated) || a.k - b.k;
+    return {k, n: list.length, subs, x: 0, y: 0, r: subs.reduce((m, g) => Math.max(m, Math.hypot(g.x, g.y) + g.cr + 18), 0) + 60};
   });
-  const placed = [], step = Math.max(6, Math.max(...packs.map(p => p.r)) / 45);
-  packs.forEach((p, i) => {
-    const [x, y] = i ? spiralSpot(placed, p.r, 300, step) : [0, 0];
-    placed.push({x, y, r: p.r});
-    islands[p.k] = {k: p.k, x, y, r: p.r, info: R[p.k], lit: 0};
-    p.subs.forEach(g => placeSubnet(g, x, y, clusters, p.k));
+  const step = Math.max(6, Math.max(...packs.map(p => p.r)) / 45);
+  packs.forEach(p => {
+    const key = netKey(R[p.k].network);
+    if (!groups.has(key)) groups.set(key, {name: R[p.k].network, packs: [], n: 0, x: 0, y: 0, r: 0});
+    const g = groups.get(key); g.packs.push(p); g.n += p.n;
+  });
+  const G = [...groups.entries()].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0])).map(e => e[1]);
+  G.forEach(g => {
+    g.packs.sort((a, b) => b.n - a.n || R[a.k].generated.localeCompare(R[b.k].generated) || a.k - b.k);
+    const placed = [];
+    g.packs.forEach((p, i) => { [p.x, p.y] = i ? spiralSpot(placed, p.r, ISLAND_GAP, step, ISLAND_K) : [0, 0]; placed.push(p); });
+    const e = enclosing(placed);
+    placed.forEach(p => { p.x -= e.x; p.y -= e.y; });
+    g.r = e.r * (placed.length > 1 ? NET_PAD : 1);
+  });
+  const gap = Math.max(NET_GAP_MIN, 0.6 * Math.max(...G.map(g => g.r)));
+  if (G.length <= 3) {
+    G.forEach((g, i) => { g.x = i ? G[i - 1].x + G[i - 1].r + gap + g.r : 0; });
+    const mid = (G[G.length - 1].x + G[G.length - 1].r - G[0].r) / 2;
+    G.forEach(g => { g.x -= mid; });
+  } else {
+    const placed = [];
+    G.forEach((g, i) => { [g.x, g.y] = i ? spiralSpot(placed, g.r, gap, Math.max(6, G[0].r / 45)) : [0, 0]; placed.push(g); });
+  }
+  G.forEach(g => {
+    const grouped = g.packs.length > 1;
+    if (grouped) nets.push({name: g.name, x: g.x, y: g.y, r: g.r, ks: g.packs.map(p => p.k), hosts: g.n,
+      total: g.packs.reduce((t, p) => t + (R[p.k].nodes || p.n), 0), lit: 0});
+    g.packs.forEach(p => {
+      const x = g.x + p.x, y = g.y + p.y;
+      islands[p.k] = {k: p.k, x, y, r: p.r, info: R[p.k], lit: 0, grouped};
+      p.subs.forEach(s => placeSubnet(s, x, y, clusters, p.k));
+    });
   });
   return clusters;
+}
+// the smallest circle round a set of circles, near enough (Badoiu-Clarkson: keep stepping towards the
+// farthest point, by less each time)
+function enclosing(cs) {
+  let x = cs.reduce((t, c) => t + c.x, 0) / cs.length, y = cs.reduce((t, c) => t + c.y, 0) / cs.length;
+  const far = () => cs.reduce((m, c) => { const d = Math.hypot(c.x - x, c.y - y) + c.r; return d > m[0] ? [d, c] : m; }, [-1, null]);
+  for (let i = 1; i <= 300 && cs.length > 1; i++) {
+    const c = far()[1], d = Math.hypot(c.x - x, c.y - y) || 1;
+    x += (c.x + (c.x - x) / d * c.r - x) / (i + 1); y += (c.y + (c.y - y) / d * c.r - y) / (i + 1);
+  }
+  return {x, y, r: far()[0]};
 }
 function netKey(name) { return String(name || '').split(/\s+/).filter(Boolean).join(' ').toLowerCase(); }
 // pillar height in the 3D overview: risk score with a scan, outside exposure without one
@@ -219,6 +262,7 @@ function relight() {
     const n = nodes.get(id), isl = n && islands[n.d.net || 0]; if (isl) isl.lit++;
     if (n) litSubnets.set(n.d.subnet, (litSubnets.get(n.d.subnet) || 0) + 1);
   });
+  nets.forEach(nt => { nt.lit = nt.ks.reduce((t, k) => t + (islands[k] ? islands[k].lit : 0), 0); });
   if (state.mode === 'overview') nodes.forEach(n => { if (!n.ext && !n.domain) n.ta = restAlpha(n); });
 }
 if (COMBINED && D.nodes.filter(n => (n.sh || []).length).length > BEACON_MAX && ITEMS.some(it => it.k === 'ioc')) spot.kind = 'ioc';
@@ -512,14 +556,19 @@ function frame(now) {
   ctx.globalAlpha = 1;
   drawGrid();
   const focusing = state.mode === 'focus';
-  // all-networks map: one dashed ring per report's island
+  // all-networks map: a solid ring round each network's reports, with its name under it ...
+  nets.forEach(nt => {
+    const [x, y] = toS(nt.x * (focusing ? 2.4 : 1), nt.y * (focusing ? 2.4 : 1));
+    ctx.globalAlpha = focusing ? 0.04 : 0.45; ctx.strokeStyle = C('#e4ecfa'); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(x, y, nt.r * cam.z, 0, Math.PI * 2); ctx.stroke();
+  });
+  // ... and one dashed ring per report's island
   islands.forEach(isl => {
     if (!isl) return;
     const [x, y] = toS(isl.x * (focusing ? 2.4 : 1), isl.y * (focusing ? 2.4 : 1));
     ctx.globalAlpha = focusing ? 0.04 : 0.7;
     ctx.strokeStyle = isl.lit ? 'rgba(255,79,216,.6)' : 'rgba(120,170,255,.35)'; ctx.lineWidth = isl.lit ? 2 : 1.4; ctx.setLineDash([10, 6]);
     ctx.beginPath(); ctx.arc(x, y, isl.r * cam.z, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    if (!focusing && state.labels) islandLabel(isl, x, y + isl.r * cam.z + 20, 1);
   });
   ctx.globalAlpha = 1;
   // subnet halos
@@ -586,22 +635,126 @@ function frame(now) {
     }
   });
   ctx.globalAlpha = 1;
+  // network and report names last, over hosts and their labels
+  if (!focusing && state.labels && islands.length) mapLabels(toS, 'flat', 24, 20);
   if (focusing) sideTitles();
   requestAnimationFrame(frame);
 }
-// an island's name under its ring: the network, then the report, its date and how many hosts are lit
-function islandLabel(isl, x, y, al) {
+// All-networks map labels. Each network's name goes under its ring (over it when under would land on
+// another network), then each report's name beside its island, biggest island first: under it, else over
+// it, right of it or left of it, wherever it covers no other island and no label already placed. A label
+// with no room anywhere loses its second line, or is left out until zooming in makes room. `at` maps a
+// point on the plane to [screen x, y]; `key` names the view, for place().
+function mapLabels(at, key, netGap, islandGap, al = 1) {
+  const boxes = [], netFeet = nets.map(nt => footprint(at, nt));
+  labelSpan = openSpan();
+  const off = f => f.cx + f.rx < labelSpan[0] || f.cx - f.rx > labelSpan[1] || f.cy + f.ry < -40 || f.cy - f.ry > H + 40;
+  nets.forEach((nt, i) => { if (!off(netFeet[i])) netRingLabel(nt, key, spotsAround(netFeet[i], netGap).slice(0, 2), al, boxes, netFeet.filter(f => f !== netFeet[i])); });
+  const all = islands.filter(Boolean), feet = all.map(isl => footprint(at, isl));
+  all.map((isl, i) => [isl, feet[i]]).sort(([a], [b]) => b.r - a.r || a.k - b.k).forEach(([isl, f]) => {
+    if (!off(f)) islandLabel(isl, key, spotsAround(f, islandGap), al, f.rx, boxes, feet.filter(o => o !== f));
+  });
+}
+// where a ring of radius r round (x, y) lies on screen, as an ellipse (a circle in Flat)
+function footprint(at, {x, y, r}) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < 16; i++) {
+    const [sx, sy] = at(x + r * Math.cos(i * Math.PI / 8), y + r * Math.sin(i * Math.PI / 8));
+    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+  }
+  return {cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, rx: Math.max(1, (x1 - x0) / 2), ry: Math.max(1, (y1 - y0) / 2)};
+}
+// the spots round a footprint for a label, as functions of its line count and width that give its first
+// baseline: under the ring, over it, right of it, left of it
+function spotsAround(f, gap) {
+  const mid = n => f.cy + 5 - (n - 1) * 8;
+  return [n => [f.cx, f.cy + f.ry + gap], n => [f.cx, f.cy - f.ry - gap + 10 - (n - 1) * 16],
+    (n, w) => [f.cx + f.rx + 8 + w / 2, mid(n)], (n, w) => [f.cx - f.rx - 8 - w / 2, mid(n)]];
+}
+// the first spot where a label fits. A label leaves the spot it had last frame (kept per view in o.at)
+// for a better one only with room to spare, so it does not flick between two while the 3D view turns.
+function place(o, key, spots, lines, w, boxes, feet) {
+  const last = (o.at || (o.at = {}))[key];
+  for (let i = 0; i < spots.length; i++) {
+    const [x, y] = spots[i](lines, w);
+    if (claim(boxes, x, y, w, lines, feet, last != null && i < last ? 10 : 0)) { o.at[key] = i; return [x, y]; }
+  }
+  return null;
+}
+// the part of the canvas that no side panel covers, [left, right]: map labels stay inside it
+let labelSpan = [0, 0];
+function openSpan() {
+  const box = id => { const el = $(id); if (!el || el.hidden) return null; const b = el.getBoundingClientRect(); return b.width && b.height ? b : null; };
+  let l = 0, r = W;
+  const rail = W > 900 && box('rail'); if (rail) l = rail.right;
+  for (const id of ['panel', 'shared', 'analyst-chat']) { const b = box(id); if (b && b.left > W / 2) r = Math.min(r, b.left); }
+  return [l, r];
+}
+const labelBox = (x, y, w, lines) => ({x0: x - w / 2 - 6, x1: x + w / 2 + 6, y0: y - 14, y1: y + 4 + (lines - 1) * 16});
+// a label of width w whose first baseline is at y and that has `lines` lines, if it is clear of the side
+// panels and covers no box yet taken and none of the footprints in `feet`, with `pad` pixels to spare
+// (it then takes its own box)
+function claim(boxes, x, y, w, lines, feet = [], pad = 0) {
+  const b = labelBox(x, y, w, lines);
+  const t = {x0: b.x0 - pad, x1: b.x1 + pad, y0: b.y0 - pad, y1: b.y1 + pad};
+  if (x - w / 2 < labelSpan[0] || x + w / 2 > labelSpan[1]) return false;
+  if (boxes.some(o => t.x0 < o.x1 && o.x0 < t.x1 && t.y0 < o.y1 && o.y0 < t.y1)) return false;
+  if (feet.some(f => {     // the box's nearest point to the ellipse's centre, with y scaled to make it a circle
+    const dx = Math.max(t.x0, Math.min(f.cx, t.x1)) - f.cx, dy = (Math.max(t.y0, Math.min(f.cy, t.y1)) - f.cy) * f.rx / f.ry;
+    return dx * dx + dy * dy < f.rx * f.rx;
+  })) return false;
+  boxes.push(b);
+  return true;
+}
+// an island's name beside its ring: the network, then the report, its date and how many hosts are lit.
+// Inside a network's ring, which carries the network's name, it is the report's name less the network's
+// ("Corvane Phoenix plant" is "Phoenix plant"), with the rest only when the island is big enough on screen.
+function islandLabel(isl, key, spots, al, px, boxes, feet) {
   const r = isl.info, same = netKey(r.network) === netKey(r.name);
-  ctx.globalAlpha = al; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(3,6,12,.85)';
-  ctx.font = '700 13px ui-monospace,Menlo,monospace'; ctx.fillStyle = isl.lit ? C('#ffb8f3') : C('#e6f1ff');
-  const t1 = r.network.toUpperCase();
-  ctx.strokeText(t1, x, y); ctx.fillText(t1, x, y);
-  ctx.font = '10.5px ui-monospace,Menlo,monospace'; ctx.fillStyle = C('#9fb3cc');
-  const bits = [(same ? '' : r.name + ' · ') + (r.generated || '').slice(0, 10), `${r.drawn.toLocaleString()} host${r.drawn === 1 ? '' : 's'}` +
+  const t1 = isl.grouped ? siteName(r) : r.network.toUpperCase();
+  const f1 = isl.grouped ? '700 12px ui-monospace,Menlo,monospace' : '700 13px ui-monospace,Menlo,monospace', f2 = '10.5px ui-monospace,Menlo,monospace';
+  const bits = [(same || isl.grouped ? '' : r.name + ' · ') + (r.generated || '').slice(0, 10), `${r.drawn.toLocaleString()} host${r.drawn === 1 ? '' : 's'}` +
     (r.drawn < r.nodes ? ` of ${r.nodes.toLocaleString()}` : '')];
   if (isl.lit) bits.push(`${isl.lit.toLocaleString()} lit`);
   const t2 = bits.join(' · ');
-  ctx.strokeText(t2, x, y + 15); ctx.fillText(t2, x, y + 15);
+  ctx.font = f1; const w1 = ctx.measureText(t1).width;
+  ctx.font = f2; const w2 = ctx.measureText(t2).width;
+  let two = !isl.grouped || px >= 90, pos = two && place(isl, key, spots, 2, Math.max(w1, w2), boxes, feet);
+  if (!pos) { two = false; pos = place(isl, key, spots, 1, w1, boxes, feet); }
+  if (!pos) return;
+  const [x, y] = pos;
+  ctx.globalAlpha = al; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = LABEL_HALO;
+  ctx.font = f1; ctx.fillStyle = isl.lit ? C('#ffb8f3') : C('#e6f1ff');
+  ctx.strokeText(t1, x, y); ctx.fillText(t1, x, y);
+  if (two) {
+    ctx.font = f2; ctx.fillStyle = C('#9fb3cc');
+    ctx.strokeText(t2, x, y + 15); ctx.fillText(t2, x, y + 15);
+  }
+  ctx.globalAlpha = 1;
+}
+// a report's name without its network's in front ("Corvane Phoenix plant" -> "Phoenix plant")
+function siteName(r) {
+  const name = String(r.name || ''), net = String(r.network || '').trim();
+  const rest = net && name.toLowerCase().startsWith(net.toLowerCase() + ' ') ? name.slice(net.length).trim() : '';
+  return rest || name;
+}
+// a network's name under its ring (over it if under has no room), then how many reports and hosts it has
+// and how many are lit. It is always drawn: islands' labels give way to it.
+function netRingLabel(nt, key, spots, al, boxes, feet) {
+  const t1 = nt.name.toUpperCase();
+  const bits = [`${nt.ks.length} reports`, `${nt.hosts.toLocaleString()} host${nt.hosts === 1 ? '' : 's'}` +
+    (nt.hosts < nt.total ? ` of ${nt.total.toLocaleString()}` : '')];
+  if (nt.lit) bits.push(`${nt.lit.toLocaleString()} lit`);
+  const t2 = bits.join(' · ');
+  ctx.font = '700 16px ui-monospace,Menlo,monospace'; const w1 = ctx.measureText(t1).width;
+  ctx.font = '11px ui-monospace,Menlo,monospace'; const w2 = ctx.measureText(t2).width;
+  const w = Math.max(w1, w2), pos = place(nt, key, spots, 2, w, boxes, feet), [x, y] = pos || spots[0](2, w);
+  if (!pos) boxes.push(labelBox(x, y, w, 2));
+  ctx.globalAlpha = al; ctx.textAlign = 'center'; ctx.lineWidth = 5; ctx.strokeStyle = LABEL_HALO;
+  ctx.font = '700 16px ui-monospace,Menlo,monospace'; ctx.fillStyle = C('#e6f1ff');
+  ctx.strokeText(t1, x, y); ctx.fillText(t1, x, y);
+  ctx.font = '11px ui-monospace,Menlo,monospace'; ctx.fillStyle = C('#9fb3cc'); ctx.lineWidth = 4;
+  ctx.strokeText(t2, x, y + 17); ctx.fillText(t2, x, y + 17);
   ctx.globalAlpha = 1;
 }
 function drawGrid() {
@@ -785,7 +938,7 @@ function edgeCurve(e) {
 }
 const qb = (c, t) => { const u = 1 - t, A = u * u, B = 2 * u * t, C = t * t;
   return [A * c[0] + B * c[3] + C * c[6], A * c[1] + B * c[4] + C * c[7], A * c[2] + B * c[5] + C * c[8]]; };
-const HALO = RGB(C('#78aaff')), CLOUD_RGB = RGB(CLOUD_COL), SHARED_RGB = RGB(SHARED);
+const HALO = RGB(C('#78aaff')), CLOUD_RGB = RGB(CLOUD_COL), SHARED_RGB = RGB(SHARED), NET_RGB = RGB(C('#e4ecfa'));
 const RISK2 = RGB(C('#ff2e88')), RISK1 = RGB(C('#ffb020')), BUNDLE = RGB(C('#6ea8ff')), BUNDLE_LAT = RGB(C('#ff8a3d')),
   RING = RGB(C('#2ee6d6')), P_CRIT = RGB(C('#ff3b5c')), P_HIGH = RGB(C('#ff8a3d'));
 // On Light's white canvas lines don't add up to light, so faint ones wash out: thin traffic is drawn more
@@ -811,10 +964,12 @@ function overviewScene(L, T, cm, cs, cdz) {
     const cn = subnetNet(c.subnet);
     if (cn && cn.cloud) L.circle(c.x * cs, c.y * cs, cdz, c.r * 1.08, 80, 1.6, CLOUD_RGB, cm * (on ? 0.7 : 0.25), true);
   });
-  // all-networks map: a dashed ring round each report's island, magenta while it holds lit hosts
+  // all-networks map: a dashed ring round each report's island, magenta while it holds lit hosts, and a
+  // solid ring round each network's reports
   islands.forEach(isl => {
     if (isl) L.circle(isl.x * cs, isl.y * cs, cdz, isl.r, 160, isl.lit ? 2.6 : 1.8, isl.lit ? SHARED_RGB : HALO, cm * (isl.lit ? 0.55 : 0.32), true);
   });
+  nets.forEach(nt => L.circle(nt.x * cs, nt.y * cs, cdz, nt.r, 240, 2.4, NET_RGB, Math.min(1, LK * cm * 0.6), false));
   // bundled subnet-to-subnet traffic, sagging under the plane; orange share = admin/lateral protocols
   const maxW = subLinks.reduce((m, l) => Math.max(m, l.w), 1);
   subLinks.forEach(l => {
@@ -975,11 +1130,6 @@ function draw3d(now, dt, k) {
       ctx.strokeText(t, x, y + 27); ctx.fillText(t, x, y + 27);
     }
   });
-  if (cm > 0.3 && state.labels) islands.forEach(isl => {
-    if (!isl) return;
-    const [x, y] = Pw(isl.x, isl.y + isl.r, 0);
-    if (x > -150 && x < W + 150 && y > -40 && y < H + 40) islandLabel(isl, x, y + 20, cm);
-  });
   if (cm > 0.3 && inetNodes.length) {
     const ac = arcCenter(view.yaw), [x, y] = Pw(ring.cx + ring.R * 1.08 * Math.cos(ac), ring.cy + ring.R * 1.08 * Math.sin(ac), ring.z + 70);
     if (y > 70) {
@@ -1009,6 +1159,8 @@ function draw3d(now, dt, k) {
   ctx.globalAlpha = 1;
   const order = [...nodes.values()].filter(n => n.a > 0.02).sort((a, b) => a.a - b.a);
   order.forEach(n => drawNode(n, T));
+  // network and report names last, over hosts and their labels
+  if (cm > 0.3 && state.labels && islands.length) mapLabels((x, y) => Pw(x, y, 0), '3d', 26, 20, cm);
   if (focusing) sideTitles();
 }
 
@@ -1710,10 +1862,12 @@ const ABOUT = telemetryOnly ? {
   focus: h => `<b>${esc(h)}</b> in the middle. <b>Left:</b> outside addresses that touched it (north/south). <b>Right:</b> internal hosts it can reach, colored by how likely a compromise could spread there (east/west). Esc or ← All hosts goes back.`,
 };
 if (COMBINED) {
-  ABOUT.flat = 'Each dashed ring is one compared report\'s network, its subnets and hosts drawn as in its own Explorer. ' +
+  ABOUT.flat = 'Each dashed ring is one compared report\'s network, its subnets and hosts drawn as in its own Explorer; ' +
+    'reports from the same network sit together inside a solid ring with the network\'s name. ' +
     'Hosts with no IOC match or vulnerability are dim; a <b>teal ring</b> marks an IOC match and a <b>magenta ring</b> an IOC or vulnerability ' +
     'that other reports have too. Pick one under <b>Shared items</b> to light up its hosts in every network.';
   ABOUT['3d'] = 'Each dashed ring is one compared report\'s network: platforms are its subnets and pillars its hosts. ' +
+    'Reports from the same network sit together inside a solid ring with the network\'s name. ' +
     'Dim hosts have no IOC match or vulnerability; a <b>magenta ring</b> marks an IOC or vulnerability that other reports have too ' +
     '(with a beacon when few are lit). Outside addresses on the arc beam down to every network they reached. Pick one under <b>Shared items</b> to light up only its hosts.';
 }
@@ -1834,7 +1988,10 @@ if (m && D.focus[decodeURIComponent(m[1])]) {
 }
 // lets the Attack paths view (attackpaths.js) hand a host back to this view
 // stats(): read-only counts for the browser smoke test (scripts/smoke): hosts in the data and, in 3D, host bodies drawn
-const stats = () => Object.assign({hosts: D.nodes.length, mode: state.mode, is3d: !!R3}, R3 && R3.stats ? R3.stats() : {});
+// and, on the all-networks map, where each report's island and each network's ring are
+const stats = () => Object.assign({hosts: D.nodes.length, mode: state.mode, is3d: !!R3}, R3 && R3.stats ? R3.stats() : {},
+  COMBINED ? {islands: islands.filter(Boolean).map(i => ({k: i.k, net: netKey(i.info.network), x: i.x, y: i.y, r: i.r})),
+              nets: nets.map(nt => ({name: nt.name, x: nt.x, y: nt.y, r: nt.r, ks: nt.ks}))} : {});
 window.VFExplorer = {focus: id => focus(id), overview: () => overview(), set3d: on => set3d(on, true), is3d: () => !!R3, can3d, markSeg, stats};
 requestAnimationFrame(frame);
 });
