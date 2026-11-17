@@ -663,5 +663,35 @@
       </HostProperties>
       <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings" />
     </ReportHost>
+    <ReportHost name="10.22.1.5">
+      <HostProperties>
+        <tag name="host-ip">10.22.1.5</tag>
+        <tag name="host-fqdn">vpn-tpa.ridgeline.example</tag>
+        <tag name="operating-system">Fortinet FortiOS 7.2.6</tag>
+        <tag name="HOST_START_TIMESTAMP">1792635060</tag>
+        <tag name="HOST_END_TIMESTAMP">1792635240</tag>
+      </HostProperties>
+      <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings" />
+      <ReportItem port="10443" svc_name="www" protocol="tcp" severity="4" pluginID="190020" pluginName="Fortinet FortiOS SSL-VPN Out-of-Bounds Write (CVE-2024-21762)" pluginFamily="General">
+        <cvss3_base_score>9.8</cvss3_base_score>
+        <cve>CVE-2024-21762</cve>
+        <exploit_available>true</exploit_available>
+        <exploit_framework_metasploit>true</exploit_framework_metasploit>
+        <synopsis>The FortiOS SSL-VPN on the remote device is affected by an out-of-bounds write that allows remote code execution.</synopsis>
+        <solution>Upgrade FortiOS to 7.2.7 or later.</solution>
+      </ReportItem>
+      <ReportItem port="8443" svc_name="www" protocol="tcp" severity="3" pluginID="910202" pluginName="FortiOS Administrative Interface Reachable From Untrusted Network" pluginFamily="General">
+        <cvss3_base_score>7.3</cvss3_base_score>
+        <exploit_available>false</exploit_available>
+        <synopsis>The FortiGate administrative GUI answers on its internet-facing interface.</synopsis>
+        <solution>Restrict administrative access to a management network and trusted hosts.</solution>
+      </ReportItem>
+      <ReportItem port="10443" svc_name="www" protocol="tcp" severity="3" pluginID="910201" pluginName="SSL-VPN Portal Accepts Single-Factor Logins" pluginFamily="General">
+        <cvss3_base_score>7.5</cvss3_base_score>
+        <exploit_available>false</exploit_available>
+        <synopsis>The SSL-VPN portal authenticates with a password alone.</synopsis>
+        <solution>Require MFA for every VPN user.</solution>
+      </ReportItem>
+    </ReportHost>
   </Report>
 </NessusClientData_v2>

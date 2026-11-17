@@ -97,7 +97,7 @@ Receive Time,Serial #,Type,Threat/Content Type,Source address,Destination addres
 2026/10/26 03:08:03,016401002231,TRAFFIC,end,10.31.250.23,10.31.10.23,ra-vpn-users,incomplete,vpn,trust,52725,135,tcp,allow,150,60,90,2026/10/26 03:08:03,,
 2026/10/26 03:08:03,016401002231,TRAFFIC,end,10.31.250.23,10.31.10.23,ra-vpn-users,incomplete,vpn,trust,53503,139,tcp,allow,150,60,90,2026/10/26 03:08:03,,
 2026/10/26 03:08:03,016401002231,TRAFFIC,end,10.31.250.23,10.31.10.23,ra-vpn-users,incomplete,vpn,trust,64319,443,tcp,allow,0,0,0,2026/10/26 03:08:03,,
-2026/10/26 03:08:40,016401002231,THREAT,scan,10.31.250.23,10.31.0.10,ra-vpn-users,not-applicable,vpn,trust,49577,22,tcp,alert,,,,2026/10/26 03:08:40,TCP Port Scan,medium
+2026/10/26 03:08:40,016401002231,THREAT,scan,10.31.250.23,10.31.0.10,ra-vpn-users,not-applicable,vpn,trust,62810,22,tcp,alert,,,,2026/10/26 03:08:40,TCP Port Scan,medium
 2026/10/26 03:08:53,016401002231,TRAFFIC,end,10.31.250.23,10.31.10.23,ra-vpn-users,incomplete,vpn,trust,50969,445,tcp,allow,150,60,90,2026/10/26 03:08:53,,
 2026/10/26 03:08:54,016401002231,TRAFFIC,end,10.31.250.23,10.31.10.23,ra-vpn-users,incomplete,vpn,trust,62104,1433,tcp,allow,0,0,0,2026/10/26 03:08:54,,
 2026/10/26 03:08:54,016401002231,TRAFFIC,end,10.31.250.23,10.31.10.23,ra-vpn-users,incomplete,vpn,trust,51539,3389,tcp,allow,0,0,0,2026/10/26 03:08:54,,
@@ -579,7 +579,7 @@ Receive Time,Serial #,Type,Threat/Content Type,Source address,Destination addres
 2026/10/26 03:22:09,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,50970,445,tcp,allow,1565,1005,560,2026/10/26 03:22:09,,
 2026/10/26 03:22:10,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,61112,445,tcp,allow,1906,1371,535,2026/10/26 03:22:10,,
 2026/10/26 03:22:10,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,52956,445,tcp,allow,1732,1080,652,2026/10/26 03:22:10,,
-2026/10/26 03:22:11,016401002231,THREAT,vulnerability,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,63796,445,tcp,alert,,,,2026/10/26 03:22:11,SMB: User Password Brute-force Attempt,high
+2026/10/26 03:22:11,016401002231,THREAT,vulnerability,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,49824,445,tcp,alert,,,,2026/10/26 03:22:11,SMB: User Password Brute-force Attempt,high
 2026/10/26 03:22:36,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,59434,445,tcp,allow,1824,1278,546,2026/10/26 03:22:36,,
 2026/10/26 03:22:37,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,64744,445,tcp,allow,1896,1283,613,2026/10/26 03:22:37,,
 2026/10/26 03:22:37,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,52200,445,tcp,allow,2034,1261,773,2026/10/26 03:22:37,,
@@ -613,7 +613,7 @@ Receive Time,Serial #,Type,Threat/Content Type,Source address,Destination addres
 2026/10/26 03:23:20,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,50222,445,tcp,allow,1731,1112,619,2026/10/26 03:23:20,,
 2026/10/26 03:23:21,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,64415,445,tcp,allow,1883,1307,576,2026/10/26 03:23:21,,
 2026/10/26 03:23:21,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,63645,445,tcp,allow,1942,1214,728,2026/10/26 03:23:21,,
-2026/10/26 03:23:21,016401002231,THREAT,vulnerability,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,50983,445,tcp,alert,,,,2026/10/26 03:23:21,SMB: User Password Brute-force Attempt,high
+2026/10/26 03:23:21,016401002231,THREAT,vulnerability,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,55430,445,tcp,alert,,,,2026/10/26 03:23:21,SMB: User Password Brute-force Attempt,high
 2026/10/26 03:23:22,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,51289,445,tcp,allow,1895,1333,562,2026/10/26 03:23:22,,
 2026/10/26 03:23:22,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,52268,445,tcp,allow,1882,1106,776,2026/10/26 03:23:22,,
 2026/10/26 03:23:23,016401002231,TRAFFIC,end,10.31.250.23,10.31.0.20,ra-vpn-users,ms-ds-smb,vpn,trust,50595,445,tcp,allow,1812,1154,658,2026/10/26 03:23:23,,
@@ -861,8 +861,24 @@ Receive Time,Serial #,Type,Threat/Content Type,Source address,Destination addres
 2026/10/27 11:53:34,016401002231,TRAFFIC,end,10.31.10.47,198.18.10.31,allow-internet,ssl,trust,untrust,57149,443,tcp,allow,16414,3571,12843,2026/10/27 11:53:34,,
 2026/10/27 12:07:55,016401002231,TRAFFIC,end,10.31.10.52,198.18.10.20,allow-internet,ssl,trust,untrust,65026,443,tcp,allow,3796,770,3026,2026/10/27 12:07:55,,
 2026/10/27 12:15:47,016401002231,TRAFFIC,end,10.31.10.41,198.18.10.44,allow-internet,ssl,trust,untrust,62627,443,tcp,allow,5286,1425,3861,2026/10/27 12:15:47,,
+2026/10/27 12:54:00,016401002231,TRAFFIC,end,146.190.195.154,10.31.1.5,allow-vpn-gateway,ssl,untrust,dmz,63796,443,tcp,allow,6402,506,5896,2026/10/27 12:54:00,,
+2026/10/27 12:54:02,016401002231,TRAFFIC,end,146.190.195.154,10.31.1.5,default-deny,incomplete,untrust,dmz,50983,8443,tcp,deny,132,132,0,2026/10/27 12:54:02,,
+2026/10/27 12:54:04,016401002231,TRAFFIC,end,146.190.195.154,10.31.1.5,default-deny,incomplete,untrust,dmz,60170,10443,tcp,deny,85,85,0,2026/10/27 12:54:04,,
+2026/10/27 12:54:06,016401002231,TRAFFIC,end,146.190.195.154,10.31.1.5,default-deny,incomplete,untrust,dmz,59617,4443,tcp,deny,129,129,0,2026/10/27 12:54:06,,
+2026/10/27 12:54:08,016401002231,TRAFFIC,end,146.190.195.154,10.31.1.5,allow-vpn-gateway,ssl,untrust,dmz,63121,443,tcp,allow,4573,568,4005,2026/10/27 12:54:08,,
+2026/10/27 12:54:10,016401002231,TRAFFIC,end,146.190.195.154,10.31.1.5,default-deny,incomplete,untrust,dmz,55509,8443,tcp,deny,189,189,0,2026/10/27 12:54:10,,
+2026/10/27 12:54:12,016401002231,TRAFFIC,end,146.190.195.154,10.31.1.5,default-deny,incomplete,untrust,dmz,64710,10443,tcp,deny,145,145,0,2026/10/27 12:54:12,,
+2026/10/27 12:54:14,016401002231,TRAFFIC,end,146.190.195.154,10.31.1.5,default-deny,incomplete,untrust,dmz,63050,4443,tcp,deny,165,165,0,2026/10/27 12:54:14,,
 2026/10/27 13:03:37,016401002231,TRAFFIC,end,10.31.10.42,198.18.10.44,allow-internet,ssl,trust,untrust,61892,443,tcp,allow,41625,2193,39432,2026/10/27 13:03:37,,
 2026/10/27 13:22:00,016401002231,TRAFFIC,end,10.31.0.53,192.0.2.53,allow-internet,dns,trust,untrust,49998,53,udp,allow,337,64,273,2026/10/27 13:22:00,,
+2026/10/27 13:25:00,016401002231,TRAFFIC,end,64.176.48.93,10.31.1.5,allow-vpn-gateway,ssl,untrust,dmz,55582,443,tcp,allow,6032,877,5155,2026/10/27 13:25:00,,
+2026/10/27 13:25:02,016401002231,TRAFFIC,end,64.176.48.93,10.31.1.5,default-deny,incomplete,untrust,dmz,49644,8443,tcp,deny,198,198,0,2026/10/27 13:25:02,,
+2026/10/27 13:25:04,016401002231,TRAFFIC,end,64.176.48.93,10.31.1.5,default-deny,incomplete,untrust,dmz,62556,10443,tcp,deny,104,104,0,2026/10/27 13:25:04,,
+2026/10/27 13:25:06,016401002231,TRAFFIC,end,64.176.48.93,10.31.1.5,default-deny,incomplete,untrust,dmz,54416,4443,tcp,deny,92,92,0,2026/10/27 13:25:06,,
+2026/10/27 13:25:08,016401002231,TRAFFIC,end,64.176.48.93,10.31.1.5,allow-vpn-gateway,ssl,untrust,dmz,49944,443,tcp,allow,2873,633,2240,2026/10/27 13:25:08,,
+2026/10/27 13:25:10,016401002231,TRAFFIC,end,64.176.48.93,10.31.1.5,default-deny,incomplete,untrust,dmz,56213,8443,tcp,deny,121,121,0,2026/10/27 13:25:10,,
+2026/10/27 13:25:12,016401002231,TRAFFIC,end,64.176.48.93,10.31.1.5,default-deny,incomplete,untrust,dmz,54700,10443,tcp,deny,188,188,0,2026/10/27 13:25:12,,
+2026/10/27 13:25:14,016401002231,TRAFFIC,end,64.176.48.93,10.31.1.5,default-deny,incomplete,untrust,dmz,49344,4443,tcp,deny,166,166,0,2026/10/27 13:25:14,,
 2026/10/27 14:42:07,016401002231,TRAFFIC,end,10.31.10.44,198.18.10.31,allow-internet,ssl,trust,untrust,62011,443,tcp,allow,33002,2469,30533,2026/10/27 14:42:07,,
 2026/10/27 14:59:11,016401002231,TRAFFIC,end,10.31.10.59,198.18.20.12,allow-internet,ssl,trust,untrust,62660,443,tcp,allow,24062,2131,21931,2026/10/27 14:59:11,,
 2026/10/27 15:01:52,016401002231,TRAFFIC,end,10.31.10.33,198.18.20.57,allow-internet,ssl,trust,untrust,62681,443,tcp,allow,26031,2096,23935,2026/10/27 15:01:52,,

@@ -476,8 +476,9 @@ python3 -m vulnflow compare nov/out dec/out --network "dec/out=Plant 3"   # set 
 
 To try it, `python3 -m vulnflow compare-sample` (in Docker, `docker compose run --rm vulnscope
 compare-sample`) loads seven sample reports from two fictional companies into the upload page and
-compares them: the Gootloader intrusion and two branch offices of the same company, and an AI-driven
-intrusion after Unit 42's Cairn report at four sites of the other. Or choose
+compares them: the Gootloader intrusion and two branch offices of the same company, an AI-driven
+intrusion after Unit 42's Cairn report at four sites of the other, and a FortiGate campaign (the
+CyberStrike AI sample's) whose addresses reach both. Or choose
 `samples/compare_two_companies` under **Analyze folder**: its `sites.csv` makes a report for each of
 its six sites and opens their comparison. See
 [the Compare sample](samples/README.md#the-compare-sample-two-companies-seven-sites).

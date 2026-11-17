@@ -292,8 +292,8 @@ function placeInet(yaw, resort = true) {
 });
 placeInet(0);
 inetNodes.forEach(n => { n.tx = n.ox; n.ty = n.oy; });
-[...inetNodes].sort((a, b) => KIND_RANK[a.info.kind] - KIND_RANK[b.info.kind] || b.info.hosts_total - a.info.hosts_total)
-  .slice(0, 6).forEach(n => { n.labelled = true; });
+const inetRanked = [...inetNodes].sort((a, b) => KIND_RANK[a.info.kind] - KIND_RANK[b.info.kind] || b.info.hosts_total - a.info.hosts_total);
+inetRanked.slice(0, 6).forEach(n => { n.labelled = true; });
 function showInet(on) { inetNodes.forEach(n => { n.ta = on ? 1 : 0; n.tx = n.ox; n.ty = n.oy; n.tz = n.oz; }); }
 function clusterAt(sx, sy) {
   if (!R3 || state.mode !== 'overview') return null;
@@ -610,6 +610,32 @@ function frame(now) {
   if (focusing) sideTitles();
   requestAnimationFrame(frame);
 }
+// Names of the outside addresses on the 3D arc, busiest address first: left of the address, else right of
+// it, then over or under it, a row further out each time, wherever it covers neither the arc's title, a
+// name already placed, nor another named or IOC-ringed address. An address with no room anywhere shows
+// its name only when hovered.
+let inetTitle = [];
+function arcLabels(on) {
+  inetNodes.forEach(n => { n.lab = null; });
+  if (!on) return;
+  labelSpan = openSpan();
+  const ioc = n => iocIds.has('ip:' + n.d.id);
+  const marks = inetNodes.filter(n => n.a > 0.5 && (n.labelled || ioc(n))).map(n => {
+    const [x, y, sc] = P(n), r = Math.max(2, n.r * sc), g = r + (ioc(n) ? 8 : 2);
+    return {n, x, y, r, gap: r + (ioc(n) ? 6 : 0), box: {x0: x - g, x1: x + g, y0: y - g, y1: y + g}};
+  });
+  const names = [...inetTitle];
+  ctx.font = '12px system-ui,-apple-system,Segoe UI,sans-serif';
+  inetRanked.forEach(n => {
+    const m = n.labelled && marks.find(o => o.n === n);
+    if (!m) return;
+    const {x, y, r, gap} = m, boxes = names.concat(marks.filter(o => o !== m).map(o => o.box));
+    n.lab = place(n, 'arc', [(l, w) => [x - r - 8 - w / 2, y + 4], (l, w) => [x + r + 8 + w / 2, y + 4],
+      ...[0, 1, 2].flatMap(k => [() => [x, y - gap - 9 - 22 * k], () => [x, y + gap + 18 + 22 * k]])],
+      1, ctx.measureText(nodeLabel(n)).width, boxes, []);
+    if (n.lab) names.push(boxes[boxes.length - 1]);
+  });
+}
 // All-networks map labels. Each network's name goes under its ring (over it when under would land on
 // another network), then each report's name beside its island, biggest island first: under it, else over
 // it, right of it or left of it, wherever it covers no other island and no label already placed. A label
@@ -806,14 +832,16 @@ function drawNode(n, T) {
   }
   if (hov && !sel) { ctx.strokeStyle = LIGHT ? '#1b1c1e' : '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 4, 0, 7); ctx.stroke(); }
   // labels
-  const show = state.labels && (sel || hov || (n.inet ? n.labelled && n.a > 0.5 : state.mode === 'focus' ? n.a > 0.5 && !n.small :
-    (n.d.observed && (sc > 0.55 || (n.d.pri === 'P1' && (!R3 || fewP1 || n.d.ev))))));
+  const show = state.labels && (sel || hov || (n.inet ? n.labelled && n.a > 0.5 && (!R3 || !!n.lab) :
+    state.mode === 'focus' ? n.a > 0.5 && !n.small : (n.d.observed && (sc > 0.55 || (n.d.pri === 'P1' && (!R3 || fewP1 || n.d.ev))))));
   if (show) {
     const name = nodeLabel(n);
     ctx.font = (sel ? '600 14px' : '12px') + ' system-ui,-apple-system,Segoe UI,sans-serif';
-    const side = n.domain ? 'center' : n.ext ? 'right' : (state.mode === 'focus' && n.id !== state.focus && n.info) ? 'left' : 'center';
+    const side = n.inet && R3 && n.lab ? 'center' : n.domain ? 'center' : n.ext ? 'right' :
+      (state.mode === 'focus' && n.id !== state.focus && n.info) ? 'left' : 'center';
     ctx.textAlign = side;
-    const lx = side === 'right' ? x - r - 8 : side === 'left' ? x + r + 8 : x, ly = side === 'center' ? y + r + 15 : y + 4;
+    const [lx, ly] = n.inet && R3 && n.lab ? n.lab :
+      [side === 'right' ? x - r - 8 : side === 'left' ? x + r + 8 : x, side === 'center' ? y + r + 15 : y + 4];
     ctx.lineWidth = 4; ctx.strokeStyle = LABEL_HALO; ctx.strokeText(name, lx, ly);
     ctx.fillStyle = sel ? (LIGHT ? '#000000' : C('#ffffff')) : C('#d6e4f5'); ctx.fillText(name, lx, ly);
     // tight columns: keep everything on one line so neighbouring rows don't collide
@@ -1077,18 +1105,23 @@ function draw3d(now, dt, k) {
       ctx.strokeText(t, x, y + 27); ctx.fillText(t, x, y + 27);
     }
   });
+  inetTitle = [];
   if (cm > 0.3 && inetNodes.length) {
     const ac = arcCenter(view.yaw), [x, y] = Pw(ring.cx + ring.R * 1.08 * Math.cos(ac), ring.cy + ring.R * 1.08 * Math.sin(ac), ring.z + 70);
     if (y > 70) {
       ctx.globalAlpha = 0.75 * cm; ctx.font = '600 11px ui-monospace,Menlo,monospace'; ctx.textAlign = 'center'; ctx.fillStyle = C('#2ee6d6');
       const tot = D.internet_total || inetNodes.length;
-      ctx.fillText(`INTERNET · ${tot.toLocaleString()} OUTSIDE ADDRESS${tot === 1 ? '' : 'ES'}` + (tot > inetNodes.length ? ` · TOP ${inetNodes.length} SHOWN` : ''), x, Math.max(84, y - 18));
+      const title = `INTERNET · ${tot.toLocaleString()} OUTSIDE ADDRESS${tot === 1 ? '' : 'ES'}` + (tot > inetNodes.length ? ` · TOP ${inetNodes.length} SHOWN` : '');
+      ctx.fillText(title, x, Math.max(84, y - 18));
+      // address names keep off the title and the space above it, so none sits over the title, away from its address
+      inetTitle.push({...labelBox(x, Math.max(84, y - 18), ctx.measureText(title).width, 1), y0: -Infinity});
       if (D.internet_out_total != null) {
         ctx.font = '10px ui-monospace,Menlo,monospace'; ctx.fillStyle = C('#7f95b3');
         const a = `↓ ${D.internet_in_total.toLocaleString()} REACHED IN   `, b = `↑ ${D.internet_out_total.toLocaleString()} CONTACTED BY HOSTS`;
         const wa = ctx.measureText(a).width, wb = ctx.measureText(b).width, x0 = x - (wa + wb) / 2;
         ctx.textAlign = 'left'; ctx.fillText(a, x0, Math.max(98, y - 4));
         ctx.fillStyle = RETURN; ctx.fillText(b, x0 + wa, Math.max(98, y - 4)); ctx.textAlign = 'center';
+        inetTitle.push(labelBox(x, Math.max(98, y - 4), wa + wb, 1));
       }
     }
   }
@@ -1104,6 +1137,7 @@ function draw3d(now, dt, k) {
     ctx.lineTo(ax - 9 * Math.cos(ang + 0.4), ay - 9 * Math.sin(ang + 0.4)); ctx.closePath(); ctx.fill();
   });
   ctx.globalAlpha = 1;
+  arcLabels(cm > 0.3 && state.labels);
   const order = [...nodes.values()].filter(n => n.a > 0.02).sort((a, b) => a.a - b.a);
   order.forEach(n => drawNode(n, T));
   // network and report names last, over hosts and their labels

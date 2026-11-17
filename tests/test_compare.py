@@ -16,7 +16,7 @@ from collections import defaultdict
 from http.server import ThreadingHTTPServer
 from unittest import mock
 
-from vulnflow import cli, combine, compare, explore, sample_compare, sample_gootloader, saved
+from vulnflow import cli, combine, compare, explore, sample_compare, sample_cyberstrike, sample_gootloader, saved
 from vulnflow.correlate import Config
 from vulnflow.errors import UserError
 from vulnflow.ioc_archive import Matcher, read_archives
@@ -604,7 +604,8 @@ class CompareWebTests(unittest.TestCase):
 
 class CompareSampleTests(unittest.TestCase):
     """The two-company sample: Ridgeline (the Gootloader sample and two branch offices) and Corvane
-    (four sites, after Unit 42's Cairn report), loaded into an upload page's data folder and compared."""
+    (four sites, after Unit 42's Cairn report), both also reached by the CyberStrike AI FortiGate
+    campaign, loaded into an upload page's data folder and compared."""
 
     def test_checked_in_folder_matches_the_generator(self):
         root = os.path.join(os.path.dirname(__file__), "..", "samples", sample_compare.FOLDER)
@@ -652,6 +653,18 @@ class CompareSampleTests(unittest.TestCase):
         self.assertEqual(where(iocs["91.215.85.143"]), {"Ridgeline HQ", "Ridgeline Denver office"})   # the copied beacon
         self.assertEqual(where(vulns["62694"]), {"Corvane Phoenix plant", "Corvane Austin design center",
                                                  "Corvane Dresden service center"})         # the VPN gateways' IKE
+        # the CyberStrike AI FortiGate campaign in both companies: its two scanners at every new site, its
+        # brute-force address at Ridgeline's FortiGates and Corvane's website, its login address in Tampa only
+        new_sites = {name for folder, name, _, _ in sample_compare.SITES if folder != sample_gootloader.FOLDER}
+        for ip in (sample_cyberstrike.FP_A, sample_cyberstrike.FP_B):
+            self.assertEqual(where(iocs[ip]), new_sites)
+            self.assertEqual(iocs[ip]["networks"], 2)
+        self.assertEqual(where(iocs[sample_cyberstrike.CSAI]),
+                         {"Ridgeline Denver office", "Ridgeline Tampa office", "Corvane HQ"})
+        self.assertEqual(iocs[sample_cyberstrike.CSAI]["networks"], 2)
+        self.assertEqual(where(iocs[sample_cyberstrike.CAMPAIGN]), {"Ridgeline Tampa office"})
+        self.assertEqual(where(vulns["190020"]), {"Ridgeline Denver office", "Ridgeline Tampa office"})  # FortiOS
+        self.assertEqual(where(vulns["910201"]), {"Ridgeline Tampa office"})              # a password alone
         leads = {}
         for run_id in runs:
             res = saved.load_results(os.path.join(data, run_id, "out"))
@@ -659,6 +672,8 @@ class CompareSampleTests(unittest.TestCase):
         self.assertEqual(leads["Corvane HQ"], ["172.16.10.10", "172.16.10.20"])          # www01 and the partner portal
         self.assertEqual(leads["Corvane Austin design center"], ["10.32.0.26"])           # the build server
         self.assertEqual(leads["Corvane Dresden service center"], [])                     # only failed VPN logins
+        self.assertEqual(leads["Ridgeline Denver office"], ["10.21.0.20", "10.21.1.5"])   # den-fs01, the FortiGate
+        self.assertEqual(leads["Ridgeline Tampa office"], ["10.22.0.20", "10.22.1.5"])    # tpa-fs01, the FortiGate
         # the upload page lists the seven reports and opens the comparison
         srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(data, Config()))
         threading.Thread(target=srv.serve_forever, daemon=True).start()

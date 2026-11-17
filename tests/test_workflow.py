@@ -528,7 +528,7 @@ class BundledSamplesTests(unittest.TestCase):
                              ["artex_ai_agentic_intrusion", "compare_two_companies", "cyberstrike_ai_fortigate_intrusion",
                               "gootloader_seo_poisoning", "hosts_onprem_and_aws",
                               "scan_and_telemetry", "telemetry_only"])
-            self.assertEqual(len(paths), 86)
+            self.assertEqual(len(paths), 87)
             self.assertEqual(sorted(os.listdir(os.path.join(root, "compare_two_companies"))),
                              ["corvane", "ridgeline", "sites.csv"])               # a folder per company
             self.assertTrue(os.path.isfile(os.path.join(root, "scan_and_telemetry", "quarterly_scan.nessus")))
