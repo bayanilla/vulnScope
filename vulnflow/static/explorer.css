@@ -320,3 +320,15 @@ box-shadow:0 20px 60px rgba(0,0,0,.5)}
 [data-calm] #lit-filter:not([hidden]),[data-calm] #shared .sh-seg button,[data-calm] .shared-badge{border-radius:var(--r)}
 [data-calm] #shared .sh-seg button[aria-pressed="true"],[data-calm] #btn-shared[aria-expanded="true"],[data-calm] #shared .sh-now b{color:var(--fg)}
 [data-theme="light"] #shared .sh-now,[data-theme="light"] #lit-filter:not([hidden]),[data-theme="light"] .shared-badge,[data-theme="light"] .hghead .hgcount .sh{color:#a8327f;border-color:#a8327f}
+/* Unpacking the report data (vf_data.js): a note while it runs on big reports, and the reason when it can't */
+#vf-loading{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:var(--bg);pointer-events:none}
+#vf-loading[hidden]{display:none}
+#vf-loading .vf-box{max-width:460px;margin:0 20px;padding:22px 26px;border:1px solid var(--line);border-radius:var(--r,10px);
+  background:var(--glass);text-align:center;pointer-events:auto}
+#vf-loading b{display:block;font-size:15px;font-weight:600;color:var(--fg)}
+#vf-loading p{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.5}#vf-loading p:empty{display:none}
+#vf-loading .vf-spin{width:26px;height:26px;margin:0 auto 12px;border-radius:50%;border:2px solid var(--line);
+  border-top-color:var(--cyan);animation:vf-spin .9s linear infinite}
+#vf-loading.vf-error .vf-spin{display:none}#vf-loading.vf-error b{color:var(--crit)}
+@keyframes vf-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#vf-loading .vf-spin{animation:none;border-color:var(--cyan)}}

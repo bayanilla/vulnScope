@@ -101,6 +101,11 @@ def check(page_path: Path, browser, shots: Path) -> list[str]:
             problems.append(f"{name}: {errors.pop(0)}")
 
     page.goto(page_path.resolve().as_uri() + "?3d")
+    # the data is unpacked in the background (vf_data.js); the views start once it is there
+    page.wait_for_function("document.documentElement.dataset.vf !== 'loading'", timeout=120_000)
+    if page.evaluate("document.documentElement.dataset.vf") == "failed":
+        page.close()
+        return problems + [f"page could not unpack its data: {page.evaluate('window.VF_ERROR')}"]
     step("3d-overview")
     if not page.evaluate("!!window.VFExplorer"):
         page.close()
