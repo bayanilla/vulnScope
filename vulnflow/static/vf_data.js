@@ -6,11 +6,12 @@
 // shows "Unpacking" instead of a frozen tab; no JavaScript library is needed and the page still opens
 // offline and straight from disk. The views wait for it: each one starts with
 // vfWhenReady(function (D) { ... }), in page order, once the data is there (D is also window.VF_DATA).
-// Unpacking stops at VF_LIMIT bytes: past that a browser tab can't hold the data as text anyway, so the
-// page says the report is too big instead of crashing the tab.
+// Unpacking stops at VF_LIMIT bytes (1 GB), so a runaway report gets a note instead of exhausting the
+// tab. Below that the browser's own text limit can still be lower (Chrome and Edge hold ~512 MB of text,
+// Firefox ~1 GB, Safari more); the page then says so and names a browser that can open it.
 (function () {
 'use strict';
-const VF_LIMIT = 500 * 1024 * 1024;     // unpacked bytes; V8 strings stop at ~536 million characters
+const VF_LIMIT = 1024 * 1024 * 1024;    // unpacked bytes
 const SHOW_AFTER_MS = 200;              // small reports open before the loading note would flash up
 const queue = [];
 let data = null;
@@ -78,7 +79,15 @@ async function gunzipText(b64) {
     parts.push(dec.decode(value, {stream: true}));
   }
   parts.push(dec.decode());
-  return parts.join('');
+  try { return parts.join(''); } catch (e) {     // RangeError: more text than this browser holds
+    throw Object.assign(new Error('too big for this browser'), {browserLimit: true, total});
+  }
+}
+
+function browserLimit(bytes) {
+  fail('This report is too big for this browser.',
+       `Its Explorer data unpacks to about ${Math.round(bytes / 1024 / 1024)} MB, more than this browser can hold ` +
+       '(Chrome and Edge stop near 512 MB). Try Firefox or Safari, or analyze a shorter time window or fewer sensors.');
 }
 
 async function load() {
@@ -97,15 +106,19 @@ async function load() {
     try { text = await gunzipText(b64); } catch (e) {
       if (e && e.tooBig) {
         fail('This report is too big to open in a browser tab.',
-             `Its Explorer data unpacks to more than ${VF_LIMIT / 1024 / 1024} MB. ` +
+             `Its Explorer data unpacks to more than ${VF_LIMIT / 1024 ** 3} GB. ` +
              'The reports and CSV files next to it still hold every finding; for the map, analyze a shorter ' +
              'time window or fewer sensors.');
         return;
       }
+      if (e && e.browserLimit) { browserLimit(e.total); return; }
       throw new Error('damaged');
     }
   }
-  try { data = JSON.parse(text); } catch (e) { throw new Error('damaged'); }
+  try { data = JSON.parse(text); } catch (e) {
+    if (e instanceof RangeError) { browserLimit(text.length); return; }   // out of memory, not damage
+    throw new Error('damaged');
+  }
   window.VF_DATA = data;
   document.documentElement.dataset.vf = 'ready';
   const el2 = document.getElementById('vf-loading');

@@ -376,7 +376,8 @@ Each run writes to its output folder (`vulnflow_runs/<id>/out/` on the upload pa
 - **Explorer**: `explorer.html`, a single offline file. Its data is packed (gzip) inside the page,
   which unpacks it with the browser's own decoder (no bundled library), so it still opens straight
   from disk with no network. Big reports show **Unpacking report data…** instead of freezing the tab;
-  data that would unpack past 500 MB, or a damaged file, gets a clear note instead of a crash. On busy networks
+  data that would unpack past 1 GB, or a damaged file, gets a clear note instead of a crash. Chrome
+  and Edge hold only about 512 MB of unpacked data; a bigger report there says to use Firefox or Safari. On busy networks
   each host keeps its top 200 outside addresses and 200 internal peers in the page (addresses with
   IPS alerts always stay); every count and view still uses the full lists. Opened through the upload
   page (a new run or **Open report**), the Explorer loads a host's full lists when you click it,
