@@ -77,7 +77,8 @@ const KIND_TXT = {alert: 'IPS alert, not blocked', vuln: 'Reached a vulnerable s
 const BAND = {High: C('#ff2e88'), Medium: C('#ffb020'), Low: C('#2ee6d6'), None: C('#5b6b82'), Unknown: C('#8da2b5')};
 
 let W = 0, H = 0, DPR = 1;
-const cam = {x: 0, y: 0, z: 0.25, tx: 0, ty: 0, tz: 1, sx: 0, sy: 0, tsx: 0, tsy: 0};
+// (uy, tuy): the user's own up/down shift of the 3D picture in screen px (middle-drag), cleared when the view is refit
+const cam = {x: 0, y: 0, z: 0.25, tx: 0, ty: 0, tz: 1, sx: 0, sy: 0, tsx: 0, tsy: 0, uy: 0, tuy: 0};
 const still = /[?&#]still\b/.test(location.search + location.hash);
 const state = {mode: 'overview', focus: null, hover: null, labels: true, motion: !reduced && !still, history: []};
 const nodes = new Map();          // id -> render node
@@ -354,7 +355,7 @@ function focus(id, push = true) {
   loadFullLists(id);
   if (push && state.focus && state.focus !== id) state.history.push(state.focus);
   stopSpin();
-  state.mode = 'focus'; state.focus = id;
+  state.mode = 'focus'; state.focus = id; cam.tuy = 0;
   document.body.classList.add('focused'); placeViewctl();   // the legend is shorter while focused
   $('hint').classList.add('gone');
   updateAbout();
@@ -446,6 +447,7 @@ function overview() {
   renderList(); updateAbout();
 }
 function fitOverview() {
+  cam.tuy = 0;
   let minX = 0, maxX = 0, minY = 0, maxY = 0;
   nodes.forEach(n => { if (!n.ext && !n.domain) { minX = Math.min(minX, n.ox); maxX = Math.max(maxX, n.ox); minY = Math.min(minY, n.oy); maxY = Math.max(maxY, n.oy); } });
   const railW = railWidth();
@@ -489,7 +491,7 @@ function frame(now) {
   const k = state.motion ? 1 - Math.pow(0.0015, dt) : 1;
   cam.x += (cam.tx - cam.x) * k; cam.y += (cam.ty - cam.y) * k; cam.z += (cam.tz - cam.z) * k;
   if (state.mode === 'focus' || !R3) { cam.tsx = 0; cam.tsy = 0; }
-  cam.sx += (cam.tsx - cam.sx) * k; cam.sy += (cam.tsy - cam.sy) * k;
+  cam.sx += (cam.tsx - cam.sx) * k; cam.sy += (cam.tsy - cam.sy) * k; cam.uy += (cam.tuy - cam.uy) * k;
   nodes.forEach(n => {
     const ready = now > n.born;
     n.x += (n.tx - n.x) * k; n.y += (n.ty - n.y) * k; n.r += (n.tr - n.r) * k;
@@ -898,7 +900,7 @@ function draw3d(now, dt, k) {
   view.cmix += ((focusing ? 0 : 1) - view.cmix) * k;
   // switching between orbit (overview) and front-on (focus) camera models: snap yaw so neither spins
   if (focusing !== view.wasFocus) { view.wasFocus = focusing; view.yaw = tyaw; }
-  R3.setCamera(cam.x, cam.y, cam.z, view.yaw, view.pitch, view.dist, !focusing, cam.sx, cam.sy);
+  R3.setCamera(cam.x, cam.y, cam.z, view.yaw, view.pitch, view.dist, !focusing, cam.sx, cam.sy + cam.uy);
 
   // ribbons: subnet halos, overview links, focus edges, shockwaves on the selected host
   const L = R3.lines; L.begin();
@@ -1033,10 +1035,15 @@ function pick(sx, sy) {
   return best;
 }
 let drag = null;
-cv.addEventListener('pointerdown', e => { drag = {x: e.clientX, y: e.clientY, cx: cam.tx, cy: cam.ty,
-  node: pick(e.clientX, e.clientY), moved: false, lx: e.clientX, ly: e.clientY, orbit: !!R3 && !(e.button === 2 || e.shiftKey),   // 3D: drag rotates, right/Shift-drag pans (same as Timeline)
+// drag rotates (3D), right/Shift-drag pans (same as Timeline), middle-drag moves the picture straight up or down
+cv.addEventListener('pointerdown', e => {
+  if (e.button === 1) e.preventDefault();   // no browser autoscroll on the middle button
+  const vert = e.button === 1;
+  drag = {x: e.clientX, y: e.clientY, cx: cam.tx, cy: cam.ty, vert,
+  node: pick(e.clientX, e.clientY), moved: false, lx: e.clientX, ly: e.clientY, orbit: !!R3 && !vert && !(e.button === 2 || e.shiftKey),
   yaw: state.mode === 'focus' ? view.fyaw : view.oyaw, pitch: state.mode === 'focus' ? view.fpitch : view.opitch}; view.idle = performance.now(); cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('contextmenu', e => { if (R3) e.preventDefault(); });
+cv.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });   // autoscroll starts on mousedown in some browsers
 cv.addEventListener('pointermove', e => {
   if (drag) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -1046,6 +1053,9 @@ cv.addEventListener('pointermove', e => {
       if (state.mode === 'focus') { view.fyaw = Math.max(-0.9, Math.min(0.9, drag.yaw - dx * 0.005)); view.fpitch = Math.max(-0.5, Math.min(0.9, drag.pitch + dy * 0.004)); }
       else { view.oyaw = drag.yaw - dx * 0.006; view.opitch = Math.max(0, Math.min(1.4, drag.pitch - dy * 0.004)); placeInet(view.oyaw, !COMBINED); markView(); }
       view.yaw = state.mode === 'focus' ? view.fyaw : view.oyaw; view.pitch = state.mode === 'focus' ? 0.13 + view.fpitch : view.opitch;
+    } else if (drag.moved && drag.vert) {
+      if (R3) { cam.tuy += e.clientY - drag.ly; cam.uy = cam.tuy; }
+      else panBy(drag.lx, drag.ly, drag.lx, e.clientY);
     } else if (drag.moved) {
       panBy(drag.lx, drag.ly, e.clientX, e.clientY);
     }
@@ -1764,7 +1774,7 @@ markView();
 if (!state.motion) $('btn-motion').setAttribute('aria-pressed', 'false');
 
 $('legend').innerHTML =
-  `<span class="only3d m">Drag: rotate and tilt · right-drag or Shift-drag: pan · Q / E: rotate · T top · Y tilted · U low · R reset (low, turning)</span>` +
+  `<span class="only3d m">Drag: rotate and tilt · right-drag or Shift-drag: pan · middle-drag: up/down · Q / E: rotate · T top · Y tilted · U low · R reset (low, turning)</span>` +
   `<span class="only3d">${telemetryOnly ? 'Pillar height: outside exposure' : 'Pillar height: risk score'}</span>` +
   `<span class="only3d"><i style="background:${C('#2ee6d6')}"></i>Arc above: top outside addresses, beams down to hosts they reached, ${LIGHT ? 'blue' : 'violet'} beams up from hosts that called out</span>` +
   `<span class="only3d"><i style="background:${C('#6ea8ff')}"></i><i style="background:${C('#ff8a3d')};width:12px"></i>Traffic between subnets (orange: mostly admin protocols)</span>` +

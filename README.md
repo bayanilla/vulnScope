@@ -274,7 +274,8 @@ inside. The view switcher offers:
 - **3D** (default where WebGL works). Each subnet is a platform and each host a pillar whose
   height is its risk score (outside exposure without a scan). Risky paths and the most significant
   outside addresses, on an arc overhead, are drawn. It opens on the Low view, turning slowly left.
-  Drag to rotate, right-drag or Shift-drag to pan, scroll to zoom.
+  Drag to rotate, right-drag or Shift-drag to pan, middle-drag to move the picture up or down,
+  scroll to zoom. The same mouse controls work in the Timeline.
 - **Flat** (or the 2 key, remembered; `explorer.html?2d` always opens flat).
 - **Attack paths**, the most likely ways in drawn like a transit map (internet origin, entry,
   first and second pivot). **Simulate fix** is a what-if that shows how much path risk fixing or
