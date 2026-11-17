@@ -934,6 +934,9 @@ const RISK2 = RGB(C('#ff2e88')), RISK1 = RGB(C('#ffb020')), BUNDLE = RGB(C('#6ea
 const BEAM_ALPHA = LIGHT ? {alert: 0.9, vuln: 0.34, reached: 0.24, outbound: 0.24, attempt: 0.14, blocked: 0.12}
   : {alert: 0.85, vuln: 0.13, reached: 0.08, outbound: 0.08, attempt: 0.04, blocked: 0.035};
 const OUT_BEAM = RGB(RETURN), OUT_ALPHA = LIGHT ? 0.3 : 0.15, LK = LIGHT ? 1.7 : 1;
+// a paler shade of a beam colour for the dots that run along it (the same colour on Light's white canvas)
+const PALER = new Map();
+const paler = col => LIGHT ? col : PALER.get(col) || PALER.set(col, col.map(v => v + (1 - v) * 0.45)).get(col);
 // which way a host's traffic with an outside address went: in, out or both (older data has no 4th field)
 const beamDir = t => t[3] || (t[1] === 'outbound' ? 'out' : 'in');
 // Overview: subnet platforms on one plane, hosts as pillars whose height is risk, traffic between
@@ -988,24 +991,31 @@ function overviewScene(L, T, cm, cs, cdz) {
       return [ring.cx + ring.R * 1.08 * Math.cos(ang), ring.cy + ring.R * 1.08 * Math.sin(ang), ring.z + dz]; };
     L.strip(61, i => arcAt(i / 60, -14), LIGHT ? 1.5 : 1.1, RING, LK * cm * 0.25, true);
     L.strip(61, i => arcAt(i / 60, 66), 0.7, RING, LK * cm * 0.1, false);
+    // On the all-networks map every solid beam holds its place and carries one slow, faint dot that shows
+    // which way the traffic went (down from the address, up from the host), like the traffic between the
+    // subnets below; a report's own map runs brighter dots on its alert and outbound beams. On a dark
+    // canvas the dot is a paler shade of its beam, so it still shows on a bright alert beam.
+    const calm = (fade, base, col, c, speed) => flows.push({c, col: paler(col), al: fade * Math.min(0.65, Math.max(0.3, base)), size: 3.4, speed});
     inetNodes.forEach(n => {
       if (n.a < 0.02) return;
       n.info.targets.forEach(t => {
         const h = nodes.get(t[0]); if (!h || h.a < 0.02) return;
         const on = !hn || hn === n || hn === h, dir = beamDir(t), w = 0.9 + Math.min(2.2, Math.log2(1 + t[2]) * 0.3);
+        const fade = Math.min(n.a, h.a) * cm;
         if (dir !== 'out') {   // inbound: from the address down to the host
-          const al = Math.min(n.a, h.a) * cm * BEAM_ALPHA[t[1]] * (on ? (hn ? 1.4 : 1) : 0.12);
+          const al = fade * BEAM_ALPHA[t[1]] * (on ? (hn ? 1.4 : 1) : 0.12);
           const c = [n.x, n.y, n.z, (n.x + h.x) / 2, (n.y + h.y) / 2, (n.z + h.z) / 2 + 60, h.x, h.y, h.z];
           const col = RGB(KIND[t[1]]), dashed = t[1] === 'blocked' || t[1] === 'attempt';
           L.quad(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], 14, w, col, al, dashed);
-          // no moving dots on the beams of the all-networks map: those lines hold still (its hosts still pulse)
-          if (!COMBINED && !dashed && on && (t[1] === 'alert' || t[1] === 'vuln' || hn)) flows.push({c, col, al: Math.min(1, al * 1.4), size: 3.2, speed: 0.18});
+          if (COMBINED) { if (!dashed && on) calm(fade, BEAM_ALPHA[t[1]] * (hn ? 2 : 1.4), col, c, 0.07); }
+          else if (!dashed && on && (t[1] === 'alert' || t[1] === 'vuln' || hn)) flows.push({c, col, al: Math.min(1, al * 1.4), size: 3.2, speed: 0.18});
         }
         if (dir !== 'in') {    // outbound: from the host up to the address, on a slightly higher curve
-          const al = Math.min(n.a, h.a) * cm * (t[1] === 'alert' ? 0.6 : OUT_ALPHA) * (on ? (hn ? 1.6 : 1) : 0.12);
+          const al = fade * (t[1] === 'alert' ? 0.6 : OUT_ALPHA) * (on ? (hn ? 1.6 : 1) : 0.12);
           const c = [h.x, h.y, h.z, (n.x + h.x) / 2, (n.y + h.y) / 2, (n.z + h.z) / 2 + 130, n.x, n.y, n.z];
           L.quad(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], 14, w, OUT_BEAM, al, false);
-          if (on && !COMBINED) flows.push({c, col: OUT_BEAM, al: Math.min(1, al * 2.2), size: 3, speed: 0.14});
+          if (COMBINED) { if (on) calm(fade, (t[1] === 'alert' ? 0.6 : OUT_ALPHA) * (hn ? 3 : 2), OUT_BEAM, c, 0.06); }
+          else if (on) flows.push({c, col: OUT_BEAM, al: Math.min(1, al * 2.2), size: 3, speed: 0.14});
         }
       });
     });
