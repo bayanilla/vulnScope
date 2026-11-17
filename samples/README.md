@@ -258,8 +258,9 @@ are in more than one report.
 - IKE Aggressive Mode on the three Corvane site VPN gateways; SMB signing, Microsoft Edge and the
   Print Spooler at every site, in both companies.
 
-On **Open all networks in the Explorer**, SMB signing alone lights up 340 of the 424 hosts, so pick
-`82.29.129.54` or a Gootloader domain under **Shared items** to see one item's hosts in every network.
+On **Open all networks in the Explorer**, hover a host to see what it shares with the other
+reports, or an outside address such as `82.29.129.54` to see how many of the reports it exchanged
+traffic with.
 Each report also opens on its own: Corvane HQ's leads are `www01` and `partners01`, Phoenix's is
 `phx-fs01`, Austin's is `build01`, and Dresden has none.
 

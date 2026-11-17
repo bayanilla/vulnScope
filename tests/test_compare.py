@@ -300,7 +300,7 @@ class CompareTests(unittest.TestCase):
         self.assertGreaterEqual(len(ip["islands"]), 3)          # both months of Plant 3 and Segment 6 at least
         hosts = {f"{h}@{isl[names[s['r']]]}" for s in row["seen"] for h in s["related"]}
         j = items.index(ip)
-        self.assertEqual({n["id"] for n in data["nodes"] if j in n.get("sh", ())}, hosts)   # lit in every network
+        self.assertEqual({n["id"] for n in data["nodes"] if j in n.get("sh", ())}, hosts)   # on its hosts in every network
         self.assertEqual(ip["drawn"], len(hosts))
         self.assertEqual(sorted(next(m for m in data["ioc_matches"] if m["value"] == "8.8.8.8")["hosts"]),
                          sorted(hosts))

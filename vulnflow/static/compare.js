@@ -57,8 +57,8 @@
     root.append(el("div", {class: "cmp-explorer"},
       el("a", {href: ex.file, class: "cmp-explorer-link", text: "Open all networks in the Explorer"}),
       el("p", {class: "hint", text: ex.drawn.toLocaleString() + (ex.drawn < ex.hosts ? " of " + ex.hosts.toLocaleString() : "") +
-        " hosts from " + plural(ex.reports, "report") + " on one map, one island per report. Hosts with an IOC or vulnerability " +
-        "that more than one report has are lit up in every network."}),
+        " hosts from " + plural(ex.reports, "report") + " on one map, one island per report. Hover a host to see the IOCs " +
+        "and vulnerabilities it shares with the other reports."}),
       ex.notes.map(n => el("p", {class: "hint", text: n}))));
   } else if (ex && ex.notes && ex.notes.length) {
     root.append(el("div", {class: "cmp-explorer"}, el("p", {class: "hint", text: "No all-networks Explorer: none of these reports has an Explorer page."}),

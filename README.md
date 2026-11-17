@@ -454,19 +454,18 @@ vulnerabilities appear in more than one saved report, and in how many networks.
 draws every compared report on one Explorer map. Each report is an island (a dashed ring) with its
 own subnets and hosts. Reports with the same network sit together inside a solid ring labelled with
 the network's name, each island labelled with its site, so every company is its own cluster. Outside
-addresses are merged onto the arc overhead, with beams down to each network they reached. Hosts with an IOC match or a vulnerability stay bright and the rest are
-dimmed. Hosts with an IOC or vulnerability that more than one report has get a magenta ring, with a
-beacon when only a few are lit. **Shared items** lists those IOCs and vulnerabilities: pick one to
-light up only its hosts, in every network, or tick **Only items in more than one network**. When
-the shared items would light up more than 400 hosts, the map opens with only the shared IOCs lit. A
-host's card names its network and report, lists what it shares with other reports, and links to
-that report's own Explorer, which has Attack paths, the Timeline and the full lists. To stay quick
-the map draws up to 3,000 hosts: hosts with shared items first, then the other IOC and
-vulnerability hosts, then the rest, taken in turn from each report.
+addresses are merged onto the arc overhead, with beams down to each network they reached. Hosts with
+an IOC match or a vulnerability stay bright and the rest are dimmed; a teal ring marks an IOC match.
+Hover a host to see the IOCs and vulnerabilities it shares with other reports, or an outside address
+to see how many of the reports it exchanged traffic with. A host's card names its network and
+report, lists what it shares with other reports, and links to that report's own Explorer, which has
+Attack paths, the Timeline and the full lists. To stay quick the map draws up to 3,000 hosts: hosts
+with shared items first, then the other IOC and vulnerability hosts, then the rest, taken in turn
+from each report.
 
 Comparisons are saved in the data folder under `comparisons/<time>/` with `ioc_overlap.csv`,
 `vulnerability_overlap.csv` (one row per item and report), `comparison.json`, and the map as
-`explorer.html` with its data in `explorer.json` (the hosts, subnets, traffic and highlights of
+`explorer.html` with its data in `explorer.json` (the hosts, subnets, traffic and shared items of
 every network, for your own tools). They are listed under **Earlier comparisons**. The reports
 themselves are not changed. From the command line:
 

@@ -56,7 +56,7 @@ if (LIGHT) Object.assign(CALM_MAP, {'#ff3b5c': '#da3737', '#ff8a3d': '#f0782f', 
   '#ffc857': '#8e9196', '#b98cff': '#5b7ba8', '#8892a6': '#a6a8ab', '#5b6b82': '#a6a8ab',
   '#ff2e88': '#bc1e70', '#ffb020': '#c98a00', '#6ea8ff': '#8e9196', '#78aaff': '#a6a8ab',
   '#e4ecfa': '#4a4c50', '#d6e4f5': '#1b1c1e', '#7f95b3': '#5c5e62', '#a9bcd6': '#3a3c40', '#e6f1ff': '#000000',
-  '#6f86a6': '#5c5e62', '#8fa3c0': '#5c5e62', '#9fb3cc': '#5c5e62', '#ff4fd8': '#a8327f', '#ffb8f3': '#a8327f', '#ff8095': '#a71627', '#ffb27a': '#9e3a16'});
+  '#6f86a6': '#5c5e62', '#8fa3c0': '#5c5e62', '#9fb3cc': '#5c5e62', '#ff8095': '#a71627', '#ffb27a': '#9e3a16'});
 // outline behind canvas labels, and the fill of hollow markers: the page colour
 const LABEL_HALO = LIGHT ? BG_IN + 'e6' : 'rgba(3,6,12,.85)', HOLLOW = LIGHT ? '#ffffff' : null;
 const C = h => (CALM && CALM_MAP[h.toLowerCase()]) || h;
@@ -143,7 +143,7 @@ function placeSubnet(g, ox, oy, clusters, island) {
 }
 // room the host list takes on the left (none on narrow screens, where it is hidden)
 function railWidth() { if (W <= 900) return 0; const r = $('rail').getBoundingClientRect(); return r.width ? Math.max(280, r.right + 2) : 280; }
-const islands = [];   // all-networks map: one per report, {k, x, y, r, info, lit, grouped}
+const islands = [];   // all-networks map: one per report, {k, x, y, r, info, grouped}
 // all-networks map: one per network that has more than one compared report (a company's sites), drawn
 // as a solid ring round its reports' islands with the network's name under it: {name, x, y, r, ks, ...}
 const nets = [];
@@ -192,10 +192,10 @@ function overviewLayout() {
   G.forEach(g => {
     const grouped = g.packs.length > 1;
     if (grouped) nets.push({name: g.name, x: g.x, y: g.y, r: g.r, ks: g.packs.map(p => p.k), hosts: g.n,
-      total: g.packs.reduce((t, p) => t + (R[p.k].nodes || p.n), 0), lit: 0});
+      total: g.packs.reduce((t, p) => t + (R[p.k].nodes || p.n), 0)});
     g.packs.forEach(p => {
       const x = g.x + p.x, y = g.y + p.y;
-      islands[p.k] = {k: p.k, x, y, r: p.r, info: R[p.k], lit: 0, grouped};
+      islands[p.k] = {k: p.k, x, y, r: p.r, info: R[p.k], grouped};
       p.subs.forEach(s => placeSubnet(s, x, y, clusters, p.k));
     });
   });
@@ -230,43 +230,12 @@ const clusters = overviewLayout();
 const links = D.links.map(([a, b, w]) => ({a: nodes.get(a), b: nodes.get(b), w})).filter(l => l.a && l.b);
 nodes.forEach(n => { n.x = n.ox * 1.8; n.y = n.oy * 1.8; n.tx = n.ox; n.ty = n.oy;
   n.z = -40 - hash01(n.id + '~') * 260; n.tz = n.oz; });
-// All-networks highlights. Hosts with an IOC match or a vulnerability are drawn as usual and the rest
-// dimmed; hosts with an IOC or vulnerability seen in more than one report are "lit": a magenta ring in
-// every network, and a beacon when few hosts are lit. The Shared items panel picks what lights up:
-// every shared item (the default), only IOCs or vulnerabilities, only items in more than one
-// network, or one item.
+// All-networks highlights: hosts with an IOC match or a vulnerability are drawn as usual and the rest
+// dimmed. What a host or an outside address shares with other reports is in its hover and host cards.
 const ITEMS = COMBINED ? COMBINED.items : [], REPS = COMBINED ? COMBINED.reports : [];
-const SHARED = C('#ff4fd8'), BEACON_MAX = 400;
-const itemHosts = ITEMS.map(() => []);
-D.nodes.forEach(n => (n.sh || []).forEach(j => { if (itemHosts[j]) itemHosts[j].push(n.id); }));
-const spot = {kind: 'all', item: -1, multi: false};
-let lit = new Map();                 // lit host id -> how many reports its most widespread lit item is in
-let litSubnets = new Map();          // subnet -> lit hosts in it
-const spotOn = j => spot.item >= 0 ? j === spot.item :
-  (spot.kind === 'all' || ITEMS[j].k === spot.kind) && (!spot.multi || ITEMS[j].networks > 1);
-const hlLevel = d => lit.has(d.id) ? 2 : (d.sev || iocCounts[d.id]) ? 1 : 0;
-// overview opacity of an internal host: lit and IOC/vulnerability hosts bright, the rest dim, and with one
-// item picked everything but its hosts dim
-function restAlpha(n) {
-  if (!COMBINED) return 1;
-  const lv = hlLevel(n.d);
-  return lv === 2 ? 1 : spot.item >= 0 ? 0.16 : lv === 1 ? 0.85 : 0.3;
-}
-function relight() {
-  if (!COMBINED) return;
-  lit = new Map();
-  ITEMS.forEach((it, j) => { if (spotOn(j)) itemHosts[j].forEach(id => lit.set(id, Math.max(lit.get(id) || 0, it.reports))); });
-  islands.forEach(isl => { if (isl) isl.lit = 0; });
-  litSubnets = new Map();
-  lit.forEach((_, id) => {
-    const n = nodes.get(id), isl = n && islands[n.d.net || 0]; if (isl) isl.lit++;
-    if (n) litSubnets.set(n.d.subnet, (litSubnets.get(n.d.subnet) || 0) + 1);
-  });
-  nets.forEach(nt => { nt.lit = nt.ks.reduce((t, k) => t + (islands[k] ? islands[k].lit : 0), 0); });
-  if (state.mode === 'overview') nodes.forEach(n => { if (!n.ext && !n.domain) n.ta = restAlpha(n); });
-}
-if (COMBINED && D.nodes.filter(n => (n.sh || []).length).length > BEACON_MAX && ITEMS.some(it => it.k === 'ioc')) spot.kind = 'ioc';
-relight();
+// overview opacity of an internal host (an item it shares with other reports is an IOC or vulnerability too)
+const restAlpha = n => !COMBINED || n.d.sev || iocCounts[n.d.id] || (n.d.sh || []).length ? 1 : 0.3;
+if (COMBINED) nodes.forEach(n => { if (!n.ext && !n.domain) n.ta = restAlpha(n); });
 // the network and report a host on the all-networks map comes from
 const repOf = d => COMBINED && d ? REPS[d.net || 0] : null;
 function netLabel(d) { const r = repOf(d); return r ? (netKey(r.network) === netKey(r.name) ? r.network : r.network + ' · ' + r.name) : ''; }
@@ -493,10 +462,11 @@ function fitOverview() {
   cam.tuy = 0;
   let minX = 0, maxX = 0, minY = 0, maxY = 0;
   nodes.forEach(n => { if (!n.ext && !n.domain) { minX = Math.min(minX, n.ox); maxX = Math.max(maxX, n.ox); minY = Math.min(minY, n.oy); maxY = Math.max(maxY, n.oy); } });
+  // all-networks map: the rings round the reports and networks too, not only their hosts
+  for (const o of [...islands, ...nets]) if (o) { minX = Math.min(minX, o.x - o.r); maxX = Math.max(maxX, o.x + o.r); minY = Math.min(minY, o.y - o.r); maxY = Math.max(maxY, o.y + o.r); }
   const railW = railWidth();
   const drawerW = document.body.classList.contains('ai-chat-open') && W > 1100 ? $('analyst-chat').getBoundingClientRect().width : 0;
-  const sharedBox = COMBINED && W > 900 && $('shared') && !$('shared').hidden ? $('shared').getBoundingClientRect().width + 20 : 0;
-  const rightInset = drawerW ? drawerW + Math.min(100, W * 0.06) : sharedBox;
+  const rightInset = drawerW ? drawerW + Math.min(100, W * 0.06) : 0;
   cam.tz = Math.min(1.5, Math.max(COMBINED ? ZOOM_MIN : drawerW ? 0.12 : 0.2,
     Math.min((W - railW - rightInset - 80) / (maxX - minX + 200), (H - 200) / (maxY - minY + 200))));
   if (R3) {
@@ -567,7 +537,7 @@ function frame(now) {
     if (!isl) return;
     const [x, y] = toS(isl.x * (focusing ? 2.4 : 1), isl.y * (focusing ? 2.4 : 1));
     ctx.globalAlpha = focusing ? 0.04 : 0.7;
-    ctx.strokeStyle = isl.lit ? 'rgba(255,79,216,.6)' : 'rgba(120,170,255,.35)'; ctx.lineWidth = isl.lit ? 2 : 1.4; ctx.setLineDash([10, 6]);
+    ctx.strokeStyle = 'rgba(120,170,255,.35)'; ctx.lineWidth = 1.4; ctx.setLineDash([10, 6]);
     ctx.beginPath(); ctx.arc(x, y, isl.r * cam.z, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
   });
   ctx.globalAlpha = 1;
@@ -575,8 +545,8 @@ function frame(now) {
   clusters.forEach(c => {
     const [x, y] = toS(c.x * (focusing ? 2.4 : 1), c.y * (focusing ? 2.4 : 1));
     ctx.globalAlpha = focusing ? 0.05 : 0.5;
-    const cn = subnetNet(c.subnet), cloud = cn && cn.cloud, lt = litSubnets.has(c.subnet);
-    ctx.strokeStyle = lt ? 'rgba(255,79,216,.75)' : cloud ? 'rgba(228,236,250,.55)' : CALM ? 'rgba(150,152,156,.28)' : 'rgba(120,170,255,.22)'; ctx.setLineDash(cloud ? [8, 4] : [3, 6]); ctx.lineWidth = lt ? 1.8 : cloud ? 1.6 : 1;
+    const cn = subnetNet(c.subnet), cloud = cn && cn.cloud;
+    ctx.strokeStyle = cloud ? 'rgba(228,236,250,.55)' : CALM ? 'rgba(150,152,156,.28)' : 'rgba(120,170,255,.22)'; ctx.setLineDash(cloud ? [8, 4] : [3, 6]); ctx.lineWidth = cloud ? 1.6 : 1;
     ctx.beginPath(); ctx.arc(x, y, c.r * cam.z, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     if (!focusing && cam.z > 0.35) { ctx.fillStyle = C('#6f86a6'); ctx.font = '11px ui-monospace,Menlo,monospace'; ctx.textAlign = 'center';
       ctx.fillText(shown(c.subnet), x, y - c.r * cam.z - 6);
@@ -687,7 +657,7 @@ function openSpan() {
   const box = id => { const el = $(id); if (!el || el.hidden) return null; const b = el.getBoundingClientRect(); return b.width && b.height ? b : null; };
   let l = 0, r = W;
   const rail = W > 900 && box('rail'); if (rail) l = rail.right;
-  for (const id of ['panel', 'shared', 'analyst-chat']) { const b = box(id); if (b && b.left > W / 2) r = Math.min(r, b.left); }
+  for (const id of ['panel', 'analyst-chat']) { const b = box(id); if (b && b.left > W / 2) r = Math.min(r, b.left); }
   return [l, r];
 }
 const labelBox = (x, y, w, lines) => ({x0: x - w / 2 - 6, x1: x + w / 2 + 6, y0: y - 14, y1: y + 4 + (lines - 1) * 16});
@@ -706,7 +676,7 @@ function claim(boxes, x, y, w, lines, feet = [], pad = 0) {
   boxes.push(b);
   return true;
 }
-// an island's name beside its ring: the network, then the report, its date and how many hosts are lit.
+// an island's name beside its ring: the network, then the report, its date and how many hosts it has.
 // Inside a network's ring, which carries the network's name, it is the report's name less the network's
 // ("Corvane Phoenix plant" is "Phoenix plant"), with the rest only when the island is big enough on screen.
 function islandLabel(isl, key, spots, al, px, boxes, feet) {
@@ -715,7 +685,6 @@ function islandLabel(isl, key, spots, al, px, boxes, feet) {
   const f1 = isl.grouped ? '700 12px ui-monospace,Menlo,monospace' : '700 13px ui-monospace,Menlo,monospace', f2 = '10.5px ui-monospace,Menlo,monospace';
   const bits = [(same || isl.grouped ? '' : r.name + ' · ') + (r.generated || '').slice(0, 10), `${r.drawn.toLocaleString()} host${r.drawn === 1 ? '' : 's'}` +
     (r.drawn < r.nodes ? ` of ${r.nodes.toLocaleString()}` : '')];
-  if (isl.lit) bits.push(`${isl.lit.toLocaleString()} lit`);
   const t2 = bits.join(' · ');
   ctx.font = f1; const w1 = ctx.measureText(t1).width;
   ctx.font = f2; const w2 = ctx.measureText(t2).width;
@@ -724,7 +693,7 @@ function islandLabel(isl, key, spots, al, px, boxes, feet) {
   if (!pos) return;
   const [x, y] = pos;
   ctx.globalAlpha = al; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = LABEL_HALO;
-  ctx.font = f1; ctx.fillStyle = isl.lit ? C('#ffb8f3') : C('#e6f1ff');
+  ctx.font = f1; ctx.fillStyle = C('#e6f1ff');
   ctx.strokeText(t1, x, y); ctx.fillText(t1, x, y);
   if (two) {
     ctx.font = f2; ctx.fillStyle = C('#9fb3cc');
@@ -738,13 +707,12 @@ function siteName(r) {
   const rest = net && name.toLowerCase().startsWith(net.toLowerCase() + ' ') ? name.slice(net.length).trim() : '';
   return rest || name;
 }
-// a network's name under its ring (over it if under has no room), then how many reports and hosts it has
-// and how many are lit. It is always drawn: islands' labels give way to it.
+// a network's name under its ring (over it if under has no room), then how many reports and hosts it
+// has. It is always drawn: islands' labels give way to it.
 function netRingLabel(nt, key, spots, al, boxes, feet) {
   const t1 = nt.name.toUpperCase();
   const bits = [`${nt.ks.length} reports`, `${nt.hosts.toLocaleString()} host${nt.hosts === 1 ? '' : 's'}` +
     (nt.hosts < nt.total ? ` of ${nt.total.toLocaleString()}` : '')];
-  if (nt.lit) bits.push(`${nt.lit.toLocaleString()} lit`);
   const t2 = bits.join(' · ');
   ctx.font = '700 16px ui-monospace,Menlo,monospace'; const w1 = ctx.measureText(t1).width;
   ctx.font = '11px ui-monospace,Menlo,monospace'; const w2 = ctx.measureText(t2).width;
@@ -832,22 +800,14 @@ function drawNode(n, T) {
       ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(x, y, r + 5, T % 7, T % 7 + 6.28); ctx.stroke(); ctx.setLineDash([]); }
   }
   ctx.shadowBlur = 0;
-  if (COMBINED && !n.ext && !n.domain) {   // all-networks map: IOC hosts ringed teal, lit hosts magenta
-    const few = lit.size <= BEACON_MAX, gap = Math.max(1.5, Math.min(1, sc * 2.5) * 4);
-    if (iocCounts[n.id]) { ctx.strokeStyle = C('#2ee6d6'); ctx.lineWidth = few ? 1.8 : 1.2; ctx.beginPath(); ctx.arc(x, y, r + gap, 0, 7); ctx.stroke(); }
-    if (lit.has(n.id) && (few || sc > 0.3 || state.mode === 'focus')) {
-      ctx.strokeStyle = SHARED; ctx.lineWidth = few ? 2 : 1.2; ctx.beginPath(); ctx.arc(x, y, r + gap * 2, 0, 7); ctx.stroke();
-      if (!gl && state.motion && few && state.mode === 'overview') {
-        const ph = (T * 0.8 + hash01(n.id)) % 1;
-        ctx.globalAlpha = n.a * (1 - ph) * 0.7; ctx.beginPath(); ctx.arc(x, y, r + gap * 2 + ph * 26 * Math.max(0.5, sc), 0, 7); ctx.stroke();
-        ctx.globalAlpha = n.a;
-      }
-    }
+  if (COMBINED && !n.ext && !n.domain && iocCounts[n.id]) {   // all-networks map: IOC hosts ringed teal
+    const gap = Math.max(1.5, Math.min(1, sc * 2.5) * 4);
+    ctx.strokeStyle = C('#2ee6d6'); ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(x, y, r + gap, 0, 7); ctx.stroke();
   }
   if (hov && !sel) { ctx.strokeStyle = LIGHT ? '#1b1c1e' : '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 4, 0, 7); ctx.stroke(); }
   // labels
   const show = state.labels && (sel || hov || (n.inet ? n.labelled && n.a > 0.5 : state.mode === 'focus' ? n.a > 0.5 && !n.small :
-    (n.d.observed && (sc > 0.55 || (n.d.pri === 'P1' && (!R3 || fewP1 || n.d.ev)))) || (lit.size <= 40 && lit.has(n.id))));
+    (n.d.observed && (sc > 0.55 || (n.d.pri === 'P1' && (!R3 || fewP1 || n.d.ev))))));
   if (show) {
     const name = nodeLabel(n);
     ctx.font = (sel ? '600 14px' : '12px') + ' system-ui,-apple-system,Segoe UI,sans-serif';
@@ -938,7 +898,7 @@ function edgeCurve(e) {
 }
 const qb = (c, t) => { const u = 1 - t, A = u * u, B = 2 * u * t, C = t * t;
   return [A * c[0] + B * c[3] + C * c[6], A * c[1] + B * c[4] + C * c[7], A * c[2] + B * c[5] + C * c[8]]; };
-const HALO = RGB(C('#78aaff')), CLOUD_RGB = RGB(CLOUD_COL), SHARED_RGB = RGB(SHARED), NET_RGB = RGB(C('#e4ecfa'));
+const HALO = RGB(C('#78aaff')), CLOUD_RGB = RGB(CLOUD_COL), NET_RGB = RGB(C('#e4ecfa'));
 const RISK2 = RGB(C('#ff2e88')), RISK1 = RGB(C('#ffb020')), BUNDLE = RGB(C('#6ea8ff')), BUNDLE_LAT = RGB(C('#ff8a3d')),
   RING = RGB(C('#2ee6d6')), P_CRIT = RGB(C('#ff3b5c')), P_HIGH = RGB(C('#ff8a3d'));
 // On Light's white canvas lines don't add up to light, so faint ones wash out: thin traffic is drawn more
@@ -957,18 +917,15 @@ function overviewScene(L, T, cm, cs, cdz) {
   if (cm < 0.01) return flows;
   const hc = state.hoverCluster, hn = state.hover;
   clusters.forEach(c => {
-    const si = subnetInfo.get(c.subnet), lt = litSubnets.has(c.subnet), col = lt ? SHARED_RGB : si && si.likely ? P_CRIT : si && si.p1 ? P_HIGH : HALO;
+    const si = subnetInfo.get(c.subnet), col = si && si.likely ? P_CRIT : si && si.p1 ? P_HIGH : HALO;
     const on = !hc || hc === c;
-    L.circle(c.x * cs, c.y * cs, cdz, c.r, 80, hc === c ? 2.2 : lt ? 2 : 1.4, col, Math.min(1, LK * cm * (on ? (lt ? 0.75 : 0.5) : 0.18)), false);
+    L.circle(c.x * cs, c.y * cs, cdz, c.r, 80, hc === c ? 2.2 : 1.4, col, Math.min(1, LK * cm * (on ? 0.5 : 0.18)), false);
     L.circle(c.x * cs, c.y * cs, cdz, c.r * 0.97, 80, 0.8, HALO, LK * cm * 0.12, true);
     const cn = subnetNet(c.subnet);
     if (cn && cn.cloud) L.circle(c.x * cs, c.y * cs, cdz, c.r * 1.08, 80, 1.6, CLOUD_RGB, cm * (on ? 0.7 : 0.25), true);
   });
-  // all-networks map: a dashed ring round each report's island, magenta while it holds lit hosts, and a
-  // solid ring round each network's reports
-  islands.forEach(isl => {
-    if (isl) L.circle(isl.x * cs, isl.y * cs, cdz, isl.r, 160, isl.lit ? 2.6 : 1.8, isl.lit ? SHARED_RGB : HALO, cm * (isl.lit ? 0.55 : 0.32), true);
-  });
+  // all-networks map: a dashed ring round each report's island and a solid ring round each network's reports
+  islands.forEach(isl => { if (isl) L.circle(isl.x * cs, isl.y * cs, cdz, isl.r, 160, 1.8, HALO, cm * 0.32, true); });
   nets.forEach(nt => L.circle(nt.x * cs, nt.y * cs, cdz, nt.r, 240, 2.4, NET_RGB, Math.min(1, LK * cm * 0.6), false));
   // bundled subnet-to-subnet traffic, sagging under the plane; orange share = admin/lateral protocols
   const maxW = subLinks.reduce((m, l) => Math.max(m, l.w), 1);
@@ -983,19 +940,9 @@ function overviewScene(L, T, cm, cs, cdz) {
   // risk pillars
   nodes.forEach(n => {
     if (n.ext || n.domain || n.a < 0.02) return;
-    const base = n.z - n.oz, w = n.d.pri === 'P1' ? 3.2 : n.d.observed ? 2 : 1, on = lit.has(n.id);
-    L.strip(2, i => [n.x, n.y, i ? n.z : base], w + (on ? 1.2 : 0), RGB(n.color), Math.min(1, LK * n.a * cm * (hn === n ? 0.95 : on ? 0.8 : 0.5)), false);
+    const base = n.z - n.oz, w = n.d.pri === 'P1' ? 3.2 : n.d.observed ? 2 : 1;
+    L.strip(2, i => [n.x, n.y, i ? n.z : base], w, RGB(n.color), Math.min(1, LK * n.a * cm * (hn === n ? 0.95 : 0.5)), false);
   });
-  // beacons over lit hosts when there are few of them, taller the more reports the item is in
-  if (lit.size && lit.size <= BEACON_MAX) {
-    const pulse = 0.5 + 0.5 * Math.sin(T * 2.4), px = 1 / Math.max(0.03, cam.z);   // world units per screen pixel, roughly
-    lit.forEach((spread, id) => {
-      const n = nodes.get(id); if (!n || n.a < 0.05) return;
-      const h = Math.max(60, ring.R * 0.06) * (1 + 0.5 * Math.min(4, spread - 2));
-      L.strip(2, i => [n.x, n.y, n.z + (i ? h : 0)], 2.6, SHARED_RGB, n.a * cm * 0.85, false);
-      L.circle(n.x, n.y, n.z - n.oz, n.r + (8 + pulse * 14) * px, 40, 1.8, SHARED_RGB, n.a * cm * (0.75 - 0.5 * pulse), false);
-    });
-  }
   // risky host-to-host paths, from pillar base to pillar base beneath the plane
   riskyLinks.forEach((l, i) => {
     if (i >= 60 && !(hn && (hn === l.a || hn === l.b))) return;
@@ -1082,7 +1029,7 @@ function draw3d(now, dt, k) {
     const isSel = state.focus === n.id, hov = state.hover === n;
     let shape = 0, hollow = 0;
     if (n.domain) shape = 3; else if (n.ext) { shape = 1; hollow = n.info.kind === 'blocked' ? 1 : 0; } else if (!n.d.observed) shape = 2;
-    const glow = isSel ? 1.6 : hov ? 1.2 : n.ext ? 0.45 : lit.has(n.id) ? 1.15 : n.d.observed ? 0.75 : 0.2;
+    const glow = isSel ? 1.6 : hov ? 1.2 : n.ext ? 0.45 : n.d.observed ? 0.75 : 0.2;
     N.add(n.x, n.y, n.z, n.r, RGB(n.color), n.a, shape, hollow, glow, 2);
   });
   N.end();
@@ -1304,7 +1251,7 @@ function tip(n, x, y) {
     h = `<b>${esc(e.ip)}</b> <span class="m">outside address</span><br>${esc(KIND_TXT[e.kind])}` +
       `<br><span class="m">${e.hosts_total} internal host(s) · ${e.sessions.toLocaleString()} session(s)` + (e.alerts ? ` · ${e.alerts} IPS alert(s) not blocked` : '') + '</span>' +
       (e.out_sessions != null ? `<br><span class="m">Inbound ${e.in_sessions.toLocaleString()} · </span><span style="color:${RETURN}">outbound ${e.out_sessions.toLocaleString()} from ${e.out_hosts} host(s)</span>` : '') +
-      (COMBINED && (e.islands || []).length > 1 ? `<br><span style="color:${SHARED}">Exchanged traffic with hosts in ${e.islands.length} of the compared reports</span>` : '') +
+      (COMBINED && (e.islands || []).length > 1 ? `<br>Exchanged traffic with hosts in ${e.islands.length} of the compared reports` : '') +
       '<br>' + e.targets.slice(0, 5).map(t => `${esc(shown(t[0]))}${COMBINED ? ` <span class="m">(${esc(netLabel(nodes.get(t[0]) && nodes.get(t[0]).d))})</span>` : ''} ${arrow(t)} <span style="color:${KIND[t[1]]}">${esc(KIND_TXT[t[1]])}</span>` +
         (beamDir(t) === 'both' && t[1] !== 'outbound' ? ` <span style="color:${RETURN}">+ host connected out</span>` : '')).join('<br>') +
       (more > 0 ? `<br><span class="m">+${more} more host(s)</span>` : '') +
@@ -1334,7 +1281,8 @@ function tip(n, x, y) {
       (info && info.band === 'None' ? `<br>East/west attempts only, no completed session<br><span class="m">${esc(info.why.join('; '))}</span>` : '') +
       (info && info.band !== 'None' && !telemetryOnly ? `<br>Estimated likelihood if ${esc(shown(state.focus))} is exploited: <b style="color:${BAND[info.band]}">${Math.round(info.p * 100)}% ${info.band}</b>` +
         `<br><span class="m">${esc(info.why.join('; '))}</span>` : '') +
-      (COMBINED && (d.sh || []).length ? `<br><span style="color:${SHARED}">${d.sh.length} IOC or vulnerabilit${d.sh.length === 1 ? 'y' : 'ies'} also seen in other reports</span>` : '') +
+      (COMBINED && (d.sh || []).length ? `<br>Also in other reports: ${d.sh.slice(0, 3).map(j => esc(ITEMS[j].label)).join(', ')}` +
+        (d.sh.length > 3 ? ` and ${d.sh.length - 3} more` : '') : '') +
       (COMBINED && iocCounts[d.id] ? `<br><span style="color:#2ee6d6">${iocCounts[d.id]} IOC match${iocCounts[d.id] === 1 ? '' : 'es'}</span>` : '') +
       (D.focus[n.id] && n.id !== state.focus ? '<br><span class="m">Click to focus</span>' : '');
   }
@@ -1381,7 +1329,6 @@ function renderList() {
   const q = $('search').value.trim().toLowerCase();
   const rows = hostOrder().filter(id => {
     if (iocOnly && !iocCounts[id]) return false;
-    if (litOnly && !lit.has(id)) return false;
     if (netFilter && !netFilter.split(',').includes(String(nodes.get(id).d.net ?? 'none'))) return false;
     if (!q) return true;
     const d = nodes.get(id).d, F = D.focus[id];
@@ -1391,29 +1338,26 @@ function renderList() {
     const d = nodes.get(id).d, F = D.focus[id];
     const iocCount = iocCounts[id] || 0;
   const iocHint = iocCount ? `<span class="ioc-host-badge" title="${iocCount} exact IOC match${iocCount === 1 ? '' : 'es'}; review the source and traffic" aria-label="${iocCount} IOC match${iocCount === 1 ? '' : 'es'}">IOC ${iocCount}</span>` : '';
-    const nLit = COMBINED && lit.has(id) ? (d.sh || []).filter(spotOn).length : 0;
     return `<div class="hrow${id === state.focus ? ' on' : ''}" role="listitem" tabindex="0" data-id="${esc(id)}">` +
       (telemetryOnly ? '' : `<span class="pill ${esc(d.pri)}">${esc(d.pri)}</span>`) + `<span class="nm">${esc(d.name ? d.name.split('.')[0] : shown(id))} ${iocHint}` +
-      (nLit ? `<span class="shared-badge" title="${nLit} lit IOC or vulnerabilit${nLit === 1 ? 'y' : 'ies'} also seen in other reports">SHARED ${nLit}</span>` : '') +
       (netOf(d) && netOf(d).cloud ? ` <span class="net-badge${netOf(d).cloud ? ' cloud' : ''}" title="${esc(netOf(d).name)}">${esc(netOf(d).cloud ? netOf(d).type.toUpperCase() : netOf(d).name)}</span>` : '') +
       `<br><span class="ip">${esc(shown(id))} · ${F.attackers_total} N/S · ${F.peers_total} E/W</span></span>` +
       (d.ev ? `<span class="tag ${d.ev}">${d.ev === 'likely' ? 'LIKELY' : 'LEAD'}</span>` : '') + '</div>';
   };
-  if (!rows.length) { $('hostlist').innerHTML = `<div class="hrow">${iocOnly ? 'No IOC hosts match' : litOnly ? 'No lit hosts match' : 'No match'}</div>`; return; }
+  if (!rows.length) { $('hostlist').innerHTML = `<div class="hrow">${iocOnly ? 'No IOC hosts match' : 'No match'}</div>`; return; }
   if (!groupByNet) { $('hostlist').innerHTML = rows.map(rowHtml).join(''); return; }
-  // one collapsible group per subnet (per network on the all-networks map), riskiest first (lit hosts,
-  // likely compromises, then P1 hosts, IOC hosts, size); hosts inside keep the priority order; a search
-  // or a filter opens every group that still has a match
+  // one collapsible group per subnet (per network on the all-networks map), riskiest first (likely
+  // compromises, then P1 hosts, IOC hosts, size); hosts inside keep the priority order; a search or a
+  // filter opens every group that still has a match
   const groups = new Map();
   rows.forEach(id => { const k = groupOf(id); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(id); });
   if (state.focus && nodes.get(state.focus)) openNets.add(groupOf(state.focus));
-  const filtered = !!q || iocOnly || litOnly;
+  const filtered = !!q || iocOnly;
   const tally = ids => { const ds = ids.map(id => nodes.get(id).d);
-    return [ds.filter(d => d.ev === 'likely').length, ds.filter(d => d.pri === 'P1').length, ids.filter(id => iocCounts[id]).length, ids.length,
-      ids.filter(id => lit.has(id)).length]; };
+    return [ds.filter(d => d.ev === 'likely').length, ds.filter(d => d.pri === 'P1').length, ids.filter(id => iocCounts[id]).length, ids.length]; };
   const order = [...groups].map(g => [g[0], g[1], tally(g[1])])
-    .sort((a, b) => b[2][4] - a[2][4] || b[2][0] - a[2][0] || b[2][1] - a[2][1] || b[2][2] - a[2][2] || b[2][3] - a[2][3]);
-  $('hostlist').innerHTML = order.map(([k, ids, [likely, p1, ioc, , shared]]) => {
+    .sort((a, b) => b[2][0] - a[2][0] || b[2][1] - a[2][1] || b[2][2] - a[2][2] || b[2][3] - a[2][3]);
+  $('hostlist').innerHTML = order.map(([k, ids, [likely, p1, ioc]]) => {
     const open = filtered || openNets.has(k);
     const net = COMBINED ? null : netOf(nodes.get(ids[0]).d);
     const label = COMBINED ? netLabel(nodes.get(ids[0]).d) : k === 'other' ? 'Other addresses' : k;
@@ -1424,7 +1368,7 @@ function renderList() {
       `<span class="hgcount">${ids.length} host${ids.length === 1 ? '' : 's'}` +
       (!COMBINED && PROBED[k] ? ` · <span title="Addresses in this subnet that were probed and never answered; not counted as hosts">${PROBED[k]} probed, no answer</span>` : '') +
       (!telemetryOnly && p1 ? ` · <b class="p1">${p1} P1</b>` : '') + (likely ? ` · <b class="lk">${likely} likely</b>` : '') +
-      (ioc ? ` · <b class="ioc">${ioc} IOC</b>` : '') + (shared ? ` · <b class="sh">${shared} shared</b>` : '') + `</span></div>` +
+      (ioc ? ` · <b class="ioc">${ioc} IOC</b>` : '') + `</span></div>` +
       (open ? `<div role="list">${ids.map(rowHtml).join('')}</div>` : '') + '</div>';
   }).join('') + (() => {
     // ranges where nothing answered at all have no hosts to list; say they were probed
@@ -1467,7 +1411,7 @@ function otExamples(items, total) {
     }).join('') + (total > items.length ?
       `<div class="conn-more">Showing ${items.length} of ${total} industrial records. See normalized/ot_events.jsonl for all records.</div>` : '');
 }
-let iocOnly = false, litOnly = false, netFilter = '';
+let iocOnly = false, netFilter = '';
 // host list grouped by subnet (the default), every subnet folded until clicked
 let groupByNet = true;
 const openNets = new Set();
@@ -1514,102 +1458,18 @@ function sharedSection(id, d) {
   const R = repOf(d), js = d.sh || [];
   const own = R && R.href ? `<p class="own">${ownLink(id, `Open in ${R.name}'s own Explorer`)}</p>` : '';
   if (!js.length) return own;
-  return own + `<h3>Seen in other reports</h3><p class="onward-note">IOCs and vulnerabilities of this host that the comparison found in other reports too. ` +
-    `Pick one to light up its hosts in every network.</p>` +
+  return own + `<h3>Seen in other reports</h3><p class="onward-note">IOCs and vulnerabilities of this host that the comparison found in other reports too.</p>` +
     js.map(j => {
       const it = ITEMS[j], others = it.seen.filter(x => x[0] !== R.r);
-      return `<div class="fd shared-fd">${itemTag(it)} <button type="button" class="sh-light" data-light="${j}">${esc(it.label)}</button>` +
+      return `<div class="fd shared-fd">${itemTag(it)} <span class="sh-name">${esc(it.label)}</span>` +
         (it.k === 'ioc' ? ' · ' + iocButton(it.type, it.label, 'details') : '') +
         `<div class="meta">${it.reports} reports · ${it.networks} network${it.networks === 1 ? '' : 's'} · ${it.hosts.toLocaleString()} host${it.hosts === 1 ? '' : 's'} in all</div>` +
         (others.length ? `<div class="meta">Also in ${others.map(([r, n]) => `${esc(repName(r))}: ${n.toLocaleString()} host${n === 1 ? '' : 's'}`).join('; ')}</div>` : '') + '</div>';
     }).join('');
 }
-let sharedOpen = false, sharedQuery = '';
-function lightItem(j) {               // pick one item (again: back to every shared item)
-  spot.item = spot.item === j ? -1 : j;
-  if (spot.item >= 0) { const it = ITEMS[j]; if (spot.kind !== 'all' && spot.kind !== it.k) spot.kind = 'all'; if (spot.multi && it.networks < 2) spot.multi = false; }
-  relit();
-}
-function relit() {
-  relight(); markLit(); renderList(); renderShared();
-  if (state.mode === 'focus' && spot.item >= 0) overview();
-}
-function markLit() {
-  const pill = $('lit-filter'); if (!pill) return;
-  pill.hidden = !ITEMS.length;
-  pill.textContent = `Shared ${lit.size.toLocaleString()}`;
-}
-function setShared(open) {
-  sharedOpen = !!open;
-  const box = $('shared'); if (!box) return;
-  box.hidden = !sharedOpen; $('btn-shared').setAttribute('aria-expanded', String(sharedOpen));
-  if (sharedOpen) renderShared();
-  if (state.mode === 'overview') fitOverview();
-}
-function renderShared() {
-  const box = $('shared'); if (!box || box.hidden) return;
-  box.querySelectorAll('.sh-seg [data-kind]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kind === spot.kind)));
-  $('sh-multi').checked = spot.multi;
-  const q = sharedQuery.trim().toLowerCase();
-  const rows = ITEMS.map((it, j) => j).filter(j => {
-    const it = ITEMS[j];
-    if (j === spot.item) return true;
-    if ((spot.kind !== 'all' && it.k !== spot.kind) || (spot.multi && it.networks < 2)) return false;
-    return !q || (it.label + ' ' + (it.cves || []).join(' ') + ' ' + it.key).toLowerCase().includes(q);
-  });
-  const nets = new Set([...lit.keys()].map(id => netKey(repOf(nodes.get(id).d).network)));
-  $('sh-now').innerHTML = spot.item >= 0
-    ? `Lit: <b>${esc(ITEMS[spot.item].label)}</b> on ${lit.size.toLocaleString()} host${lit.size === 1 ? '' : 's'} in ${nets.size} network${nets.size === 1 ? '' : 's'} ` +
-      `<button type="button" class="sh-clear">Show every shared item</button>`
-    : `Lit: ${lit.size.toLocaleString()} host${lit.size === 1 ? '' : 's'} in ${nets.size} network${nets.size === 1 ? '' : 's'}. Pick an item to light up only its hosts.`;
-  const MAX = 300;
-  $('sh-list').innerHTML = rows.slice(0, MAX).map(j => {
-    const it = ITEMS[j], on = j === spot.item;
-    return `<div class="sh-row${on ? ' on' : ''}" role="listitem"><button type="button" class="sh-pick" data-light="${j}" aria-pressed="${on}">` +
-      `${itemTag(it)} <span class="sh-label">${esc(it.label)}</span>` +
-      `<span class="sh-meta">${it.reports} reports · ${it.networks} network${it.networks === 1 ? '' : 's'} · ${it.hosts.toLocaleString()} host${it.hosts === 1 ? '' : 's'}` +
-      (it.drawn < it.hosts ? ` (${it.drawn.toLocaleString()} on the map)` : '') + '</span></button>' +
-      (it.k === 'ioc' ? iocButton(it.type, it.label, 'details') : '') + '</div>';
-  }).join('') + (rows.length > MAX ? `<p class="sh-more">${(rows.length - MAX).toLocaleString()} more; filter to narrow the list.</p>` : '') +
-    (rows.length ? '' : '<p class="sh-more">Nothing matches.</p>');
-}
 if (COMBINED) {
-  const nI = ITEMS.filter(it => it.k === 'ioc').length, nV = ITEMS.length - nI;
-  const btn = document.createElement('button');
-  btn.id = 'btn-shared'; btn.type = 'button'; btn.setAttribute('aria-controls', 'shared');
-  btn.title = 'IOCs and vulnerabilities seen in more than one report';
-  btn.textContent = `Shared items (${ITEMS.length})`;
-  $('controls').insertBefore(btn, $('btn-labels'));
-  const box = document.createElement('aside');
-  box.id = 'shared'; box.hidden = true; box.setAttribute('aria-label', 'IOCs and vulnerabilities seen in more than one report');
-  box.innerHTML = `<div class="sh-top"><h2>Seen in more than one report</h2><button type="button" class="sh-close" aria-label="Close">×</button></div>` +
-    `<p class="sh-lede">${ITEMS.length ? `${nI} IOC${nI === 1 ? '' : 's'} and ${nV} vulnerabilit${nV === 1 ? 'y' : 'ies'} are in more than one of the ${COMBINED.compared.length} compared reports. ` +
-      'Their hosts have a magenta ring in every network.' : 'No IOC or vulnerability is in more than one of the compared reports.'}</p>` +
-    `<div class="sh-seg seg" role="group" aria-label="Which shared items light up"><button type="button" data-kind="all">All ${ITEMS.length}</button>` +
-    `<button type="button" data-kind="ioc">IOCs ${nI}</button><button type="button" data-kind="vuln">Vulnerabilities ${nV}</button></div>` +
-    `<label class="sh-multi"><input type="checkbox" id="sh-multi"> Only items in more than one network</label>` +
-    `<input type="search" id="sh-q" placeholder="Filter by name, CVE or value" aria-label="Filter the shared items" autocomplete="off">` +
-    `<div id="sh-now" class="sh-now" role="status" aria-live="polite"></div><div id="sh-list" role="list"></div>`;
-  document.body.appendChild(box);
-  btn.onclick = () => setShared(!sharedOpen);
-  box.querySelector('.sh-close').onclick = () => setShared(false);
-  box.querySelectorAll('.sh-seg [data-kind]').forEach(b => { b.onclick = () => { spot.kind = b.dataset.kind; spot.item = -1; relit(); }; });
-  $('sh-multi').onchange = e => { spot.multi = e.target.checked; spot.item = -1; relit(); };
-  $('sh-q').addEventListener('input', e => { sharedQuery = e.target.value; renderShared(); });
-  box.addEventListener('click', e => {
-    const b = e.target.closest('[data-light]'); if (b) { lightItem(+b.dataset.light); return; }
-    if (e.target.closest('.sh-clear')) { spot.item = -1; relit(); }
-  });
-  // the host list's "lit hosts only" pill, next to IOC hosts
-  const pill = document.createElement('button');
-  pill.id = 'lit-filter'; pill.type = 'button'; pill.setAttribute('aria-pressed', 'false');
-  pill.title = 'Show only hosts with an IOC or vulnerability seen in more than one report (what Shared items lights up)';
-  $('ioc-filter').after(pill);
-  pill.onclick = () => { litOnly = !litOnly; pill.setAttribute('aria-pressed', String(litOnly)); renderList(); };
-  markLit();
   $('group-toggle').textContent = 'By network';
   $('group-toggle').title = 'Group the host list by network (click a network to open or fold it)';
-  setShared(ITEMS.length > 0 && innerWidth >= 1280);
 }
 $('hostlist').addEventListener('click', e => {
   const g = e.target.closest('.hghead'); if (g) { toggleNet(g.dataset.net); return; }
@@ -1649,7 +1509,6 @@ function ipRow(kind, item) {
   const dir = (o ? `→ ${o}` : '') + (o && i ? '  ' : '') + (i ? `← ${i}` : '');
   return `<details class="ip-entry" data-k="peer" data-ip="${esc(q.ip)}"><summary class="row peer"><div class="bar b-${q.band}"><i style="width:${Math.round(q.p * 100)}%"></i></div>` +
     `<span>${pd.name ? `${esc(nm)} <span class="ip" style="color:var(--muted);font-size:11px">${esc(shown(q.ip))}</span>` : `<span class="ip">${esc(shown(q.ip))}</span>`}</span>` +
-    (COMBINED && lit.has(q.ip) ? '<span class="shared-dot" title="Has an IOC or vulnerability seen in other reports"></span>' : '') +
     `<span class="lk" style="color:${BAND[q.band] || 'var(--muted)'}">${none ? 'no session' : telemetryOnly ? 'observed' : Math.round(q.p * 100) + '% ' + q.band}</span></summary>` +
     `<div class="ip-detail">${D.focus[q.ip] ? `<button type="button" class="go" data-go="${esc(q.ip)}">Focus ${esc(nm)}</button> · ` : ''}` +
     `${esc(dir)} ${none ? 'attempts, none completed' : 'completed sessions'}${q.ports_out.length ? ' · ' + (none ? 'tried ' : 'uses ') + esc(q.ports_out.join(', ')) : ''}` +
@@ -1796,7 +1655,6 @@ function renderPanel(id) {
 }
 $('panel').addEventListener('click', e => {
   const go = e.target.closest('[data-go]'); if (go) { focus(go.dataset.go); return; }
-  const light = e.target.closest('[data-light]'); if (light) { setShared(true); lightItem(+light.dataset.light); return; }
   const expand = e.target.closest('[data-ip-expand]');
   if (expand) { panelLists[expand.dataset.ipExpand].expanded = true; renderIpList(expand.dataset.ipExpand); return; }
   const collapse = e.target.closest('[data-ip-collapse]');
@@ -1864,12 +1722,12 @@ const ABOUT = telemetryOnly ? {
 if (COMBINED) {
   ABOUT.flat = 'Each dashed ring is one compared report\'s network, its subnets and hosts drawn as in its own Explorer; ' +
     'reports from the same network sit together inside a solid ring with the network\'s name. ' +
-    'Hosts with no IOC match or vulnerability are dim; a <b>teal ring</b> marks an IOC match and a <b>magenta ring</b> an IOC or vulnerability ' +
-    'that other reports have too. Pick one under <b>Shared items</b> to light up its hosts in every network.';
+    'Hosts with no IOC match or vulnerability are dim and a <b>teal ring</b> marks an IOC match. ' +
+    '<b>Hover</b> a host to see what it shares with the other reports.';
   ABOUT['3d'] = 'Each dashed ring is one compared report\'s network: platforms are its subnets and pillars its hosts. ' +
     'Reports from the same network sit together inside a solid ring with the network\'s name. ' +
-    'Dim hosts have no IOC match or vulnerability; a <b>magenta ring</b> marks an IOC or vulnerability that other reports have too ' +
-    '(with a beacon when few are lit). Outside addresses on the arc beam down to every network they reached. Pick one under <b>Shared items</b> to light up only its hosts.';
+    'Dim hosts have no IOC match or vulnerability. Outside addresses on the arc beam down to every network they reached: ' +
+    '<b>hover</b> one, or a host, to see what it shares with the other reports.';
 }
 function aboutKey() { return state.mode === 'focus' ? 'focus:' + state.focus : R3 ? '3d' : 'flat'; }
 function aboutHtml() {
@@ -1878,13 +1736,13 @@ function aboutHtml() {
   return ABOUT.focus(d.name ? d.name.split('.')[0] + ' (' + shown(state.focus) + ')' : shown(state.focus));
 }
 // The note sits centered under the picture: above the legend, between the host list on the left and
-// whatever is open on the right (host panel, shared items, 3D camera controls, Security Assistant).
+// whatever is open on the right (host panel, 3D camera controls, Security Assistant).
 function placeAbout() {
   const box = id => { const el = $(id); if (!el || el.hidden) return null; const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden') return null; const b = el.getBoundingClientRect(); return b.width && b.height ? b : null; };
   let l = 18, r = innerWidth - 18, bottom = innerHeight - 14;
   const rail = box('rail'); if (rail) l = Math.max(l, rail.right + 14);
-  for (const id of ['panel', 'shared', 'viewctl', 'analyst-chat']) { const b = box(id); if (b && b.bottom > innerHeight / 2) r = Math.min(r, b.left - 14); }
+  for (const id of ['panel', 'viewctl', 'analyst-chat']) { const b = box(id); if (b && b.bottom > innerHeight / 2) r = Math.min(r, b.left - 14); }
   const lg = box('legend'); if (lg) bottom = lg.top - 10;
   if (r - l < 280) { l = 18; r = innerWidth - 18; }   // no room between the side panels: use the full width
   const root = document.documentElement.style;
@@ -1910,7 +1768,7 @@ $('about').addEventListener('mouseleave', () => { clearTimeout(aboutTimer); abou
 addEventListener('resize', () => { if (!$('about').hidden) placeAbout(); });
 // re-place when a side panel opens or closes (host panel, Security Assistant drawer)
 { const mo = new MutationObserver(() => { if (!$('about').hidden) placeAbout(); });
-  for (const el of [document.body, $('panel'), $('shared'), $('analyst-chat')]) if (el) mo.observe(el, { attributes: true, attributeFilter: ['class', 'hidden'] }); }
+  for (const el of [document.body, $('panel'), $('analyst-chat')]) if (el) mo.observe(el, { attributes: true, attributeFilter: ['class', 'hidden'] }); }
 const closePaths = () => { if (window.VFPaths) window.VFPaths.close(); if (window.VFTimeline) window.VFTimeline.close(); };
 $('vw-flat').onclick = () => { closePaths(); set3d(false, true); };
 $('btn-3d').onclick = () => { closePaths(); set3d(true, true); };
@@ -1933,8 +1791,7 @@ $('legend').innerHTML =
   `<span class="only3d"><i style="background:${C('#6ea8ff')}"></i><i style="background:${C('#ff8a3d')};width:12px"></i>Traffic between subnets (orange: mostly admin protocols)</span>` +
   `<span class="only3d"><i style="background:${C('#ff2e88')}"></i><i style="background:${C('#ffb020')};width:12px"></i>Risky host paths: admin protocol into P1 or flagged host / either one</span>` +
   (NETS.some(n => n.cloud) ? `<span><i style="background:repeating-linear-gradient(90deg,${CLOUD_COL} 0 6px,transparent 6px 9px)"></i>${CALM ? '' : '☁ '}Cloud network (from the network map)</span>` : '') +
-  (COMBINED ? `<span><span class="sw" style="background:transparent;border:2px solid ${SHARED}"></span>IOC or vulnerability seen in more than one report</span>` +
-    `<span><span class="sw" style="background:transparent;border:2px solid ${C('#2ee6d6')}"></span>Host with an IOC match</span>` +
+  (COMBINED ? `<span><span class="sw" style="background:transparent;border:2px solid ${C('#2ee6d6')}"></span>Host with an IOC match</span>` +
     `<span><i style="background:repeating-linear-gradient(90deg,${C('#78aaff')} 0 8px,transparent 8px 12px)"></i>One report's network · dim hosts: no IOC or vulnerability</span>` : '') +
   `<span><i style="background:${KIND.alert}"></i>IPS alert, not blocked</span>` +
   (telemetryOnly ? '' : `<span><i style="background:${KIND.vuln}"></i>Reached a vulnerable service</span>`) +
