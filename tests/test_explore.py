@@ -67,6 +67,18 @@ class ExploreTests(unittest.TestCase):
         self.assertEqual(explore.read_data(page), json.loads(json.dumps(self.data, default=str)))
         self.assertIn("not confirmed compromise", page)
 
+    def test_views_wait_for_builtin_unpacking(self):
+        # the browser's own gzip decoder unpacks the data (no bundled library), and every view that reads
+        # it starts only once it is there, in page order after vf_data.js
+        page = explore.html(self.data)
+        self.assertIn("new DecompressionStream('gzip')", page)
+        self.assertNotIn("fflate", page)
+        starts = [page.index("window.vfWhenReady = ")] + [page.index(f"window.{name} = ") for name in
+                                                          ("VFExplorer", "VFPaths", "VFTimeline")]
+        self.assertEqual(starts, sorted(starts))
+        self.assertEqual(page.count("vfWhenReady(function (D) {   // starts once"), 3)
+        self.assertNotIn("window.VF_DATA;", page)    # no view reads the data before it is unpacked
+
     def test_ioc_host_hints_count_distinct_matches(self):
         res = dict(self.res)
         res["ioc_matches"] = [

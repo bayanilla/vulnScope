@@ -861,7 +861,8 @@ def _json_parts(data: dict):
 
 def write_data(fh, data: dict) -> None:
     """The Explorer data as gzip in base64, written to ``fh`` piece by piece. The page unpacks it
-    itself (vendored fflate), so it still opens offline and straight from disk."""
+    itself with the browser's built-in gzip decoder (vf_data.js), so it still opens offline and
+    straight from disk."""
     comp = zlib.compressobj(6, zlib.DEFLATED, 31)       # gzip framing, no timestamp
     pending = b""
 
@@ -934,9 +935,9 @@ def write_html(fh, data: dict, ioc_drawer: list | None = None) -> None:
     fh.write(DATA_TAG)
     write_data(fh, data)
     fh.write("</script>"
-             # fflate (MIT) unpacks the data and Three.js (MIT) draws the 3D views, both vendored so the
-             # page works offline; the Explorer falls back to its 2D canvas when WebGL is unavailable
-             + "<script>" + _read("vendor/fflate.min.js") + "</script>"
+             # vf_data.js unpacks the data with the browser's own gzip decoder and starts the views once it
+             # is there; Three.js (MIT, vendored so the page works offline) draws the 3D views, and the
+             # Explorer falls back to its 2D canvas when WebGL is unavailable
              + "<script>" + _read("vf_data.js") + "</script>"
              + "<script>" + _read("vendor/three.min.js") + "</script>"
              + "<script>" + _read("explorer3d.js") + "</script>"

@@ -2,9 +2,8 @@
 // Columns are attack steps (internet origin, entry, first pivot, second pivot), rows are subnets, and
 // each colored line is one ranked chain built from the Explorer data already on the page. Chains rank
 // where to look; they are estimates, never a confirmed compromise.
-(function () {
+vfWhenReady(function (D) {   // starts once vf_data.js has unpacked the data
 'use strict';
-const D = window.VF_DATA;
 const root = document.getElementById('attack-paths'), openBtn = document.getElementById('btn-paths');
 // not on the all-networks map (combine.py): its chains are drawn per report, in each report's own Explorer
 if (!root || !openBtn || D.combined) return;
@@ -492,4 +491,4 @@ addEventListener('keydown', e => {
 addEventListener('resize', () => { if (state.open) { renderMap(); renderTimeline(); } });
 if (/[?&#]paths\b/.test(location.search + location.hash)) open();
 window.VFPaths = {open, close, select, toggleCut, walk, LINES, CHAINS};
-})();
+});

@@ -2,9 +2,8 @@
 // flow is a chord drawn at the moment it happened, so the order of events (first contact, an exploit
 // alert, the callback, repeating beacons) reads directly. Data comes from the `timeline` block that
 // explore.py adds to the Explorer blob; large runs are sampled there, and the side panel says so.
-(function () {
+vfWhenReady(function (D) {   // starts once vf_data.js has unpacked the data
 'use strict';
-const D = window.VF_DATA;
 const T = D.timeline, root = document.getElementById('timeline-view'), openBtn = document.getElementById('btn-timeline');
 if (!root || !openBtn) return;
 const supported = (() => { try { const c = document.createElement('canvas'); return !!(window.THREE && (c.getContext('webgl2') || c.getContext('webgl'))); } catch (_) { return false; } })();
@@ -406,4 +405,4 @@ function stats() {
   return out;
 }
 window.VFTimeline = {open, close, isOpen: () => isOpen, stats};
-})();
+});

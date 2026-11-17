@@ -269,7 +269,8 @@ plan for free disk of about the size of the uncompressed logs. `--workdir` (or
 ## Explore hosts
 
 `explorer.html` is written with every run. It is a single offline file with three.js bundled
-inside. The view switcher offers:
+inside. It needs Chrome or Edge 80+, Firefox 113+ or Safari 16.4+ (2023 or later), whose built-in
+gzip decoder unpacks the report data; an older browser shows a note saying so. The view switcher offers:
 
 - **3D** (default where WebGL works). Each subnet is a platform and each host a pillar whose
   height is its risk score (outside exposure without a scan). Risky paths and the most significant
@@ -373,7 +374,9 @@ Each run writes to its output folder (`vulnflow_runs/<id>/out/` on the upload pa
 
 - **Executive summary** and **technical report**, as Markdown and standalone HTML.
 - **Explorer**: `explorer.html`, a single offline file. Its data is packed (gzip) inside the page,
-  which unpacks it itself, so it still opens straight from disk with no network. On busy networks
+  which unpacks it with the browser's own decoder (no bundled library), so it still opens straight
+  from disk with no network. Big reports show **Unpacking report data…** instead of freezing the tab;
+  data that would unpack past 500 MB, or a damaged file, gets a clear note instead of a crash. On busy networks
   each host keeps its top 200 outside addresses and 200 internal peers in the page (addresses with
   IPS alerts always stay); every count and view still uses the full lists. Opened through the upload
   page (a new run or **Open report**), the Explorer loads a host's full lists when you click it,

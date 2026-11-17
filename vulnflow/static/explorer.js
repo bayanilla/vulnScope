@@ -1,6 +1,5 @@
-(function () {
+vfWhenReady(function (D) {   // starts once vf_data.js has unpacked the data
 'use strict';
-const D = window.VF_DATA;
 const telemetryOnly = D.vulnerability_data_available === false;
 // subnet -> addresses that were probed and never answered (not hosts, so not drawn)
 const PROBED = D.probed_subnets || {};
@@ -1838,4 +1837,4 @@ if (m && D.focus[decodeURIComponent(m[1])]) {
 const stats = () => Object.assign({hosts: D.nodes.length, mode: state.mode, is3d: !!R3}, R3 && R3.stats ? R3.stats() : {});
 window.VFExplorer = {focus: id => focus(id), overview: () => overview(), set3d: on => set3d(on, true), is3d: () => !!R3, can3d, markSeg, stats};
 requestAnimationFrame(frame);
-})();
+});
