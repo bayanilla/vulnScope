@@ -54,7 +54,7 @@ $('tl-sub').textContent = `${fmt(0)} → ${fmt(T.hours)} · ${T.flows.length.toL
   + (T.hidden ? ` · ${T.hidden.toLocaleString()} with an unreadable address not drawn` : '');
 $('tl-legend').innerHTML = [[COL.pink, 'To/from an alert or IOC address'], [COL.cyan, 'Inbound from internet'], [COL.violet, 'Outbound to internet'],
   [COL.orange, 'Direct between subnets'], [COL.internal, 'Within a subnet or to shared services'], [COL.blocked, 'Blocked or failed'], [COL.crit, 'IPS alert', 'ring'], [COL.pink, 'IOC domain lookup', 'dot']]
-  .map(([c, t, k]) => `<span><i class="${k || ''}" style="--c:${hex(c)}"></i>${t}</span>`).join('') + '<span class="cal">Drag: rotate · right-drag or Shift-drag: pan · scroll: zoom</span>';
+  .map(([c, t, k]) => `<span><i class="${k || ''}" style="--c:${hex(c)}"></i>${t}</span>`).join('') + '<span class="cal">Drag: rotate · right-drag or Shift-drag: pan · middle-drag: up/down · scroll: zoom</span>';
 
 // ---------------------------------------------------------------- scene (built on first open)
 let renderer, scene, camera, built = false, raf = 0, last = 0;
@@ -296,8 +296,9 @@ function hit(e) {
 function controls() {
   const el = renderer.domElement, pts = new Map(); let drag = null;
   el.addEventListener('contextmenu', e => e.preventDefault());
-  el.addEventListener('pointerdown', e => { el.setPointerCapture(e.pointerId); pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
-    drag = {pan: e.button === 2 || e.shiftKey, moved: 0}; el.classList.add('drag'); });
+  el.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });   // no browser autoscroll on the middle button
+  el.addEventListener('pointerdown', e => { if (e.button === 1) e.preventDefault(); el.setPointerCapture(e.pointerId); pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    drag = {pan: e.button === 2 || e.shiftKey, vert: e.button === 1, moved: 0}; el.classList.add('drag'); });
   el.addEventListener('pointermove', e => {
     if (!drag) { const b = hit(e), tip = $('tl-tip');
       if (b) { tip.innerHTML = b.p.info(b.h.instanceId); tip.hidden = false; el.classList.add('hover');
@@ -309,7 +310,9 @@ function controls() {
       const [c, d] = [...pts.values()], d1 = Math.hypot(c.x - d.x, c.y - d.y); if (d0 && d1) { cam.r *= d0 / d1; applyCam(); } setSpin(false); return; }
     const dx = e.clientX - prev.x, dy = e.clientY - prev.y; pts.set(e.pointerId, {x: e.clientX, y: e.clientY}); drag.moved += Math.abs(dx) + Math.abs(dy);
     if (drag.moved > 3) { setSpin(false); cam.preset = ''; markCam(); $('tl-tip').hidden = true; }
-    if (drag.pan) { const s = cam.r * .0016, right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0), up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+    if (drag.vert) { const s = cam.r * .0016, up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);   // middle-drag: straight up or down on screen
+      cam.tx += dy * s * up.x; cam.ty += dy * s * up.y; cam.tz += dy * s * up.z; }
+    else if (drag.pan) { const s = cam.r * .0016, right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0), up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
       cam.tx += -dx * s * right.x + dy * s * up.x; cam.ty += -dx * s * right.y + dy * s * up.y; cam.tz += -dx * s * right.z + dy * s * up.z; }
     else { cam.theta -= dx * .005; cam.phi -= dy * .005; }
     applyCam();
