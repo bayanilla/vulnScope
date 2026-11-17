@@ -25,6 +25,7 @@ Numeric bounds in one place. Each row names where the value is set; change it th
 | Explorer focus | 24 / 400 | labeled / drawn peers per side | `vulnflow/static/explorer.js` |
 | Explorer IP list | 8 / 20 | preview rows / rows per page | `vulnflow/static/explorer.js` |
 | Explorer host lists in the page | 200 / 1,000 / 20 | outside addresses and internal peers kept per host / outside addresses with IPS alerts kept even past 200 / rows with connection examples when a list is cut (counts use the full lists; the upload server sends the full lists from `normalized/explorer_contacts.parquet`) | `vulnflow/explore.py` |
+| Explorer data in the browser | 1 GB / ~512 MB | unpacked report data a page will open / what Chrome and Edge can hold as text (use Firefox or Safari beyond it) | `vulnflow/static/vf_data.js` |
 | Explorer data read back | 2 GB | unpacked Explorer data in a saved page (Open report, Compare) | `vulnflow/explore.py` |
 | Explorer overview | 2,000 / 200 / 48 | hosts (riskiest) / risky paths / outside addresses drawn | `vulnflow/explore.py`, `vulnflow/static/explorer.js` |
 | Attack paths | 9 | ranked lines | `vulnflow/static/attackpaths.js` |

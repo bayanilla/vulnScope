@@ -33,7 +33,7 @@ RUN python3 -c "import sys; sys.path.insert(0, '/opt/vulnscope/deps'); import du
 COPY vulnflow /opt/vulnscope/vulnflow
 COPY samples /opt/vulnscope/samples
 COPY docker/entrypoint.py /opt/vulnscope/entrypoint.py
-COPY README.md METHODS.md ARCHITECTURE.md DEVELOPMENT.md API.md UPGRADE.md LICENSE THIRD_PARTY_NOTICES.md /opt/vulnscope/
+COPY README.md CHANGELOG.md METHODS.md ARCHITECTURE.md DEVELOPMENT.md API.md UPGRADE.md LICENSE THIRD_PARTY_NOTICES.md /opt/vulnscope/
 COPY docs /opt/vulnscope/docs
 # Files keep their permissions from the checkout; make them readable by the non-root user even
 # if some were saved as owner-only (mode 600), which otherwise crash-loops the container.
