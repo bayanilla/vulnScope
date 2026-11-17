@@ -616,7 +616,10 @@ class CompareSampleTests(unittest.TestCase):
             for rel in made:
                 with open(os.path.join(tmp, rel), "rb") as a, open(os.path.join(root, rel), "rb") as b:
                     self.assertEqual(a.read(), b.read(), rel)
-        self.assertEqual(sorted(os.listdir(root)), sorted(f for f, *_ in sample_compare.SITES if f != sample_gootloader.FOLDER))
+        self.assertEqual(sorted(os.listdir(root)), ["corvane", "ridgeline", "sites.csv"])     # one folder per company
+        self.assertEqual(sorted(f"{company}/{site}" for company in ("corvane", "ridgeline")
+                                for site in os.listdir(os.path.join(root, company))),
+                         sorted(f for f, *_ in sample_compare.SITES if f != sample_gootloader.FOLDER))
 
     def test_one_command_loads_and_compares_seven_reports(self):
         data = tempfile.mkdtemp()

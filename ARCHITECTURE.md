@@ -95,6 +95,7 @@ Folder path, Browse, upload, or command line
 | `vulnflow/web/` page modules | `upload.py` (Analyze), `folders.py` (Browse and folder paths), `runs.py` (results pages, Security Assistant, briefs, Radar), `settings.py`, `branding_page.py`, `compare_page.py` |
 | `vulnflow/compare.py` | Compare reports: counts per report and network from saved `results.json` files; looks for IOCs again in saved normalized data with the analysis' matcher |
 | `vulnflow/combine.py` | All networks on one Explorer map: merges the compared reports' saved Explorer data, one island per report, with the shared IOCs and vulnerabilities highlighted |
+| `vulnflow/sites.py` | A folder with a `sites.csv`: reads the list, analyzes each site into its own named report, then saves a comparison of them |
 | `vulnflow/errors.py` | `UserError`: a problem the person can fix, whose message is shown. Any other exception is a bug: the page says the step failed and the traceback goes to the server console |
 | `vulnflow/pipeline.py`, `cli.py` | Orchestration and the `vulnflow` command line |
 | `docker/`, `Dockerfile`, `compose.yaml` | Container image with Zeek, entry point and folder sharing |
@@ -167,6 +168,7 @@ docker compose run --rm vulnscope analyze /data/case1 -o /runs/case1
 docker compose run --rm vulnscope explore /data/case1 -o /runs/case1-explorer
 docker compose run --rm vulnscope analyze /opt/vulnscope/samples/gootloader_seo_poisoning -o /runs/demo
 docker compose run --rm vulnscope compare-sample        # seven sample reports + a comparison, on the upload page
+docker compose run --rm vulnscope analyze-sites /data/two_companies   # a report per site of its sites.csv, compared
 docker compose run --rm vulnscope zeek -C -r /data/capture.pcap local     # Zeek by itself
 ```
 

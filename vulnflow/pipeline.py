@@ -13,6 +13,7 @@ from .errors import UserError
 from .ioc_archive import is_archive, match_archive, read_archives
 from .normalize import load
 from .report import write_all
+from .sites import is_sites_file
 
 
 def run(paths: list[str], outdir: str, cfg: Config | None = None,
@@ -84,9 +85,9 @@ NOTES = ("readme.md", "readme.txt")
 
 
 def _not_telemetry(path: str) -> bool:
-    """A folder's README and its saved article overviews are not telemetry."""
+    """A folder's README, its saved article overviews and its sites list (sites.py) are not telemetry."""
     name = os.path.basename(path)
-    return name == PREVIEW_CACHE or name.lower() in NOTES
+    return name == PREVIEW_CACHE or name.lower() in NOTES or is_sites_file(path)
 
 
 def input_files(paths: list[str], outdir: str) -> list[str]:

@@ -1,0 +1,7 @@
+folder,name,network,description
+ridgeline/denver,Ridgeline Denver office,Ridgeline,"Sample: dc01's scan reaches this office over the site VPN. On day 2 the attacker copies a Cobalt Strike beacon to den-fs01, which calls the C2 through the office's own internet line."
+ridgeline/tampa,Ridgeline Tampa office,Ridgeline,Sample: only dc01's scan reaches this office; nothing else from the intrusion.
+corvane/hq,Corvane HQ,Corvane,"Sample: an AI agent (Cairn, CL-STA-1238 in Unit 42's report) maps the public servers, brute-forces the partner portal, pulls user and email lists, and comes back with an API token."
+corvane/phoenix,Corvane Phoenix plant,Corvane,"Sample: the agent logs into the site VPN with a leaked group password, scans the plant network and reads the file server."
+corvane/austin,Corvane Austin design center,Corvane,"Sample: VPN login with the leaked group password, SSH to the build server, source code pulled from GitLab, tools fetched from the staging server. A user also lands on two Gootloader sites (blocked)."
+corvane/dresden,Corvane Dresden service center,Corvane,"Sample: the leaked group password no longer works here; only failed VPN logins. Analyzed with the IOC feed from before Unit 42's report, so only Compare's re-hunt finds the egress address."

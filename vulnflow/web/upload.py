@@ -1,6 +1,7 @@
 """The upload page and the two ways to start an analysis from it: uploading files, or reading a
 folder on this machine in place. Both end in ``_analyze``; a completed report's output folder is
-reopened instead (see saved.py)."""
+reopened instead (see saved.py), and a folder with a sites list is analyzed one report per site,
+then compared (see sites.py)."""
 from __future__ import annotations
 
 import dataclasses
@@ -8,9 +9,10 @@ import html
 import os
 import re
 import shutil
+import sys
 import traceback
 
-from .. import multipart, resources, runname, saved
+from .. import multipart, resources, runname, saved, sites
 from ..branding import icon_data_uri, product_name
 from ..errors import UserError
 from ..parsers import FORMATS
@@ -58,8 +60,10 @@ folder name plus the date and time.</div></section>
 <label class="check"><input type="checkbox" id="skip2" name="skip_copies" value="1"{skip_copies}> Skip full copies of flows and Zeek events</label>
 <div class="hint">For large inputs: leaves out <code>normalized/flows.csv</code> and the Zeek event files, which are about as large as the input. Reports and the Explorer are the same.</div>
 <div class="btnrow"><button type="submit" id="analyze-folder">Analyze folder</button></div>
+<div id="sites-msg" class="hint" role="status" aria-live="polite"></div>
 <div class="hint">To see a completed report again, choose its output folder (the one with <code>results.json</code>
-and <code>explorer.html</code>): the button changes to Open report, and nothing is reanalyzed.</div>
+and <code>explorer.html</code>): the button changes to Open report, and nothing is reanalyzed. A folder with a sites
+list (<code>{sites_file}</code>) is analyzed one report per site, then compared, so each network's sites stay apart.</div>
 </form>
 <h2>Or upload files</h2>
 <form method="post" action="/analyze" enctype="multipart/form-data" data-busy="Analyzing…" data-busy-hint="{analyze_hint}">
@@ -103,7 +107,7 @@ def page(req, error: str = ""):
         css=CSS, forms_css=asset("forms.css"), html_open=HTML_OPEN, theme_init=THEME_INIT, theme_ui=theme_control(),
         product_name=html.escape(product_name()), icon=icon_data_uri(), error=error_html(error),
         formats=", ".join(FORMATS) + ", pcap/pcapng (converted with Zeek)", csrf=app.csrf,
-        analyze_hint=html.escape(ANALYZE_HINT),
+        analyze_hint=html.escape(ANALYZE_HINT), sites_file=sites.FILENAME,
         path=html.escape(app.last_path),
         report_name=html.escape(app.last_report.get("name", "")),
         report_network=html.escape(app.last_report.get("network", "")),
@@ -214,6 +218,8 @@ def analyze_folder(req):
         return _open_report(req, folder)
     if resources.busy():
         return page(req, BUSY_MESSAGE)
+    if sites.find(folder):
+        return _analyze_sites(req, folder, form)
     data_dir = os.path.realpath(app.data_dir) + os.sep
     files = [f for f in input_files([folder], app.data_dir) if not os.path.realpath(f).startswith(data_dir)]
     if not files:
@@ -224,6 +230,23 @@ def analyze_folder(req):
         fh.write(f"Read in place from {folder}\n" + "\n".join(files) + "\n")
     return _analyze(req, run_id, files, form.get("internal_nets", ""), report,
                     form.get("skip_copies") == "1")
+
+
+def _analyze_sites(req, folder: str, form: dict):
+    """A folder with a sites list: one report per site, named and with its network from the list,
+    then a comparison of them, which opens when it's ready (sites.py)."""
+    app = req.app
+    try:
+        _, cid = sites.analyze(app.data_dir, folder, _config(req, form.get("internal_nets", ""),
+                                                             form.get("skip_copies") == "1"),
+                               log=lambda m: print(m, file=sys.stderr))
+    except UserError as exc:
+        return page(req, str(exc))
+    except Exception:
+        traceback.print_exc()          # the run folders are kept for a look at what went wrong
+        return page(req, "The analysis failed; see the server console for details.")
+    app.last_report = {}
+    req.redirect(f"/compare/{cid}/")
 
 
 def _open_report(req, folder: str):
@@ -247,10 +270,18 @@ def _open_report(req, folder: str):
 
 
 def folder_kind(req):
-    """POST /folder-kind: whether a folder is a completed report's output folder (the page
-    relabels its button)."""
+    """POST /folder-kind: whether a folder is a completed report's output folder, and how many sites
+    its sites list names (the page relabels its button)."""
     body = req.read_json()
     if body is None:
         return req.send_json(403, {"error": "Forbidden"})
     folder = folders.resolve(str(body.get("path") or ""))
-    return req.send_json(200, {"report": bool(folder) and os.path.isdir(folder) and saved.is_report_folder(folder)})
+    found = bool(folder) and os.path.isdir(folder)
+    kind = {"report": found and saved.is_report_folder(folder)}
+    listed = found and not kind["report"] and sites.find(folder)
+    if listed:
+        try:
+            kind["sites"] = len(sites.read(listed))
+        except UserError:
+            kind["sites"] = -1         # Analyze folder shows what's wrong with the list
+    return req.send_json(200, kind)

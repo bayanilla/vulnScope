@@ -106,6 +106,7 @@ failing step's log is one click away under **Details**.
 | `test_branding.py` | Branding page, password lock, logo validation |
 | `test_saved.py`, `test_report_name.py` | Reopening a saved report; report names, networks and timestamped run folders |
 | `test_compare.py` | Compare reports: counts per report and network, the re-hunt over saved data, the all-networks Explorer (islands, shared-item highlights, fair trimming), command line and page, the two-company sample |
+| `test_sites.py` | A folder with a `sites.csv`: reading and checking the list, files shared by every site, a report per site and their comparison from the command line and the upload page |
 | `test_web_errors.py` | Which analysis errors the upload page shows, and which go to the server console |
 | `test_release.py` | The ready-made image's `compose.release.yaml` matches `compose.yaml` apart from the image and project name; default port 8765 on the host; `.env.example` does not pin an image |
 
@@ -115,8 +116,10 @@ failing step's log is one click away under **Details**.
 on-prem + AWS sample, Gootloader (`vulnflow/sample_gootloader.py`), the two-company Compare sample
 (`vulnflow/sample_compare.py`) and the Artex AI and CyberStrike AI samples (`vulnflow/sample_artex.py`,
 `vulnflow/sample_cyberstrike.py`, sharing the writers in `vulnflow/sample_kit.py`; their README files are
-written by hand). `python3 -m vulnflow compare-sample` analyzes the Compare sample's
-seven sites into an upload page's data folder and compares them. All sample data is fabricated. See
+written by hand). The Compare sample has one folder per company and a `sites.csv`, so
+`python3 -m vulnflow analyze-sites samples/compare_two_companies` (or **Analyze folder** on it) makes
+six site reports and compares them; `python3 -m vulnflow compare-sample` analyzes its sites and the
+Gootloader sample, seven in all, into an upload page's data folder and compares them. All sample data is fabricated. See
 [samples/README.md](samples/README.md). Use `samples/` and `example_output/` for interface testing
 only. Tests check that each generated sample matches its checked-in folder byte for byte.
 

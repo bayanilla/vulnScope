@@ -251,6 +251,9 @@ Compare reports reads finished report folders and changes none of them.
   the host count adds the reports' hosts together.
 - **Networks.** A report's network is its Network field (Report details or `--network-name`), else
   its report name, else its folder name. Names that differ only in case or spacing are one network.
+  A folder analyzed with a `sites.csv` gives each site's report the network from the list, or the
+  site's company folder (`corvane` for `corvane/hq`), so the same address at two companies stays two
+  hosts in two reports.
 - **Same analysis.** A report and its reopened copy, or one folder given twice (same analysis time,
   name and counts), count once, with a note.
 - **Looking for IOCs again (re-hunt).** Every IOC any chosen report matched, and every indicator

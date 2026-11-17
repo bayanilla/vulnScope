@@ -35,7 +35,9 @@ timings, volumes, the bursts of machine-paced requests between pauses) is invent
             an agreement template lands on two Gootloader sites, which the firewall blocks.
   Dresden   The group password was changed here: only failed VPN logins, on both days.
 
-Both companies' sensors cover the Gootloader sample's two days. The six new site folders carry one IOC
+Both companies' sensors cover the Gootloader sample's two days. The six new site folders, one folder per
+company (ridgeline/denver, ridgeline/tampa, corvane/hq, corvane/phoenix, corvane/austin, corvane/dresden)
+with a sites list (sites.csv) naming each site's report and company, carry one IOC
 list with both reports' indicators, the way a service provider runs one feed for every client, except
 Dresden's: like the Gootloader sample's own list, it predates Unit 42's report, so only Compare's re-hunt
 finds the egress address there. Internal addresses overlap on purpose: both head offices use
@@ -78,21 +80,21 @@ PREVIEW = {UNIT42_URL: {
 SITES = [
     (goot.FOLDER, "Ridgeline HQ", "Ridgeline",
      "Sample: Ridgeline's head office. The Gootloader intrusion from The DFIR Report, replayed."),
-    ("ridgeline_denver", "Ridgeline Denver office", "Ridgeline",
+    ("ridgeline/denver", "Ridgeline Denver office", "Ridgeline",
      "Sample: dc01's scan reaches this office over the site VPN. On day 2 the attacker copies a Cobalt "
      "Strike beacon to den-fs01, which calls the C2 through the office's own internet line."),
-    ("ridgeline_tampa", "Ridgeline Tampa office", "Ridgeline",
+    ("ridgeline/tampa", "Ridgeline Tampa office", "Ridgeline",
      "Sample: only dc01's scan reaches this office; nothing else from the intrusion."),
-    ("corvane_hq", "Corvane HQ", "Corvane",
+    ("corvane/hq", "Corvane HQ", "Corvane",
      "Sample: an AI agent (Cairn, CL-STA-1238 in Unit 42's report) maps the public servers, brute-forces "
      "the partner portal, pulls user and email lists, and comes back with an API token."),
-    ("corvane_phoenix", "Corvane Phoenix plant", "Corvane",
+    ("corvane/phoenix", "Corvane Phoenix plant", "Corvane",
      "Sample: the agent logs into the site VPN with a leaked group password, scans the plant network and "
      "reads the file server."),
-    ("corvane_austin", "Corvane Austin design center", "Corvane",
+    ("corvane/austin", "Corvane Austin design center", "Corvane",
      "Sample: VPN login with the leaked group password, SSH to the build server, source code pulled from "
      "GitLab, tools fetched from the staging server. A user also lands on two Gootloader sites (blocked)."),
-    ("corvane_dresden", "Corvane Dresden service center", "Corvane",
+    ("corvane/dresden", "Corvane Dresden service center", "Corvane",
      "Sample: the leaked group password no longer works here; only failed VPN logins. Analyzed with the IOC "
      "feed from before Unit 42's report, so only Compare's re-hunt finds the egress address."),
 ]
@@ -340,9 +342,9 @@ def _sweep(s, start, servers, workstations, printers):
 
 
 def _ridgeline():
-    den, d_srv, d_ws, d_prn = _branch("ridgeline_denver", "10.21", "den", "2101", (14, 24), "D", 40,
+    den, d_srv, d_ws, d_prn = _branch("ridgeline/denver", "10.21", "den", "2101", (14, 24), "D", 40,
                                       "Monthly scan - Denver office")
-    tpa, t_srv, t_ws, t_prn = _branch("ridgeline_tampa", "10.22", "tpa", "2102", (12, 22), "T", 30,
+    tpa, t_srv, t_ws, t_prn = _branch("ridgeline/tampa", "10.22", "tpa", "2102", (12, 22), "T", 30,
                                       "Monthly scan - Tampa office")
     hq_sweep = len(goot.HOSTS) - 1                         # hosts the sweep covers at the head office first
     after = _sweep(den, SWEEP + timedelta(seconds=hq_sweep * 1.3 + 2), d_srv, d_ws, d_prn)
@@ -438,7 +440,7 @@ def _windows_ports(servers, workstations, extra=None):
 
 
 def _corvane_hq():
-    s = Site("corvane_hq", CORVANE, "10.20.0.53", "016401002210", 4201, (15, 1), "H", "Quarterly scan - HQ")
+    s = Site("corvane/hq", CORVANE, "10.20.0.53", "016401002210", 4201, (15, 1), "H", "Quarterly scan - HQ")
     rng = s.rng
     www = s.host("172.16.10.10", "www01", UBUNTU)
     portal = s.host("172.16.10.20", "partners01", UBUNTU)        # the partner-integration application
@@ -566,7 +568,7 @@ def _corvane_site(folder, net, prefix, seed, hours, uid, scan_name, ws_count, se
 
 def _corvane_phoenix():
     s, vpn, srv, ws, printers = _corvane_site(
-        "corvane_phoenix", "10.31", "phx", "4231", (15, 1), "P", "Quarterly scan - Phoenix plant", 40,
+        "corvane/phoenix", "10.31", "phx", "4231", (15, 1), "P", "Quarterly scan - Phoenix plant", 40,
         [("phx-dc03", 10, WS2019), ("phx-fs01", 20, WS2016), ("phx-mes01", 30, WS2019), ("phx-hist01", 31, WS2019)])
     rng = s.rng
     dc, fs, mes, hist = srv["phx-dc03"], srv["phx-fs01"], srv["phx-mes01"], srv["phx-hist01"]
@@ -623,7 +625,7 @@ def _corvane_phoenix():
 
 def _corvane_austin():
     s, vpn, srv, ws, printers = _corvane_site(
-        "corvane_austin", "10.32", "aus", "4232", (13, 23), "A", "Quarterly scan - Austin design center", 30,
+        "corvane/austin", "10.32", "aus", "4232", (13, 23), "A", "Quarterly scan - Austin design center", 30,
         [("aus-fs01", 20, WS2019), ("git01", 25, UBUNTU), ("build01", 26, "Ubuntu 20.04"), ("lic01", 27, UBUNTU)])
     rng = s.rng
     fs, git, build, lic = srv["aus-fs01"], srv["git01"], srv["build01"], srv["lic01"]
@@ -705,7 +707,7 @@ def _gootloader_blocked(s, ws):
 
 def _corvane_dresden():
     s, vpn, srv, ws, printers = _corvane_site(
-        "corvane_dresden", "10.33", "dre", "4233", (7, 17), "R", "Quarterly scan - Dresden service center", 18,
+        "corvane/dresden", "10.33", "dre", "4233", (7, 17), "R", "Quarterly scan - Dresden service center", 18,
         [("dre-fs01", 20, WS2019)])
     rng = s.rng
     fs = srv["dre-fs01"]
@@ -807,7 +809,7 @@ def _write(s: Site, outdir: str, iocs: list[list]) -> list[str]:
                         r["dp"], r["proto"], r["action"], r["sent"] + r["rcvd"], r["sent"], r["rcvd"], ts, "", ""])
     paths.append(p)
 
-    p = os.path.join(outdir, f"{s.folder.split('_', 1)[1]}_scan.nessus")
+    p = os.path.join(outdir, f"{s.folder.rsplit('/', 1)[-1]}_scan.nessus")
     _nessus(s, p)
     paths.append(p)
 
@@ -869,14 +871,22 @@ def _nessus(s: Site, path: str):
 
 
 def generate(outdir: str) -> list[str]:
-    """Write the six new site folders (Ridgeline's head office is the Gootloader sample)."""
+    """Write the six new site folders, grouped by company (corvane/hq, ..., ridgeline/denver, ...;
+    Ridgeline's head office is the Gootloader sample), and their sites list, so Analyze folder on the
+    whole folder makes a report per site and compares them: one cluster per company."""
     paths = []
     for s in _ridgeline() + [_corvane_hq(), _corvane_phoenix(), _corvane_austin(), _corvane_dresden()]:
         for r in s.conn + s.pan:              # every generated address must be a real address
             ipaddress.ip_address(r["s"]), ipaddress.ip_address(r["d"])
         # Dresden's folder keeps the feed from before Unit 42 published: only Compare's re-hunt finds the egress node
-        paths += _write(s, os.path.join(outdir, s.folder), goot.ioc_rows() if s.folder == "corvane_dresden" else ioc_rows())
-    return paths
+        paths += _write(s, os.path.join(outdir, *s.folder.split("/")),
+                        goot.ioc_rows() if s.folder == "corvane/dresden" else ioc_rows())
+    path = os.path.join(outdir, "sites.csv")
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(["folder", "name", "network", "description"])
+        w.writerows(site for site in SITES if site[0] != goot.FOLDER)
+    return paths + [path]
 
 
 # -- loading the sites into the upload page --------------------------------------------------------
@@ -897,7 +907,7 @@ def load(data_dir: str, again: bool = False, log=print) -> tuple[list[str], str 
         goot.generate(os.path.join(tmp, goot.FOLDER))
         generate(os.path.join(tmp, FOLDER))
         for folder, name, network, description in SITES:
-            src = os.path.join(tmp, folder if folder == goot.FOLDER else os.path.join(FOLDER, folder))
+            src = os.path.join(tmp, folder if folder == goot.FOLDER else os.path.join(FOLDER, *folder.split("/")))
             run_id = runname.new_run(data_dir, name)
             root = os.path.join(data_dir, run_id)
             shutil.copytree(src, os.path.join(root, "in"))          # like an upload: the inputs stay with the run
