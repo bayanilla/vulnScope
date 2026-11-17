@@ -3,17 +3,9 @@
     "title": "SEO Poisoning to Domain Control: The Gootloader Saga Continues",
     "overview": "The DFIR Report follows an intrusion that began when a user downloaded a poisoned search result: Gootloader JavaScript fetched a Cobalt Strike payload about nine hours later, and the attacker moved over SMB, WinRM and RDP, used SystemBC as a SOCKS5 tunnel and reached the domain controllers, file shares and backup server."
   },
-  "https://brandefense.io/security-news/cyberstrikeai-attacks-explained/": {
-    "title": "CyberStrikeAI attacks explained",
-    "overview": "Brandefense explains how the open-source CyberStrikeAI platform, which chains 100+ security tools under an LLM agent, was tied to AI-assisted attacks on FortiGate appliances."
-  },
-  "https://aws.amazon.com/blogs/security/ai-augmented-threat-actor-accesses-fortigate-devices-at-scale/": {
-    "title": "AI-augmented threat actor accesses FortiGate devices at scale",
-    "overview": "Amazon Threat Intelligence reports 600+ FortiGate devices in 55 countries reached through exposed management ports (443, 8443, 10443, 4443) and weak or stolen credentials, followed by gogo, Nuclei, DCSync, pass-the-hash and attacks on Veeam (CVE-2023-27532, CVE-2024-40711)."
-  },
-  "https://www.team-cymru.com/post/tracking-cyberstrikeai-usage": {
-    "title": "Tracking CyberStrikeAI usage",
-    "overview": "Team Cymru tied the FortiGate campaign address 212.11.64.250 to a 'CyberStrikeAI' banner on port 8080 and tracked 21 CyberStrikeAI server addresses between January and February 2026."
+  "https://github.com/PaloAltoNetworks/Unit42-timely-threat-intel/blob/main/2026-10-30-activity-using-ARTEX-agentic-AI.txt": {
+    "title": "ARTEX Agentic AI Framework Used to Abuse Exposed APIs and Probe Identity Providers",
+    "overview": "Unit 42 describes intrusion attempts from 24 September to 27 October 2026 that it assesses used ARTEX, an openly published multi-agent AI penetration-testing framework, or a derivative: application mapping from JavaScript source maps, runtime configuration and OpenAPI specifications; identity-provider probing (login baselining with made-up users, OAuth redirect-URI abuse, password spraying, account-recovery abuse); then a fall-back to exposed APIs, where self-registered accounts read data and approved changes and a development API accepted unauthenticated writes. Requests came in bursts of 1-14 about a second apart with 25-31 second pauses. Not all ARTEX activity is malicious, so the addresses are indicators rather than block-list entries."
   },
   "https://unit42.paloaltonetworks.com/cairn-framework-ai-autonomous-attacks/": {
     "title": "Attackers Use Autonomous AI to Target Semiconductor, Defense and Civil Society Sectors",

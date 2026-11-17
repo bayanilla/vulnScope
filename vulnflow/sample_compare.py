@@ -9,7 +9,7 @@ describes one site.
            On day 2 the attacker, working from dc01, opens RDP to den-fs01, copies the same Cobalt
            Strike beacon dc01 received over SMB, and den-fs01 calls the report's published C2 through
            the office's own internet line until the activity stops. The file share is then browsed.
-  Tampa    Only the sweep from that intrusion (the FortiGate campaign below breaks in later).
+  Tampa    Only the sweep from that intrusion.
 
 Corvane ("corvane.example"), a fictional semiconductor equipment supplier, follows the campaign in
 Unit 42's "Attackers Use Autonomous AI to Target Semiconductor, Defense and Civil Society Sectors"
@@ -35,27 +35,58 @@ timings, volumes, the bursts of machine-paced requests between pauses) is invent
             an agreement template lands on two Gootloader sites, which the firewall blocks.
   Dresden   The group password was changed here: only failed VPN logins, on both days.
 
-Both companies are also caught by a third, unrelated campaign: the AI-assisted FortiGate campaign of the
-CyberStrike AI sample (sample_cyberstrike), whose four addresses Amazon Threat Intelligence and Team
-Cymru publish. It sweeps the internet, so the same addresses reach sites of both companies. Ridgeline's
-offices give staff remote access through a FortiGate SSL-VPN in the office DMZ, behind the Palo Alto.
-What each address does, and when, is invented (27 Oct, UTC):
+Both companies also meet ARTEX, the openly published multi-agent AI penetration-testing framework in
+Unit 42's timely threat intel note of 2026-10-30, "ARTEX Agentic AI Framework Used to Abuse Exposed APIs
+and Probe Identity Providers" (activity 24 September to 27 October). Each intrusion there followed one
+playbook: map the application from its JavaScript source maps, runtime configuration and OpenAPI
+documents, probe the identity provider, then fall back to exposed APIs. A planner model picks each step,
+so requests come in bursts of 1-14, about a second apart, with 25-31 s pauses while it waits on the
+model. The note publishes four addresses: 31.40.205.155 (the primary source; it answers with an HTTP
+Basic realm named ARTEX and runs a Sub2API LLM gateway), 173.254.220.78 (the same Sub2API gateway, seen
+at another organization), and, monitor only, 103.100.158.103 (same user agents and OAuth client IDs as
+the primary, starting 18 minutes after it) and 152.233.51.12 (probing and unauthenticated API writes);
+and two domains of a related LLM gateway, lanmao666.com and .xyz, that nobody here contacts. Unit 42's
+article on ARTEX (2026-11-11) adds that within one hour the targets included more than a dozen VPN
+appliances. Here the addresses play those parts; which site sees what, the times and the volumes are
+invented.
+Corvane HQ's Palo Alto decrypts traffic to the public servers and has custom signatures for the note's
+detection opportunities. Ridgeline's offices give staff remote access through a FortiGate SSL-VPN in the
+office DMZ, behind the Palo Alto; their sensors see it only as TLS, so Suricata counts the logins and a
+local Zeek script flags the think-then-act cadence. 27 Oct, UTC:
 
-  12:40  Two CyberStrikeAI servers try the FortiGate ports (443, 8443, 10443, 4443) on every site's
-         internet-facing addresses, two seconds apart: Ridgeline's FortiGates, Corvane's public servers
-         and VPN gateways. Only the FortiGates answer like FortiGates.
-  13:30  212.11.64.250 runs Nuclei's web templates against Corvane's website; nothing it tries works.
-  14:20  212.11.64.250 tries SSL-VPN logins on both FortiGates: three 5-minute bursts, one login every
-         1.5 s, no jitter. Denver asks for a second factor; Tampa's SSL-VPN takes a password alone.
-  18:52  Tampa: 185.196.11.225 logs in with a password the bursts found, scans the office from the VPN
-         pool and copies files from tpa-fs01 for two and a half hours, all through the tunnel.
+  12:40  31.40.205.155 runs ffuf against Corvane's supplier portal (supply01, about 1,400 requests),
+         then maps it: a path that cannot exist, bundle.js and its source map, runtime and app config,
+         the password policy, /openapi.json, /docs and /redoc, then the routes the source map names.
+  12:58  103.100.158.103 scans every site's public addresses within the hour, both companies' VPN
+         gateways included, and runs content discovery on whatever answers. At HQ it also sends OAuth
+         requests with unregistered redirect URIs for 40 client IDs to the sign-in service (id01).
+  13:15  31.40.205.155 on id01: a made-up user (zz_no_such_user_9f3a), "admin" a second later, the same
+         client IDs, a password spray, then password-reset requests and the OTP and MFA endpoints.
+         No account falls.
+  13:46  Two minutes after its last failed sign-in it turns to the supplier portal's API: it registers
+         nine supplier accounts in 40 minutes, reads about 50 MB of users, roles, approvals, terms,
+         taxonomy and contacts, tries IDs 999999995, 999999 and 0, then approves its own accounts and
+         edits user records, reading each change back a second or two later.
+  14:10  152.233.51.12 finds the development API published by mistake (api-dev01): the OpenAPI document,
+         three collections created, every write route tried within three seconds (422 and 500), the
+         document fetched twice more, and 38 s later 8 update-documents and 3 batch-update-documents
+         writes succeed, each read back within two seconds; two short runs of 403s don't stop it.
+         At 15:20 three other addresses replay the sequence, about 30 s apart, and get nowhere.
+  14:20  31.40.205.155 on the SSL-VPN logins at Denver and Tampa: a made-up user, "admin", then a spray
+         at the same pace. Nothing works (Denver asks for a second factor; Tampa's takes a password
+         alone, but none matches). Two minutes after the last try, 152.233.51.12 turns to the
+         FortiGates' REST API on the admin port: 36 rejections on one route, then a trailing slash,
+         the unversioned path, /api/v2/ and a shorter path. Nothing.
+  15:30  173.254.220.78 reads the FortiGates' portal configuration, then makes hundreds of tries at
+         internal applications' ports on the offices' addresses (Jira, Confluence, RabbitMQ,
+         Kubernetes, MinIO); the firewalls drop them all.
 
 Both companies' sensors cover the Gootloader sample's two days. The six new site folders, one folder per
 company (ridgeline/denver, ridgeline/tampa, corvane/hq, corvane/phoenix, corvane/austin, corvane/dresden)
 with a sites list (sites.csv) naming each site's report and company, carry one IOC
-list with all three campaigns' indicators, the way a service provider runs one feed for every client,
-except Dresden's: it predates Unit 42's report, so only Compare's re-hunt finds the Cairn egress address
-there. Internal addresses overlap on purpose: both head offices use 10.20.0.0/24 for servers.
+list with all three reports' indicators, the way a service provider runs one feed for every client,
+except Dresden's: it predates Unit 42's Cairn report, so only Compare's re-hunt finds the Cairn egress
+address there. Internal addresses overlap on purpose: both head offices use 10.20.0.0/24 for servers.
 """
 from __future__ import annotations
 
@@ -69,7 +100,6 @@ import tempfile
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 
-from . import sample_cyberstrike as cs
 from . import sample_gootloader as goot
 
 FOLDER = "compare_two_companies"
@@ -84,14 +114,54 @@ WIN11, WIN10 = "Microsoft Windows 11 Enterprise", "Microsoft Windows 10 Enterpri
 WS2016, WS2019, WS2022 = (f"Microsoft Windows Server {v} Standard" for v in (2016, 2019, 2022))
 UBUNTU, ASA = "Ubuntu 22.04", "Cisco Adaptive Security Appliance"
 FORTIOS = "Fortinet FortiOS 7.2.6"
-# the CyberStrike AI FortiGate campaign on day 2 (UTC)
-CS_FP = datetime(2026, 10, 27, 12, 40, tzinfo=timezone.utc)      # its two scanners try every site
-CS_WEB = datetime(2026, 10, 27, 13, 30, tzinfo=timezone.utc)     # Nuclei against Corvane's website
-CS_BRUTE = datetime(2026, 10, 27, 14, 20, tzinfo=timezone.utc)   # SSL-VPN login bursts at Ridgeline's FortiGates
-CS_LOGIN = datetime(2026, 10, 27, 18, 52, tzinfo=timezone.utc)   # the password found in Tampa is used
 SSLVPN_POOL = "10.212.134"                                       # FortiGate's default SSL-VPN tunnel range
-CS_PREVIEW = {url: {"title": title, "overview": text}
-              for key, (url, title, text) in cs.SOURCES.items() if key in ("amazon", "cymru", "brandefense")}
+# ARTEX, after Unit 42's timely threat intel note of 2026-10-30; the four addresses are the note's
+AX_URL = ("https://github.com/PaloAltoNetworks/Unit42-timely-threat-intel/blob/main/"
+          "2026-10-30-activity-using-ARTEX-agentic-AI.txt")
+AX_PRIMARY = "31.40.205.155"      # Basic realm "ARTEX" and a Sub2API gateway; self-registration, API data, IdP probing
+AX_SUB2API = "173.254.220.78"     # the same Sub2API gateway; recon, configuration harvesting, denied requests
+AX_SCANNER = "103.100.158.103"    # monitor only: the primary's user agents and client IDs; scanning, OAuth probing
+AX_WRITER = "152.233.51.12"       # monitor only: probing and the unauthenticated API writes
+AX_DOMAINS = ("lanmao666.com", "lanmao666.xyz")      # a related AI/LLM gateway; nobody here contacts it
+AX_REPLAY = ("198.51.100.61", "198.51.100.62", "198.51.100.63")   # fictional: three more sources replay the writes
+# 27 Oct (UTC)
+AX_START = datetime(2026, 10, 27, 12, 40, tzinfo=timezone.utc)    # the primary starts on Corvane's supplier portal
+AX_SCAN = AX_START + timedelta(minutes=18)                         # the scanner starts 18 minutes later, as in the note
+AX_IDP = AX_START + timedelta(minutes=35)                          # the primary turns to Corvane's sign-in service
+AX_DEV = datetime(2026, 10, 27, 14, 10, tzinfo=timezone.utc)       # 152.233.51.12 on the development API
+AX_REPLAYED = datetime(2026, 10, 27, 15, 20, tzinfo=timezone.utc)  # three other sources replay it
+AX_VPN = datetime(2026, 10, 27, 14, 20, tzinfo=timezone.utc)       # the SSL-VPN logins at Ridgeline's offices
+AX_SUB = datetime(2026, 10, 27, 15, 30, tzinfo=timezone.utc)       # 173.254.220.78 at Ridgeline's offices
+AX_PORTS = (22, 80, 443, 4443, 8080, 8443, 9443, 10443)           # what the scanner tries on public addresses
+AX_APP_PORTS = (8080, 8090, 15672, 6443, 9000, 5601, 3000, 9200)  # Jira, Confluence, RabbitMQ, Kubernetes, MinIO, ...
+# Corvane HQ's Palo Alto decrypts traffic to the public servers; custom signatures written from the
+# note's detection opportunities, as the threat log names them
+AX_PAN = {
+    "ffuf": ("Custom: ffuf User-Agent (Fuzz Faster U Fool)", "medium"),
+    "ua": ("Custom: Self-Describing Scanner User-Agent (security-testing; authorized)", "medium"),
+    "spec": ("Custom: Source Map or OpenAPI Fetch Then Non-Public API Route", "medium"),
+    "oauth": ("Custom: OAuth illegal_redirect_uri_enhanced Across Many Client IDs", "medium"),
+    "canary": ("Custom: Canary Login (zz_no_such_user) Then admin Within Seconds", "high"),
+    "brute": ("HTTP: User Authentication Brute-force Attempt", "high"),
+    "bulk": ("Custom: Self-Registered Account Calls Bulk Approval and User Admin API", "high"),
+    "readback": ("Custom: Write Then GET Read-Back Within 2 s", "medium"),
+}
+# Ridgeline's offices see their FortiGates only as TLS: Suricata counts the logins (the sid is a local
+# placeholder) and a local Zeek script flags the think-then-act cadence
+AX_SPRAY_SIG = ("ET SCAN Sustained TLS Logins to SSL-VPN Portal From Single Source (Possible Password Spray)",
+                9200101, "Attempted User Privilege Gain", 2)
+AX_NOTE = "Agentic::Think_Then_Act"
+AX_PREVIEW = {AX_URL: {
+    "title": "ARTEX Agentic AI Framework Used to Abuse Exposed APIs and Probe Identity Providers",
+    "overview": "Unit 42 describes intrusion attempts from 24 September to 27 October 2026 that it assesses used "
+                "ARTEX, an openly published multi-agent AI penetration-testing framework, or a derivative: "
+                "application mapping from JavaScript source maps, runtime configuration and OpenAPI "
+                "specifications; identity-provider probing (login baselining with made-up users, OAuth "
+                "redirect-URI abuse, password spraying, account-recovery abuse); then a fall-back to exposed "
+                "APIs, where self-registered accounts read data and approved changes and a development API "
+                "accepted unauthenticated writes. Requests came in bursts of 1-14 about a second apart with "
+                "25-31 second pauses. Not all ARTEX activity is malicious, so the addresses are indicators "
+                "rather than block-list entries."}}
 PREVIEW = {UNIT42_URL: {
     "title": "Attackers Use Autonomous AI to Target Semiconductor, Defense and Civil Society Sectors",
     "overview": "Unit 42 describes CL-STA-1238, assessed with moderate confidence as China-nexus, running a "
@@ -106,27 +176,29 @@ SITES = [
      "Sample: Ridgeline's head office. The Gootloader intrusion from The DFIR Report, replayed."),
     ("ridgeline/denver", "Ridgeline Denver office", "Ridgeline",
      "Sample: dc01's scan reaches this office over the site VPN. On day 2 the attacker copies a Cobalt "
-     "Strike beacon to den-fs01, which calls the C2 through the office's own internet line. Later the "
-     "CyberStrike AI FortiGate campaign tries passwords on the office's SSL-VPN; the second factor stops it."),
+     "Strike beacon to den-fs01, which calls the C2 through the office's own internet line. Later ARTEX "
+     "(Unit 42's October note) works on the office's FortiGate: a scan, a password spray at an AI agent's "
+     "pace, its REST API, hundreds of dropped tries at app ports. The second factor holds; nothing gets in."),
     ("ridgeline/tampa", "Ridgeline Tampa office", "Ridgeline",
-     "Sample: only dc01's scan reaches this office from the Gootloader intrusion. On day 2 the CyberStrike AI "
-     "FortiGate campaign tries passwords on the office's SSL-VPN, logs in with one that works, scans the "
-     "office and copies files from tpa-fs01."),
+     "Sample: only dc01's scan reaches this office from the Gootloader intrusion. On day 2 ARTEX (Unit 42's "
+     "October note) works on the office's FortiGate as in Denver: a scan, a password spray at an AI agent's "
+     "pace, its REST API, hundreds of dropped tries. This SSL-VPN takes a password alone, but none matches."),
     ("corvane/hq", "Corvane HQ", "Corvane",
      "Sample: an AI agent (Cairn, CL-STA-1238 in Unit 42's report) maps the public servers, brute-forces "
-     "the partner portal, pulls user and email lists, and comes back with an API token. The CyberStrike AI "
-     "campaign's scanners probe the public servers too."),
+     "the partner portal, pulls user and email lists, and comes back with an API token. On day 2 ARTEX "
+     "(Unit 42's October note) maps the supplier portal, probes the sign-in service, registers accounts that "
+     "read 50 MB and approve themselves, and writes to a development API."),
     ("corvane/phoenix", "Corvane Phoenix plant", "Corvane",
      "Sample: the agent logs into the site VPN with a leaked group password, scans the plant network and "
-     "reads the file server. The CyberStrike AI campaign's scanners probe the VPN gateway."),
+     "reads the file server. The ARTEX scanner (Unit 42's October note) probes the VPN gateway."),
     ("corvane/austin", "Corvane Austin design center", "Corvane",
      "Sample: VPN login with the leaked group password, SSH to the build server, source code pulled from "
      "GitLab, tools fetched from the staging server. A user also lands on two Gootloader sites (blocked), "
-     "and the CyberStrike AI campaign's scanners probe the VPN gateway."),
+     "and the ARTEX scanner (Unit 42's October note) probes the VPN gateway."),
     ("corvane/dresden", "Corvane Dresden service center", "Corvane",
      "Sample: the leaked group password no longer works here; only failed VPN logins. Analyzed with the IOC "
-     "feed from before Unit 42's report, so only Compare's re-hunt finds the egress address. The CyberStrike "
-     "AI campaign's scanners probe the VPN gateway."),
+     "feed from before Unit 42's Cairn report, so only Compare's re-hunt finds the egress address. The ARTEX "
+     "scanner (Unit 42's October note) probes the VPN gateway."),
 ]
 # (pluginID, name, severity, cvss3, cves, exploit, metasploit, synopsis, solution) by short name
 V = {
@@ -190,6 +262,22 @@ V = {
     "fortiadmin": ("910202", "FortiOS Administrative Interface Reachable From Untrusted Network", 3, 7.3, [], False,
                    False, "The FortiGate administrative GUI answers on its internet-facing interface.",
                    "Restrict administrative access to a management network and trusted hosts."),
+    # Corvane's public web apps; the first three as the Artex AI sample has them, so Compare matches them
+    "srcmap": ("900102", "JavaScript Source Maps Publicly Accessible", 2, 5.3, [], False, False,
+               "Production JavaScript source maps reveal internal API routes.", "Do not publish source maps."),
+    "openapi": ("900103", "OpenAPI / Swagger Documentation Exposed Without Authentication", 2, 5.3, [], False, False,
+                "The API publishes its full OpenAPI document to anonymous users.",
+                "Require authentication for API documentation."),
+    "ratelimit": ("900104", "Web Login Endpoint Lacks Rate Limiting and Account Lockout", 3, 7.5, [], False, False,
+                  "The sign-in service accepts unlimited attempts from one address.",
+                  "Add rate limiting, lockout and phishing-resistant MFA."),
+    "selfreg": ("910301", "Self-Registered Accounts Reach Approval and User Administration API Routes", 3, 8.1, [],
+                False, False, "Accounts created through public self-registration are accepted by the portal's "
+                "approval and user-administration API routes.",
+                "Give a self-registered account no role until someone approves it, and check roles on every route."),
+    "devwrite": ("910302", "Development API Accepts Unauthenticated Write Requests", 4, 9.1, [], False, False,
+                 "The development API's document store accepts create, update and batch-update requests without "
+                 "authentication.", "Put development APIs behind authentication, or keep them off the internet."),
 }
 # Corvane's head office, as the remote sites see it over the site-to-site VPN
 C_DC1, C_DC2, C_FS, C_SQL, C_ERP = "10.20.0.10", "10.20.0.11", "10.20.0.20", "10.20.0.40", "10.20.0.41"
@@ -213,6 +301,7 @@ class Site:
         self.hosts: dict[str, tuple[str, str]] = {}      # ip -> (fqdn, os); everything here is scanned
         self.vulns: list[tuple] = []
         self.conn, self.pan, self.threats, self.dns, self.http, self.ssl, self.files, self.eve = ([] for _ in range(8))
+        self.notes: list[dict] = []
         self.uid = 0
 
     def host(self, ip, name, os_name):
@@ -265,6 +354,10 @@ class Site:
 
     def ids(self, ts, s, d, dp, sig, sid, category, sev=2, app="smb"):
         self.eve.append(dict(ts=ts, s=s, d=d, dp=dp, sig=sig, sid=sid, cat=category, sev=sev, app=app))
+
+    def note(self, ts, s, d, dp, note, msg):
+        """A Zeek notice from a local detection script."""
+        self.notes.append(dict(ts=ts, uid=self._uid(), s=s, d=d, dp=dp, note=note, msg=msg))
 
 
 def _bursts(rng, start, count, size=(8, 30), gap=(0.15, 0.6), pause=(20, 90)):
@@ -389,15 +482,15 @@ def _ridgeline():
     after = _sweep(den, SWEEP + timedelta(seconds=hq_sweep * 1.3 + 2), d_srv, d_ws, d_prn)
     _sweep(tpa, after + timedelta(seconds=2), t_srv, t_ws, t_prn)
     _denver_beacon(den, d_srv[-1])
-    # the FortiGate campaign: Denver's SSL-VPN asks for a second factor, Tampa's takes a password alone
-    vpns = {}
-    for s, net, prefix, fs, users, delay, mfa in ((den, "10.21", "den", d_srv[-1], 3, 0, True),
-                                                  (tpa, "10.22", "tpa", t_srv[-1], 2, 3, False)):
-        vpns[prefix] = vpn = _fortigate(s, net, prefix, mfa)
+    # staff remote access: Denver's SSL-VPN asks for a second factor, Tampa's takes a password alone.
+    # Then ARTEX: the scanner, the login spray and the REST API, and 173.254.220.78's dropped tries
+    for s, net, prefix, fs, users, k, mfa, tries in ((den, "10.21", "den", d_srv[-1], 3, 0, True, 340),
+                                                     (tpa, "10.22", "tpa", t_srv[-1], 2, 1, False, 380)):
+        vpn = _fortigate(s, net, prefix, mfa)
         _sslvpn_users(s, vpn, [(fs, 445, "smb"), (goot.APP, 443, "ssl"), (goot.DC1, 389, "ldap")], users)
-        _cs_fingerprint(s, {vpn: {443, 8443, 10443}}, CS_FP + timedelta(minutes=delay), "allow-vpn-gateway")
-        _cs_brute(s, vpn, CS_BRUTE + timedelta(minutes=2 * delay))
-    _cs_tampa(tpa, vpns["tpa"], t_srv, t_ws, t_prn)
+        _ax_scan(s, AX_SCAN + timedelta(minutes=8 + 7 * k), {vpn: {443, 8443, 10443}}, "allow-vpn-gateway")
+        _ax_vpn(s, vpn, AX_VPN + timedelta(minutes=4 * k))
+        _ax_sub2api(s, vpn, AX_SUB + timedelta(minutes=8 * k), tries)
     return [den, tpa]
 
 
@@ -428,7 +521,7 @@ def _denver_beacon(s, fs):
         t += timedelta(minutes=rng.uniform(22, 35))
 
 
-# -- the CyberStrike AI FortiGate campaign, at both companies --------------------------------------
+# -- Ridgeline's FortiGates -----------------------------------------------------------------------
 
 def _fortigate(s, net, prefix, mfa):
     """A Ridgeline office's FortiGate for staff remote access, in the DMZ behind the Palo Alto:
@@ -461,77 +554,254 @@ def _sslvpn_users(s, vpn, targets, users):
                           fz="vpn", tz="trust", rule="ra-vpn-users", rb=rng.randint(10_000, 3_000_000))
 
 
-def _cs_fingerprint(s, answers, start, rule):
-    """The campaign's two CyberStrikeAI servers try the FortiGate ports on the site's internet-facing
-    addresses, one every 2 s. ``answers`` maps each address to the ports that answer; the firewall
-    drops the rest. Suricata (Ridgeline's offices) recognizes the FortiOS fingerprinting."""
+# -- ARTEX at both companies (Unit 42's note of 2026-10-30) ---------------------------------------
+
+def _cadence(rng, start, count):
+    """The note's think-then-act cadence: bursts of 1-14 requests about a second apart, separated by
+    25-31 s pauses while the planner waits on its model."""
+    return _bursts(rng, start, count, size=(1, 14), gap=(0.8, 1.25), pause=(25, 31))
+
+
+def _burst_count(times):
+    """How many bursts a run of request times makes (a gap over 10 s starts a new one)."""
+    return 1 + sum((b - a).total_seconds() > 10 for a, b in zip(times, times[1:]))
+
+
+def _ax_req(s, ts, src, d, port, rule, ob=None, rb=None, dur=None, sni=None, fz="untrust", tz="dmz"):
+    """One request from the agent's tools: a short TLS session of its own through the firewall.
+    With ``sni`` (the empty string for an address), the handshake also goes to ssl.log."""
     rng = s.rng
-    for src, offset in ((cs.FP_A, 0), (cs.FP_B, 31)):
-        ts = start + timedelta(minutes=offset)
-        for d, open_ports in answers.items():
-            for port in (443, 8443, 10443, 4443) * 2:
-                if port in open_ports:
-                    uid, sp = s.session(ts, src, d, port, svc="ssl", app="ssl", fz="untrust", tz="dmz",
-                                        ob=rng.randint(500, 900), rb=rng.randint(1_500, 6_000), dur=0.3, rule=rule)
-                else:
-                    s.session(ts, src, d, port, app="incomplete", fz="untrust", tz="dmz", action="deny",
-                              rule="default-deny")
-                ts += timedelta(seconds=2)
-            if 10443 in open_ports:
-                s.ids(ts - timedelta(seconds=12), src, d, 10443, *cs.SIG["fp"], app="tls")
-                s.ids(ts - timedelta(seconds=10), src, d, 8443, *cs.SIG["mgmt"], app="tls")
+    uid, sp = s.session(ts, src, d, port, svc="ssl", app="ssl", fz=fz, tz=tz,
+                        ob=rng.randint(400, 1_400) if ob is None else ob,
+                        rb=rng.randint(300, 2_500) if rb is None else rb,
+                        dur=rng.uniform(0.05, 0.6) if dur is None else dur, rule=rule)
+    if sni is not None:
+        s.ssl.append(dict(ts=ts, uid=uid, s=src, sp=sp, d=d, dp=port, sni=sni, ja3="", ja3s=""))
 
 
-def _cs_web(s, www, sni):
-    """212.11.64.250 runs Nuclei's web templates against a public website: bursts of short requests.
-    Nothing it tries works."""
+def _ax_pan(s, ts, src, d, key):
+    """A threat-log line from one of Corvane HQ's custom signatures (traffic to the public servers is
+    decrypted there)."""
+    name, sev = AX_PAN[key]
+    s.threat(ts, src, d, 443, name, sev, kind="vulnerability", app="ssl", fz="untrust", tz="dmz")
+
+
+def _ax_scan(s, start, answers, rule, names=None):
+    """103.100.158.103 scans a site's public addresses at nmap pace, then, after a pause, runs content
+    discovery (ffuf: a few keep-alive sessions of hundreds of requests) on each web port that answered.
+    ``answers`` maps each address to its open ports; the firewall drops the rest."""
     rng = s.rng
-    for k, ts in enumerate(_bursts(rng, CS_WEB, 120, size=(5, 25), gap=(0.05, 0.3), pause=(3, 15))):
-        uid, sp = s.session(ts, cs.CSAI, www, 443, svc="ssl", app="ssl", fz="untrust", tz="dmz",
-                            ob=rng.randint(300, 900), rb=rng.randint(200, 6_000), dur=rng.uniform(0.02, 0.6),
-                            rule="allow-dmz-inbound")
-        if k % 20 == 0:
-            s.ssl.append(dict(ts=ts, uid=uid, s=cs.CSAI, sp=sp, d=www, dp=443, sni=sni, ja3="", ja3s=""))
+    ts, found = start, []
+    for d, open_ports in answers.items():
+        for port in AX_PORTS:
+            if port in open_ports:
+                s.session(ts, AX_SCANNER, d, port, ob=80, rb=120, dur=0.02, app="incomplete", fz="untrust", tz="dmz",
+                          rule=rule)
+                found.append((d, port))
+            else:
+                s.session(ts, AX_SCANNER, d, port, app="incomplete", fz="untrust", tz="dmz", action="deny",
+                          rule="default-deny")
+            ts += timedelta(seconds=rng.uniform(0.02, 0.15))
+    s.threat(start + timedelta(seconds=4), AX_SCANNER, next(iter(answers)), 443, "TCP Port Scan", "medium",
+             kind="scan", app="not-applicable", fz="untrust", tz="dmz")
+    for d, port in found:
+        ts += timedelta(seconds=rng.uniform(25, 31))
+        plain = port == 80
+        for k in range(4):
+            uid, sp = s.session(ts + timedelta(seconds=rng.uniform(0, 1)), AX_SCANNER, d, port,
+                                svc="http" if plain else "ssl", app="web-browsing" if plain else "ssl", fz="untrust",
+                                tz="dmz", ob=rng.randint(15_000, 40_000), rb=rng.randint(20_000, 90_000),
+                                dur=rng.uniform(15, 45), rule=rule)
+            if k == 0 and not plain:
+                s.ssl.append(dict(ts=ts, uid=uid, s=AX_SCANNER, sp=sp, d=d, dp=port, sni=(names or {}).get(d, ""),
+                                  ja3="", ja3s=""))
+        if names and d in names:
+            _ax_pan(s, ts + timedelta(seconds=2), AX_SCANNER, d, "ffuf")
 
 
-def _cs_brute(s, vpn, start):
-    """SSL-VPN logins from 212.11.64.250: three 5-minute bursts 45 minutes apart, one every 1.5 s."""
+def _hq_portals(s, ws):
+    """Corvane HQ's sign-in service, supplier portal and a development API published by mistake, with
+    their everyday traffic: suppliers sign in and use the portal, engineers try the development API."""
     rng = s.rng
-    n = 0
-    for b in range(3):
-        first = ts = start + timedelta(minutes=45 * b)
-        while ts < first + timedelta(minutes=5):
-            uid, sp = s.session(ts, cs.CSAI, vpn, 10443, svc="ssl", app="ssl", fz="untrust", tz="dmz",
-                                ob=rng.randint(1_100, 1_300), rb=rng.randint(1_900, 2_100), dur=0.4,
-                                rule="allow-vpn-gateway")
-            if n % 100 == 0:
-                s.ssl.append(dict(ts=ts, uid=uid, s=cs.CSAI, sp=sp, d=vpn, dp=10443, sni="", ja3="", ja3s=""))
-            n += 1
-            ts += timedelta(seconds=1.5)
-        s.ids(first + timedelta(seconds=30), cs.CSAI, vpn, 10443, *cs.SIG["brute"], app="tls")
+    idp = s.host("172.16.10.30", "id01", UBUNTU)            # login.corvane.example
+    supply = s.host("172.16.10.40", "supply01", UBUNTU)     # suppliers.corvane.example: registration, approvals
+    apidev = s.host("172.16.10.50", "api-dev01", UBUNTU)    # api-dev.corvane.example
+    sdb = s.host("10.20.0.46", "supplydb01", UBUNTU)
+    span = (END - START).total_seconds() - 900
+    for _ in range(150):
+        t = START + timedelta(seconds=rng.uniform(0, span))
+        who = f"198.19.{rng.randint(0, 255)}.{rng.randint(1, 254)}"
+        s.session(t, who, idp, 443, svc="ssl", app="ssl", fz="untrust", tz="dmz", ob=rng.randint(1_500, 4_000),
+                  rb=rng.randint(3_000, 20_000), rule="allow-dmz-inbound")
+        if rng.random() < 0.7:
+            t += timedelta(seconds=rng.uniform(3, 30))
+            s.session(t, who, supply, 443, svc="ssl", app="ssl", fz="untrust", tz="dmz", ob=rng.randint(2_000, 30_000),
+                      rb=rng.randint(20_000, 900_000), dur=rng.uniform(5, 300), rule="allow-dmz-inbound")
+            s.session(t + timedelta(seconds=0.4), supply, sdb, 5432, svc="postgresql", ob=rng.randint(400, 2_000),
+                      rb=rng.randint(5_000, 400_000))
+    for _ in range(60):
+        s.session(s.work_ts(), rng.choice(ws[:20]), apidev, 443, svc="ssl", app="ssl", fz="trust", tz="dmz",
+                  ob=rng.randint(1_000, 40_000), rb=rng.randint(2_000, 200_000), rule="allow-dev-api")
+    s.vuln(idp, 443, "www", "ratelimit")
+    for key in ("srcmap", "openapi", "selfreg"):
+        s.vuln(supply, 443, "www", key)
+    for key in ("openapi", "devwrite"):
+        s.vuln(apidev, 443, "www", key)
+    return idp, supply, apidev, sdb
 
 
-def _cs_tampa(s, vpn, servers, workstations, printers):
-    """185.196.11.225 logs into Tampa's SSL-VPN with a password the bursts found, scans the office from
-    the VPN pool, then copies files from the file share for two and a half hours: everything it
-    copies leaves through the tunnel."""
+def _ax_hq(s, idp, supply, apidev, sdb):
+    """ARTEX at Corvane HQ: the supplier portal mapped, the sign-in service probed, then the portal's API
+    used from self-registered accounts; the development API written to."""
     rng = s.rng
-    a, fs = f"{SSLVPN_POOL}.205", servers[-1]
-    _agent_scan(s, a, CS_LOGIN + timedelta(minutes=6), servers + workstations + printers,
-                (21, 22, 80, 135, 139, 443, 445, 1433, 3389, 5985),
-                _windows_ports(servers, workstations, {p: {80, 443} for p in printers}))
-    s.ids(CS_LOGIN + timedelta(minutes=6, seconds=12), a, fs, 445, *cs.SIG["gogo"], app="smb")
-    copied, t = 0, CS_LOGIN + timedelta(minutes=24)
-    while t < CS_LOGIN + timedelta(hours=2, minutes=55):
-        rb = int(rng.uniform(20, 70) * 1e6)
-        s.session(t, a, fs, 445, svc="smb", ob=rng.randint(20_000, 90_000), rb=rb, dur=rng.uniform(60, 400),
-                  app="ms-ds-smb", fz="vpn", tz="trust", rule="ra-vpn-users")
-        copied += rb
-        t += timedelta(minutes=rng.uniform(6, 12))
-    uid, sp = s.session(CS_LOGIN, cs.CAMPAIGN, vpn, 10443, svc="ssl", app="ssl", fz="untrust", tz="dmz",
-                        ob=rng.randint(30_000_000, 60_000_000), rb=int(copied * 1.04),
-                        dur=(t - CS_LOGIN).total_seconds() + 420, rule="allow-vpn-gateway")
-    s.ssl.append(dict(ts=CS_LOGIN, uid=uid, s=cs.CAMPAIGN, sp=sp, d=vpn, dp=10443, sni="", ja3="", ja3s=""))
+    rule = "allow-dmz-inbound"
+    portal, login = "suppliers.corvane.example", "login.corvane.example"
+    # content discovery with ffuf: about 1,400 requests over 40 keep-alive sessions
+    for k in range(40):
+        uid, sp = s.session(AX_START + timedelta(seconds=rng.uniform(0, 4)), AX_PRIMARY, supply, 443, svc="ssl",
+                            app="ssl", fz="untrust", tz="dmz", ob=rng.randint(9_000, 13_000),
+                            rb=rng.randint(11_000, 30_000), dur=rng.uniform(40, 80), rule=rule)
+        if k == 0:
+            s.ssl.append(dict(ts=AX_START, uid=uid, s=AX_PRIMARY, sp=sp, d=supply, dp=443, sni=portal, ja3="",
+                              ja3s=""))
+    _ax_pan(s, AX_START + timedelta(seconds=2), AX_PRIMARY, supply, "ffuf")
+    # mapping: a path that cannot exist, bundle.js and its source map, runtime and app config, the
+    # password policy, /openapi.json, /docs and /redoc, then the API routes the source map names
+    sizes = [300, 1_400_000, 3_800_000, 2_100, 1_700, 900, 186_000, 41_000, 39_000]
+    times = _cadence(rng, AX_START + timedelta(minutes=3), 34)
+    for k, ts in enumerate(times):
+        rb = sizes[k] if k < len(sizes) else rng.randint(400, 9_000)
+        _ax_req(s, ts, AX_PRIMARY, supply, 443, rule, rb=rb, dur=rng.uniform(0.4, 2.5) if rb > 100_000 else None,
+                sni=portal if k % 12 == 0 else None)
+    _ax_pan(s, times[0] + timedelta(seconds=1), AX_PRIMARY, supply, "ua")
+    _ax_pan(s, times[len(sizes)] + timedelta(seconds=1), AX_PRIMARY, supply, "spec")
+    # 103.100.158.103, with the same user agents: OAuth requests with unregistered redirect URIs for 40
+    # of the portal's client IDs, rejected with illegal_redirect_uri_enhanced
+    times = _cadence(rng, AX_SCAN + timedelta(minutes=4), 80)
+    for k, ts in enumerate(times):
+        _ax_req(s, ts, AX_SCANNER, idp, 443, rule, rb=rng.randint(600, 1_200), sni=login if k % 20 == 0 else None)
+    _ax_pan(s, times[30] + timedelta(seconds=1), AX_SCANNER, idp, "oauth")
+    # the sign-in service: a made-up user, admin a second later, the same client IDs, a password spray,
+    # then password-reset requests and the OTP and MFA-profile endpoints. No account falls.
+    _ax_req(s, AX_IDP, AX_PRIMARY, idp, 443, rule, rb=900, sni=login)
+    _ax_req(s, AX_IDP + timedelta(seconds=1), AX_PRIMARY, idp, 443, rule, rb=900)
+    _ax_pan(s, AX_IDP + timedelta(seconds=2), AX_PRIMARY, idp, "canary")
+    oauth = _cadence(rng, AX_IDP + timedelta(seconds=29), 40)
+    spray = _cadence(rng, oauth[-1] + timedelta(seconds=28), 300)
+    recovery = _cadence(rng, spray[-1] + timedelta(seconds=29), 14)
+    for ts in oauth + spray + recovery:
+        _ax_req(s, ts, AX_PRIMARY, idp, 443, rule, ob=rng.randint(900, 1_500), rb=rng.randint(700, 1_400))
+    for k in (40, 150, 260):
+        _ax_pan(s, spray[k] + timedelta(seconds=1), AX_PRIMARY, idp, "brute")
+    # two minutes after its last failed sign-in, the supplier portal's API: nine accounts registered in
+    # 40 minutes, each followed by reads (about 50 MB in all), IDs 999999995, 999999 and 0 tried
+    t = recovery[-1] + timedelta(minutes=2)
+    for k in range(9):
+        reg = t + timedelta(minutes=5 * k, seconds=rng.uniform(0, 30))
+        _ax_req(s, reg, AX_PRIMARY, supply, 443, rule, ob=rng.randint(1_500, 3_000), rb=rng.randint(500, 900),
+                sni=portal if k == 0 else None)
+        for ts in _cadence(rng, reg + timedelta(seconds=rng.uniform(25, 31)), 13):
+            rb = rng.randint(330_000, 530_000)
+            _ax_req(s, ts, AX_PRIMARY, supply, 443, rule, ob=rng.randint(600, 1_100), rb=rb, dur=rng.uniform(0.3, 2))
+            s.session(ts + timedelta(seconds=0.1), supply, sdb, 5432, svc="postgresql", ob=rng.randint(500, 2_000),
+                      rb=int(rb * rng.uniform(1.05, 1.3)), dur=rng.uniform(0.05, 0.8))
+    for ts in _cadence(rng, reg + timedelta(minutes=2), 3):
+        _ax_req(s, ts, AX_PRIMARY, supply, 443, rule, rb=rng.randint(300, 500))
+    # then its own accounts approved and user records changed, each change read back a second or two later
+    writes = _cadence(rng, reg + timedelta(minutes=4), 15)
+    for ts in writes:
+        _ax_req(s, ts, AX_PRIMARY, supply, 443, rule, ob=rng.randint(2_000, 6_000), rb=rng.randint(400, 900))
+        s.session(ts + timedelta(seconds=0.1), supply, sdb, 5432, svc="postgresql", ob=rng.randint(800, 3_000),
+                  rb=rng.randint(300, 900), dur=rng.uniform(0.02, 0.2))
+        _ax_req(s, ts + timedelta(seconds=rng.uniform(1, 2)), AX_PRIMARY, supply, 443, rule, ob=rng.randint(600, 900),
+                rb=rng.randint(1_500, 8_000))
+    _ax_pan(s, writes[0] + timedelta(seconds=1), AX_PRIMARY, supply, "bulk")
+    _ax_pan(s, writes[0] + timedelta(seconds=3), AX_PRIMARY, supply, "readback")
+    _ax_devapi(s, apidev)
+
+
+def _ax_devapi(s, apidev):
+    """152.233.51.12 on the development API: the OpenAPI document, three collections created, every
+    write route tried within three seconds (422 and 500), the document fetched twice more, then 38 s
+    later 8 update-documents and 3 batch-update-documents writes that work, each read back within two
+    seconds; two short runs of 403s don't stop it. Later three other addresses replay the sequence,
+    about 30 s apart, without success."""
+    rng = s.rng
+    rule = "allow-dmz-inbound"
+    host = "api-dev.corvane.example"
+    t = AX_DEV
+    _ax_req(s, t, AX_WRITER, apidev, 443, rule, rb=rng.randint(70_000, 90_000), sni=host)
+    for k in range(3):
+        _ax_req(s, t + timedelta(seconds=2 + k * 0.9), AX_WRITER, apidev, 443, rule, rb=rng.randint(300, 600))
+    for k in range(8):
+        _ax_req(s, t + timedelta(seconds=5 + k * 0.37), AX_WRITER, apidev, 443, rule, ob=rng.randint(900, 4_000),
+                rb=rng.randint(400, 1_400))
+    t += timedelta(seconds=8 + rng.uniform(25, 31))
+    for k in range(2):
+        _ax_req(s, t + timedelta(seconds=k * 1.1), AX_WRITER, apidev, 443, rule, rb=rng.randint(70_000, 90_000))
+    t += timedelta(seconds=38)
+    first = t
+    for k in range(11):
+        if k in (3, 7):
+            for j in range(3):
+                _ax_req(s, t + timedelta(seconds=j * 0.9), AX_WRITER, apidev, 443, rule, rb=rng.randint(200, 400))
+            t += timedelta(seconds=rng.uniform(4, 9))
+        _ax_req(s, t, AX_WRITER, apidev, 443, rule,
+                ob=rng.randint(1_500, 9_000) if k < 8 else rng.randint(20_000, 60_000), rb=rng.randint(300, 700))
+        _ax_req(s, t + timedelta(seconds=rng.uniform(1, 2)), AX_WRITER, apidev, 443, rule, ob=rng.randint(600, 900),
+                rb=rng.randint(1_500, 30_000))
+        t += timedelta(seconds=rng.uniform(25, 31) if k % 4 == 3 else rng.uniform(2.5, 4))
+    _ax_pan(s, first + timedelta(seconds=2), AX_WRITER, apidev, "readback")
+    for n, src in enumerate(AX_REPLAY):
+        t = AX_REPLAYED + timedelta(seconds=30 * n + rng.uniform(-2, 2))
+        for k in range(14):
+            _ax_req(s, t, src, apidev, 443, rule, rb=rng.randint(200, 400))
+            t += timedelta(seconds=rng.uniform(0.3, 1.2))
+
+
+def _ax_vpn(s, vpn, start):
+    """31.40.205.155 on an office's SSL-VPN login: a made-up user, admin a second later, then a password
+    spray at the think-then-act pace; nothing works. Two minutes after the last try 152.233.51.12 turns
+    to the FortiGate's REST API on the admin port: 36 rejections on one route, then a trailing slash,
+    the unversioned path, /api/v2/ and a shorter path. Suricata counts the logins; the Zeek script
+    flags both runs."""
+    rng = s.rng
+    rule = "allow-vpn-gateway"
+    _ax_req(s, start, AX_PRIMARY, vpn, 10443, rule, rb=2_200, sni="")
+    _ax_req(s, start + timedelta(seconds=1), AX_PRIMARY, vpn, 10443, rule, rb=2_200)
+    spray = _cadence(rng, start + timedelta(seconds=28), 260)
+    for k, ts in enumerate(spray):
+        _ax_req(s, ts, AX_PRIMARY, vpn, 10443, rule, ob=rng.randint(1_100, 1_500), rb=rng.randint(1_800, 2_600),
+                dur=rng.uniform(0.2, 0.5), sni="" if k % 60 == 59 else None)
+    s.ids(spray[30], AX_PRIMARY, vpn, 10443, *AX_SPRAY_SIG, app="tls")
+    s.note(spray[-1], AX_PRIMARY, vpn, 10443, AX_NOTE,
+           f"{AX_PRIMARY} opened {len(spray) + 2} TLS sessions to {vpn}:10443 in {_burst_count(spray) + 1} bursts "
+           "of 1-14, about 1 s apart, with 25-31 s pauses")
+    api = _cadence(rng, spray[-1] + timedelta(minutes=2), 40)
+    for k, ts in enumerate(api):
+        _ax_req(s, ts, AX_WRITER, vpn, 8443, rule, ob=rng.randint(500, 900), rb=rng.randint(300, 700),
+                sni="" if k == 0 else None)
+    s.note(api[-1], AX_WRITER, vpn, 8443, AX_NOTE,
+           f"{AX_WRITER} opened {len(api)} TLS sessions to {vpn}:8443 in {_burst_count(api)} bursts of 1-14, "
+           "about 1 s apart, with 25-31 s pauses")
+
+
+def _ax_sub2api(s, vpn, start, tries):
+    """173.254.220.78, on the same Sub2API gateway as 31.40.205.155: the SSL-VPN portal's configuration
+    (its language file, login and SSO pages), then hundreds of tries at internal applications' ports on
+    the office's address (Jira, Confluence, RabbitMQ, Kubernetes, MinIO, ...), which the firewall drops."""
+    rng = s.rng
+    times = _cadence(rng, start, 16)
+    for k, ts in enumerate(times):
+        _ax_req(s, ts, AX_SUB2API, vpn, 10443, "allow-vpn-gateway", rb=rng.randint(2_000, 40_000),
+                sni="" if k == 0 else None)
+    t = times[-1] + timedelta(seconds=rng.uniform(25, 31))
+    s.threat(t + timedelta(seconds=20), AX_SUB2API, vpn, AX_APP_PORTS[0], "TCP Port Scan", "medium", kind="scan",
+             app="not-applicable", fz="untrust", tz="dmz")
+    for _ in range(tries):
+        s.session(t, AX_SUB2API, vpn, rng.choice(AX_APP_PORTS), app="incomplete", fz="untrust", tz="dmz",
+                  action="deny", rule="default-deny")
+        t += timedelta(seconds=rng.uniform(0.3, 1.5))
 
 
 # -- Corvane --------------------------------------------------------------------------------------
@@ -650,8 +920,12 @@ def _corvane_hq():
     for ip in (www, portal, mail):
         s.vuln(ip, 22, "ssh", "terrapin")
     _cairn_hq(s, www, portal, mail, pdb)
-    _cs_fingerprint(s, {www: {443}, portal: {443}, mail: set()}, CS_FP + timedelta(minutes=9), "allow-dmz-inbound")
-    _cs_web(s, www, "www.corvane.example")
+    idp, supply, apidev, sdb = _hq_portals(s, ws)
+    _ax_scan(s, AX_SCAN, {www: {80, 443}, portal: {443}, mail: set(), idp: {443}, supply: {443}, apidev: {443}},
+             "allow-dmz-inbound", names={www: "www.corvane.example", portal: "partners.corvane.example",
+                                         idp: "login.corvane.example", supply: "suppliers.corvane.example",
+                                         apidev: "api-dev.corvane.example"})
+    _ax_hq(s, idp, supply, apidev, sdb)
     return s
 
 
@@ -776,7 +1050,7 @@ def _corvane_phoenix():
             s.session(t, pool, fs, 445, svc="smb", ob=rng.randint(20_000, 90_000), rb=int(rng.uniform(*mb) * 1e6),
                       dur=rng.uniform(60, 400), app="ms-ds-smb", fz="vpn", tz="trust", rule="ra-vpn-users")
             t += timedelta(minutes=rng.uniform(7, 14))
-    _cs_fingerprint(s, {vpn: {443}}, CS_FP + timedelta(minutes=14), "allow-vpn-gateway")
+    _ax_scan(s, AX_SCAN + timedelta(minutes=23), {vpn: {443}}, "allow-vpn-gateway")
     return s
 
 
@@ -837,7 +1111,7 @@ def _corvane_austin():
                   rb=rng.randint(40_000_000, 110_000_000), dur=rng.uniform(40, 300), app="ssl", fz="vpn", tz="trust",
                   rule="ra-vpn-users")
     _gootloader_blocked(s, ws[13])
-    _cs_fingerprint(s, {vpn: {443}}, CS_FP + timedelta(minutes=18), "allow-vpn-gateway")
+    _ax_scan(s, AX_SCAN + timedelta(minutes=31), {vpn: {443}}, "allow-vpn-gateway")
     return s
 
 
@@ -877,7 +1151,7 @@ def _corvane_dresden():
         for ts in _bursts(rng, start, tries, size=(3, 6), gap=(1, 4), pause=(30, 120)):
             s.session(ts, EGRESS, vpn, 500, proto="udp", app="ike", fz="untrust", tz="dmz", ob=rng.randint(600, 1_200),
                       rb=rng.randint(300, 700), dur=rng.uniform(0.2, 0.8), rule="allow-vpn-gateway")
-    _cs_fingerprint(s, {vpn: {443}}, CS_FP + timedelta(minutes=23), "allow-vpn-gateway")
+    _ax_scan(s, AX_SCAN + timedelta(minutes=38), {vpn: {443}}, "allow-vpn-gateway")
     return s
 
 
@@ -935,6 +1209,13 @@ def _write(s: Site, outdir: str, iocs: list[list]) -> list[str]:
              ([goot._ts(r["ts"]), f"F{s.prefix}{i:07x}", r["uid"], r["s"], str(r["sp"]), r["d"], str(r["dp"]), "SMB",
                "MD5,SHA1,SHA256" if r["md5"] else "(empty)", r["mime"], r["name"], "T", str(r["size"]),
                r["md5"] or "-", r["sha1"] or "-", r["sha256"] or "-"] for i, r in enumerate(sorted(s.files, key=by_ts))))
+    if s.notes:
+        zeek("notice", ["ts", "uid", "id.orig_h", "id.orig_p", "id.resp_h", "id.resp_p", "note", "msg", "src", "dst",
+                        "p", "actions"],
+             ["time", "string", "addr", "port", "addr", "port", "string", "string", "addr", "addr", "port",
+              "set[enum]"],
+             ([goot._ts(r["ts"]), r["uid"], r["s"], "-", r["d"], str(r["dp"]), r["note"], r["msg"], r["s"], r["d"],
+               str(r["dp"]), "Notice::ACTION_LOG"] for r in sorted(s.notes, key=by_ts)))
     if s.eve:
         p = os.path.join(outdir, "suricata_eve.json")
         with open(p, "w") as fh:
@@ -981,22 +1262,37 @@ def _write(s: Site, outdir: str, iocs: list[list]) -> list[str]:
 
     p = os.path.join(outdir, "article_previews.json")
     with open(p, "w") as fh:
-        json.dump({**goot.PREVIEW, **CS_PREVIEW, **PREVIEW}, fh, indent=2)
+        json.dump({**goot.PREVIEW, **AX_PREVIEW, **PREVIEW}, fh, indent=2)
         fh.write("\n")
     paths.append(p)
     return paths
 
 
-def ioc_rows(before_unit42: bool = False) -> list[list]:
-    """One feed for every client: The DFIR Report's Gootloader indicators, the CyberStrike AI FortiGate
-    campaign's (Amazon, Team Cymru) and Unit 42's two Cairn addresses. ``before_unit42``: the feed as it
-    was before Unit 42's report (2026-11-12), without the Cairn addresses."""
+def ioc_rows(before_cairn: bool = False) -> list[list]:
+    """One feed for every client: The DFIR Report's Gootloader indicators, Unit 42's ARTEX note of
+    2026-10-30 (four addresses, two domains) and Unit 42's two Cairn addresses. ``before_cairn``: the feed
+    as it was before the Cairn report (2026-11-12), without the Cairn addresses."""
     seen = "2026-11-12T00:00:00.000Z"
     cairn = [["ip", ip, "Actionable", why, "cl-sta-1238;cairn", seen, seen, 1, "unit42.paloaltonetworks.com",
               UNIT42_URL, "ioc-table", ""]
              for ip, why in ((CAIRN_SERVER, "Cairn hosting server (HK, AS979)"),
                              (EGRESS, "Cairn staging server and attack egress (US, AS142036)"))]
-    return goot.ioc_rows() + cs.ioc_rows() + ([] if before_unit42 else cairn)
+    noted = "2026-10-30T00:00:00.000Z"
+    # the note: "Not all ARTEX activity is inherently malicious, so these are indicators without needing to be blocked"
+    artex = [[kind, value, "Suspicious", f"ARTEX activity (Unit 42): {why}", tags, noted, noted, 1, "github.com",
+              AX_URL, "ioc-table", ""]
+             for kind, value, why, tags in (
+                 ("ip", AX_PRIMARY, "answers with an HTTP Basic realm named ARTEX and runs a Sub2API gateway on TCP "
+                  "8080; primary source of self-registration, API data access, source-map harvesting and "
+                  "identity-provider probing", "artex;sub2api"),
+                 ("ip", AX_SUB2API, "runs the same Sub2API gateway; reconnaissance, configuration harvesting, "
+                  "account-recovery probing and hundreds of denied requests", "artex;sub2api"),
+                 ("ip", AX_SCANNER, "monitor only; same user agents and client IDs as 31.40.205.155; scanning and "
+                  "OAuth probing; has hosted a lanmao666.com subdomain", "artex"),
+                 ("ip", AX_WRITER, "monitor only; probing and the unauthenticated API writes", "artex"),
+                 *(("domain", d, "multi-tenant AI/LLM gateway related to ARTEX infrastructure", "artex;llm-gateway")
+                   for d in AX_DOMAINS))]
+    return goot.ioc_rows() + artex + ([] if before_cairn else cairn)
 
 
 def _nessus(s: Site, path: str):
@@ -1039,7 +1335,7 @@ def generate(outdir: str) -> list[str]:
     for s in _ridgeline() + [_corvane_hq(), _corvane_phoenix(), _corvane_austin(), _corvane_dresden()]:
         for r in s.conn + s.pan:              # every generated address must be a real address
             ipaddress.ip_address(r["s"]), ipaddress.ip_address(r["d"])
-        # Dresden's folder keeps the feed from before Unit 42 published: only Compare's re-hunt finds the egress node
+        # Dresden's folder keeps the feed from before the Cairn report: only Compare's re-hunt finds the egress node
         paths += _write(s, os.path.join(outdir, *s.folder.split("/")), ioc_rows(s.folder == "corvane/dresden"))
     path = os.path.join(outdir, "sites.csv")
     with open(path, "w", encoding="utf-8", newline="") as fh:

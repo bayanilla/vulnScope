@@ -84,7 +84,7 @@ Receive Time,Serial #,Type,Threat/Content Type,Source address,Destination addres
 2026/10/26 05:00:03,016401002232,TRAFFIC,end,10.32.250.41,10.32.20.26,ra-vpn-users,incomplete,vpn,trust,53266,8080,tcp,allow,0,0,0,2026/10/26 05:00:03,,
 2026/10/26 05:00:03,016401002232,TRAFFIC,end,10.32.250.41,10.32.20.27,ra-vpn-users,incomplete,vpn,trust,57914,22,tcp,allow,150,60,90,2026/10/26 05:00:03,,
 2026/10/26 05:00:03,016401002232,TRAFFIC,end,10.32.250.41,10.32.20.27,ra-vpn-users,incomplete,vpn,trust,50468,80,tcp,allow,0,0,0,2026/10/26 05:00:03,,
-2026/10/26 05:00:40,016401002232,THREAT,scan,10.32.250.41,10.32.0.20,ra-vpn-users,not-applicable,vpn,trust,57573,22,tcp,alert,,,,2026/10/26 05:00:40,TCP Port Scan,medium
+2026/10/26 05:00:40,016401002232,THREAT,scan,10.32.250.41,10.32.0.20,ra-vpn-users,not-applicable,vpn,trust,55665,22,tcp,alert,,,,2026/10/26 05:00:40,TCP Port Scan,medium
 2026/10/26 05:00:42,016401002232,TRAFFIC,end,10.32.250.41,10.32.20.27,ra-vpn-users,incomplete,vpn,trust,55620,443,tcp,allow,0,0,0,2026/10/26 05:00:42,,
 2026/10/26 05:00:42,016401002232,TRAFFIC,end,10.32.250.41,10.32.20.27,ra-vpn-users,incomplete,vpn,trust,50642,445,tcp,allow,0,0,0,2026/10/26 05:00:42,,
 2026/10/26 05:00:42,016401002232,TRAFFIC,end,10.32.250.41,10.32.20.27,ra-vpn-users,incomplete,vpn,trust,60894,3389,tcp,allow,0,0,0,2026/10/26 05:00:42,,
@@ -188,7 +188,7 @@ Receive Time,Serial #,Type,Threat/Content Type,Source address,Destination addres
 2026/10/26 05:12:03,016401002232,TRAFFIC,end,10.32.250.41,10.32.0.26,ra-vpn-users,jenkins,vpn,trust,61067,8080,tcp,allow,49858,1422,48436,2026/10/26 05:12:03,,
 2026/10/26 05:12:03,016401002232,TRAFFIC,end,10.32.250.41,10.32.0.26,ra-vpn-users,jenkins,vpn,trust,51296,8080,tcp,allow,42924,787,42137,2026/10/26 05:12:03,,
 2026/10/26 05:12:04,016401002232,TRAFFIC,end,10.32.250.41,10.32.0.26,ra-vpn-users,jenkins,vpn,trust,62569,8080,tcp,allow,57756,1322,56434,2026/10/26 05:12:04,,
-2026/10/26 05:12:04,016401002232,THREAT,vulnerability,10.32.250.41,10.32.0.26,ra-vpn-users,jenkins,vpn,trust,55665,8080,tcp,alert,,,,2026/10/26 05:12:04,Jenkins Arbitrary File Read Vulnerability (CVE-2024-23897),critical
+2026/10/26 05:12:04,016401002232,THREAT,vulnerability,10.32.250.41,10.32.0.26,ra-vpn-users,jenkins,vpn,trust,51577,8080,tcp,alert,,,,2026/10/26 05:12:04,Jenkins Arbitrary File Read Vulnerability (CVE-2024-23897),critical
 2026/10/26 05:12:58,016401002232,TRAFFIC,end,10.32.250.41,10.32.0.26,ra-vpn-users,jenkins,vpn,trust,53561,8080,tcp,allow,52456,1014,51442,2026/10/26 05:12:58,,
 2026/10/26 05:12:59,016401002232,TRAFFIC,end,10.32.250.41,10.32.0.26,ra-vpn-users,jenkins,vpn,trust,56486,8080,tcp,allow,24624,832,23792,2026/10/26 05:12:59,,
 2026/10/26 05:13:00,016401002232,TRAFFIC,end,10.32.250.41,10.32.0.26,ra-vpn-users,jenkins,vpn,trust,51153,8080,tcp,allow,20965,1648,19317,2026/10/26 05:13:00,,
@@ -260,9 +260,9 @@ Receive Time,Serial #,Type,Threat/Content Type,Source address,Destination addres
 2026/10/26 16:03:25,016401002232,TRAFFIC,end,10.32.10.27,198.18.20.12,allow-internet,ssl,trust,untrust,64859,443,tcp,allow,14420,1620,12800,2026/10/26 16:03:25,,
 2026/10/26 16:19:21,016401002232,TRAFFIC,end,10.32.10.34,198.18.10.20,allow-internet,ssl,trust,untrust,61669,443,tcp,allow,88400,2400,86000,2026/10/26 16:19:21,,
 2026/10/26 16:20:00,016401002232,TRAFFIC,end,10.32.10.34,198.51.100.47,allow-internet,ssl,trust,untrust,65318,443,tcp,allow,243000,3000,240000,2026/10/26 16:20:00,,
-2026/10/26 16:20:37,016401002232,THREAT,url,10.32.10.34,203.0.113.105,allow-internet,ssl,trust,untrust,51577,443,tcp,block-url,,,,2026/10/26 16:20:37,URL filtering: malware (my-little-kitchen.com),medium
+2026/10/26 16:20:37,016401002232,THREAT,url,10.32.10.34,203.0.113.105,allow-internet,ssl,trust,untrust,58953,443,tcp,block-url,,,,2026/10/26 16:20:37,URL filtering: malware (my-little-kitchen.com),medium
 2026/10/26 16:20:37,016401002232,TRAFFIC,end,10.32.10.34,203.0.113.105,allow-internet,ssl,trust,untrust,55748,443,tcp,allow,619,554,65,2026/10/26 16:20:37,,
-2026/10/26 16:20:57,016401002232,THREAT,url,10.32.10.34,203.0.113.107,allow-internet,ssl,trust,untrust,58953,443,tcp,block-url,,,,2026/10/26 16:20:57,URL filtering: malware (pocketofpreschool.com),medium
+2026/10/26 16:20:57,016401002232,THREAT,url,10.32.10.34,203.0.113.107,allow-internet,ssl,trust,untrust,51777,443,tcp,block-url,,,,2026/10/26 16:20:57,URL filtering: malware (pocketofpreschool.com),medium
 2026/10/26 16:20:57,016401002232,TRAFFIC,end,10.32.10.34,203.0.113.107,allow-internet,ssl,trust,untrust,51282,443,tcp,allow,682,618,64,2026/10/26 16:20:57,,
 2026/10/26 16:24:50,016401002232,TRAFFIC,end,10.32.10.43,192.0.2.120,allow-internet,ssl,trust,untrust,62050,443,tcp,allow,8280,1089,7191,2026/10/26 16:24:50,,
 2026/10/26 16:26:23,016401002232,TRAFFIC,end,10.32.10.42,198.18.10.20,allow-internet,ssl,trust,untrust,57963,443,tcp,allow,5056,1027,4029,2026/10/26 16:26:23,,
@@ -360,25 +360,22 @@ Receive Time,Serial #,Type,Threat/Content Type,Source address,Destination addres
 2026/10/27 10:26:53,016401002232,TRAFFIC,end,10.32.10.27,192.0.2.120,allow-internet,ssl,trust,untrust,63416,443,tcp,allow,38832,3827,35005,2026/10/27 10:26:53,,
 2026/10/27 11:19:00,016401002232,TRAFFIC,end,10.32.0.53,192.0.2.53,allow-internet,dns,trust,untrust,58308,53,udp,allow,366,88,278,2026/10/27 11:19:00,,
 2026/10/27 12:37:03,016401002232,TRAFFIC,end,10.32.10.44,198.18.10.44,allow-internet,ssl,trust,untrust,60343,443,tcp,allow,20888,1953,18935,2026/10/27 12:37:03,,
-2026/10/27 12:58:00,016401002232,TRAFFIC,end,146.190.195.154,10.32.1.5,allow-vpn-gateway,ssl,untrust,dmz,58002,443,tcp,allow,6023,757,5266,2026/10/27 12:58:00,,
-2026/10/27 12:58:02,016401002232,TRAFFIC,end,146.190.195.154,10.32.1.5,default-deny,incomplete,untrust,dmz,59426,8443,tcp,deny,124,124,0,2026/10/27 12:58:02,,
-2026/10/27 12:58:04,016401002232,TRAFFIC,end,146.190.195.154,10.32.1.5,default-deny,incomplete,untrust,dmz,65488,10443,tcp,deny,129,129,0,2026/10/27 12:58:04,,
-2026/10/27 12:58:06,016401002232,TRAFFIC,end,146.190.195.154,10.32.1.5,default-deny,incomplete,untrust,dmz,59547,4443,tcp,deny,188,188,0,2026/10/27 12:58:06,,
-2026/10/27 12:58:08,016401002232,TRAFFIC,end,146.190.195.154,10.32.1.5,allow-vpn-gateway,ssl,untrust,dmz,55502,443,tcp,allow,2740,629,2111,2026/10/27 12:58:08,,
-2026/10/27 12:58:10,016401002232,TRAFFIC,end,146.190.195.154,10.32.1.5,default-deny,incomplete,untrust,dmz,57149,8443,tcp,deny,192,192,0,2026/10/27 12:58:10,,
-2026/10/27 12:58:12,016401002232,TRAFFIC,end,146.190.195.154,10.32.1.5,default-deny,incomplete,untrust,dmz,58671,10443,tcp,deny,171,171,0,2026/10/27 12:58:12,,
-2026/10/27 12:58:14,016401002232,TRAFFIC,end,146.190.195.154,10.32.1.5,default-deny,incomplete,untrust,dmz,61323,4443,tcp,deny,89,89,0,2026/10/27 12:58:14,,
 2026/10/27 13:03:00,016401002232,TRAFFIC,end,10.32.0.53,192.0.2.53,allow-internet,dns,trust,untrust,55274,53,udp,allow,199,87,112,2026/10/27 13:03:00,,
 2026/10/27 13:07:00,016401002232,TRAFFIC,end,10.32.0.26,198.18.30.10,allow-internet,ssl,trust,untrust,50088,443,tcp,allow,51770149,3204,51766945,2026/10/27 13:07:00,,
-2026/10/27 13:29:00,016401002232,TRAFFIC,end,64.176.48.93,10.32.1.5,allow-vpn-gateway,ssl,untrust,dmz,65356,443,tcp,allow,2681,894,1787,2026/10/27 13:29:00,,
-2026/10/27 13:29:02,016401002232,TRAFFIC,end,64.176.48.93,10.32.1.5,default-deny,incomplete,untrust,dmz,56962,8443,tcp,deny,91,91,0,2026/10/27 13:29:02,,
+2026/10/27 13:29:00,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,default-deny,incomplete,untrust,dmz,64218,22,tcp,deny,186,186,0,2026/10/27 13:29:00,,
+2026/10/27 13:29:00,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,default-deny,incomplete,untrust,dmz,55941,80,tcp,deny,76,76,0,2026/10/27 13:29:00,,
+2026/10/27 13:29:00,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,allow-vpn-gateway,incomplete,untrust,dmz,58014,443,tcp,allow,200,80,120,2026/10/27 13:29:00,,
+2026/10/27 13:29:00,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,default-deny,incomplete,untrust,dmz,53241,4443,tcp,deny,79,79,0,2026/10/27 13:29:00,,
+2026/10/27 13:29:00,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,default-deny,incomplete,untrust,dmz,57149,8080,tcp,deny,192,192,0,2026/10/27 13:29:00,,
+2026/10/27 13:29:00,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,default-deny,incomplete,untrust,dmz,56829,8443,tcp,deny,155,155,0,2026/10/27 13:29:00,,
+2026/10/27 13:29:00,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,default-deny,incomplete,untrust,dmz,49363,9443,tcp,deny,68,68,0,2026/10/27 13:29:00,,
+2026/10/27 13:29:00,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,default-deny,incomplete,untrust,dmz,59589,10443,tcp,deny,186,186,0,2026/10/27 13:29:00,,
 2026/10/27 13:29:02,016401002232,TRAFFIC,end,10.32.10.31,192.0.2.80,allow-internet,ssl,trust,untrust,53054,443,tcp,allow,35269,3543,31726,2026/10/27 13:29:02,,
-2026/10/27 13:29:04,016401002232,TRAFFIC,end,64.176.48.93,10.32.1.5,default-deny,incomplete,untrust,dmz,65404,10443,tcp,deny,155,155,0,2026/10/27 13:29:04,,
-2026/10/27 13:29:06,016401002232,TRAFFIC,end,64.176.48.93,10.32.1.5,default-deny,incomplete,untrust,dmz,63952,4443,tcp,deny,187,187,0,2026/10/27 13:29:06,,
-2026/10/27 13:29:08,016401002232,TRAFFIC,end,64.176.48.93,10.32.1.5,allow-vpn-gateway,ssl,untrust,dmz,50031,443,tcp,allow,6537,780,5757,2026/10/27 13:29:08,,
-2026/10/27 13:29:10,016401002232,TRAFFIC,end,64.176.48.93,10.32.1.5,default-deny,incomplete,untrust,dmz,65456,8443,tcp,deny,196,196,0,2026/10/27 13:29:10,,
-2026/10/27 13:29:12,016401002232,TRAFFIC,end,64.176.48.93,10.32.1.5,default-deny,incomplete,untrust,dmz,54179,10443,tcp,deny,167,167,0,2026/10/27 13:29:12,,
-2026/10/27 13:29:14,016401002232,TRAFFIC,end,64.176.48.93,10.32.1.5,default-deny,incomplete,untrust,dmz,61703,4443,tcp,deny,76,76,0,2026/10/27 13:29:14,,
+2026/10/27 13:29:04,016401002232,THREAT,scan,103.100.158.103,10.32.1.5,allow-dmz-inbound,not-applicable,untrust,dmz,50288,443,tcp,alert,,,,2026/10/27 13:29:04,TCP Port Scan,medium
+2026/10/27 13:29:29,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,allow-vpn-gateway,ssl,untrust,dmz,65535,443,tcp,allow,83335,26931,56404,2026/10/27 13:29:29,,
+2026/10/27 13:29:29,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,allow-vpn-gateway,ssl,untrust,dmz,57573,443,tcp,allow,87713,15893,71820,2026/10/27 13:29:29,,
+2026/10/27 13:29:29,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,allow-vpn-gateway,ssl,untrust,dmz,56108,443,tcp,allow,55547,32031,23516,2026/10/27 13:29:29,,
+2026/10/27 13:29:29,016401002232,TRAFFIC,end,103.100.158.103,10.32.1.5,allow-vpn-gateway,ssl,untrust,dmz,62864,443,tcp,allow,72602,32494,40108,2026/10/27 13:29:29,,
 2026/10/27 13:34:44,016401002232,TRAFFIC,end,10.32.10.21,198.18.20.12,allow-internet,ssl,trust,untrust,52631,443,tcp,allow,10268,3310,6958,2026/10/27 13:34:44,,
 2026/10/27 13:38:21,016401002232,TRAFFIC,end,10.32.10.29,198.18.20.12,allow-internet,ssl,trust,untrust,54432,443,tcp,allow,39423,531,38892,2026/10/27 13:38:21,,
 2026/10/27 13:39:19,016401002232,TRAFFIC,end,10.32.10.34,198.18.20.57,allow-internet,ssl,trust,untrust,55726,443,tcp,allow,25209,1267,23942,2026/10/27 13:39:19,,

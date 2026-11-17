@@ -14,7 +14,7 @@ import urllib.parse
 from http.server import ThreadingHTTPServer
 from unittest import mock
 
-from vulnflow import cli, sample_cyberstrike, sites
+from vulnflow import cli, sample_compare, sites
 from vulnflow.correlate import Config
 from vulnflow.errors import UserError
 
@@ -153,9 +153,9 @@ class SitesAnalysisTests(unittest.TestCase):
             result = json.load(fh)
         self.assertEqual((result["summary"]["reports"], result["summary"]["networks"]), (6, 2))
         self.assertGreaterEqual(result["summary"]["found_by_hunt"], 1)       # Dresden's egress, as in compare-sample
-        # the CyberStrike AI campaign's scanners and brute-force address reach both companies
+        # ARTEX (Unit 42's note of 30 October): the scanner, the primary source and the API writer reach both
         self.assertEqual(sorted(i["value"] for i in result["iocs"] if i["networks"] == 2),
-                         sorted([sample_cyberstrike.CSAI, sample_cyberstrike.FP_A, sample_cyberstrike.FP_B]))
+                         sorted([sample_compare.AX_SCANNER, sample_compare.AX_PRIMARY, sample_compare.AX_WRITER]))
         with open(os.path.join(folder, "explorer.json"), encoding="utf-8") as fh:
             explorer = json.load(fh)
         self.assertEqual(sorted({r["network"] for r in explorer["combined"]["reports"]}), ["Corvane", "Ridgeline"])

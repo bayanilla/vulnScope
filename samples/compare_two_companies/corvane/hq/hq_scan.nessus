@@ -1534,5 +1534,81 @@
       </HostProperties>
       <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings" />
     </ReportHost>
+    <ReportHost name="172.16.10.30">
+      <HostProperties>
+        <tag name="host-ip">172.16.10.30</tag>
+        <tag name="host-fqdn">id01.corvane.example</tag>
+        <tag name="operating-system">Ubuntu 22.04</tag>
+        <tag name="HOST_START_TIMESTAMP">1792635860</tag>
+        <tag name="HOST_END_TIMESTAMP">1792636040</tag>
+      </HostProperties>
+      <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings" />
+      <ReportItem port="443" svc_name="www" protocol="tcp" severity="3" pluginID="900104" pluginName="Web Login Endpoint Lacks Rate Limiting and Account Lockout" pluginFamily="General">
+        <cvss3_base_score>7.5</cvss3_base_score>
+        <exploit_available>false</exploit_available>
+        <synopsis>The sign-in service accepts unlimited attempts from one address.</synopsis>
+        <solution>Add rate limiting, lockout and phishing-resistant MFA.</solution>
+      </ReportItem>
+    </ReportHost>
+    <ReportHost name="172.16.10.40">
+      <HostProperties>
+        <tag name="host-ip">172.16.10.40</tag>
+        <tag name="host-fqdn">supply01.corvane.example</tag>
+        <tag name="operating-system">Ubuntu 22.04</tag>
+        <tag name="HOST_START_TIMESTAMP">1792635880</tag>
+        <tag name="HOST_END_TIMESTAMP">1792636060</tag>
+      </HostProperties>
+      <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings" />
+      <ReportItem port="443" svc_name="www" protocol="tcp" severity="2" pluginID="900102" pluginName="JavaScript Source Maps Publicly Accessible" pluginFamily="General">
+        <cvss3_base_score>5.3</cvss3_base_score>
+        <exploit_available>false</exploit_available>
+        <synopsis>Production JavaScript source maps reveal internal API routes.</synopsis>
+        <solution>Do not publish source maps.</solution>
+      </ReportItem>
+      <ReportItem port="443" svc_name="www" protocol="tcp" severity="2" pluginID="900103" pluginName="OpenAPI / Swagger Documentation Exposed Without Authentication" pluginFamily="General">
+        <cvss3_base_score>5.3</cvss3_base_score>
+        <exploit_available>false</exploit_available>
+        <synopsis>The API publishes its full OpenAPI document to anonymous users.</synopsis>
+        <solution>Require authentication for API documentation.</solution>
+      </ReportItem>
+      <ReportItem port="443" svc_name="www" protocol="tcp" severity="3" pluginID="910301" pluginName="Self-Registered Accounts Reach Approval and User Administration API Routes" pluginFamily="General">
+        <cvss3_base_score>8.1</cvss3_base_score>
+        <exploit_available>false</exploit_available>
+        <synopsis>Accounts created through public self-registration are accepted by the portal's approval and user-administration API routes.</synopsis>
+        <solution>Give a self-registered account no role until someone approves it, and check roles on every route.</solution>
+      </ReportItem>
+    </ReportHost>
+    <ReportHost name="172.16.10.50">
+      <HostProperties>
+        <tag name="host-ip">172.16.10.50</tag>
+        <tag name="host-fqdn">api-dev01.corvane.example</tag>
+        <tag name="operating-system">Ubuntu 22.04</tag>
+        <tag name="HOST_START_TIMESTAMP">1792635900</tag>
+        <tag name="HOST_END_TIMESTAMP">1792636080</tag>
+      </HostProperties>
+      <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings" />
+      <ReportItem port="443" svc_name="www" protocol="tcp" severity="2" pluginID="900103" pluginName="OpenAPI / Swagger Documentation Exposed Without Authentication" pluginFamily="General">
+        <cvss3_base_score>5.3</cvss3_base_score>
+        <exploit_available>false</exploit_available>
+        <synopsis>The API publishes its full OpenAPI document to anonymous users.</synopsis>
+        <solution>Require authentication for API documentation.</solution>
+      </ReportItem>
+      <ReportItem port="443" svc_name="www" protocol="tcp" severity="4" pluginID="910302" pluginName="Development API Accepts Unauthenticated Write Requests" pluginFamily="General">
+        <cvss3_base_score>9.1</cvss3_base_score>
+        <exploit_available>false</exploit_available>
+        <synopsis>The development API's document store accepts create, update and batch-update requests without authentication.</synopsis>
+        <solution>Put development APIs behind authentication, or keep them off the internet.</solution>
+      </ReportItem>
+    </ReportHost>
+    <ReportHost name="10.20.0.46">
+      <HostProperties>
+        <tag name="host-ip">10.20.0.46</tag>
+        <tag name="host-fqdn">supplydb01.corvane.example</tag>
+        <tag name="operating-system">Ubuntu 22.04</tag>
+        <tag name="HOST_START_TIMESTAMP">1792635920</tag>
+        <tag name="HOST_END_TIMESTAMP">1792636100</tag>
+      </HostProperties>
+      <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information" pluginFamily="Settings" />
+    </ReportHost>
   </Report>
 </NessusClientData_v2>

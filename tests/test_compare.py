@@ -16,7 +16,7 @@ from collections import defaultdict
 from http.server import ThreadingHTTPServer
 from unittest import mock
 
-from vulnflow import cli, combine, compare, explore, sample_compare, sample_cyberstrike, sample_gootloader, saved
+from vulnflow import cli, combine, compare, explore, sample_compare, sample_gootloader, saved
 from vulnflow.correlate import Config
 from vulnflow.errors import UserError
 from vulnflow.ioc_archive import Matcher, read_archives
@@ -604,8 +604,8 @@ class CompareWebTests(unittest.TestCase):
 
 class CompareSampleTests(unittest.TestCase):
     """The two-company sample: Ridgeline (the Gootloader sample and two branch offices) and Corvane
-    (four sites, after Unit 42's Cairn report), both also reached by the CyberStrike AI FortiGate
-    campaign, loaded into an upload page's data folder and compared."""
+    (four sites, after Unit 42's Cairn report), both also reached by the ARTEX activity of Unit 42's
+    note of 30 October, loaded into an upload page's data folder and compared."""
 
     def test_checked_in_folder_matches_the_generator(self):
         root = os.path.join(os.path.dirname(__file__), "..", "samples", sample_compare.FOLDER)
@@ -653,23 +653,28 @@ class CompareSampleTests(unittest.TestCase):
         self.assertEqual(where(iocs["91.215.85.143"]), {"Ridgeline HQ", "Ridgeline Denver office"})   # the copied beacon
         self.assertEqual(where(vulns["62694"]), {"Corvane Phoenix plant", "Corvane Austin design center",
                                                  "Corvane Dresden service center"})         # the VPN gateways' IKE
-        # the CyberStrike AI FortiGate campaign in both companies: its two scanners at every new site, its
-        # brute-force address at Ridgeline's FortiGates and Corvane's website, its login address in Tampa only
+        # ARTEX (Unit 42's note of 30 October) in both companies: the scanner at every new site; the primary
+        # source and the API writer at Corvane HQ's web apps and Ridgeline's two FortiGates; the second
+        # Sub2API host at Ridgeline only; the LLM gateway domains nowhere
         new_sites = {name for folder, name, _, _ in sample_compare.SITES if folder != sample_gootloader.FOLDER}
-        for ip in (sample_cyberstrike.FP_A, sample_cyberstrike.FP_B):
-            self.assertEqual(where(iocs[ip]), new_sites)
+        self.assertEqual(where(iocs[sample_compare.AX_SCANNER]), new_sites)
+        for ip in (sample_compare.AX_SCANNER, sample_compare.AX_PRIMARY, sample_compare.AX_WRITER):
             self.assertEqual(iocs[ip]["networks"], 2)
-        self.assertEqual(where(iocs[sample_cyberstrike.CSAI]),
-                         {"Ridgeline Denver office", "Ridgeline Tampa office", "Corvane HQ"})
-        self.assertEqual(iocs[sample_cyberstrike.CSAI]["networks"], 2)
-        self.assertEqual(where(iocs[sample_cyberstrike.CAMPAIGN]), {"Ridgeline Tampa office"})
+        for ip in (sample_compare.AX_PRIMARY, sample_compare.AX_WRITER):
+            self.assertEqual(where(iocs[ip]), {"Ridgeline Denver office", "Ridgeline Tampa office", "Corvane HQ"})
+        self.assertEqual(where(iocs[sample_compare.AX_SUB2API]), {"Ridgeline Denver office", "Ridgeline Tampa office"})
+        for domain in sample_compare.AX_DOMAINS:
+            self.assertNotIn(domain, iocs)
         self.assertEqual(where(vulns["190020"]), {"Ridgeline Denver office", "Ridgeline Tampa office"})  # FortiOS
         self.assertEqual(where(vulns["910201"]), {"Ridgeline Tampa office"})              # a password alone
+        self.assertEqual(where(vulns["910302"]), {"Corvane HQ"})                          # the development API
         leads = {}
         for run_id in runs:
             res = saved.load_results(os.path.join(data, run_id, "out"))
             leads[res["report"]["name"]] = res["summary"]["hosts_to_investigate"]
-        self.assertEqual(leads["Corvane HQ"], ["172.16.10.10", "172.16.10.20"])          # www01 and the partner portal
+        # www01 and the partner portal (Cairn); the sign-in service, supplier portal and development API (ARTEX)
+        self.assertEqual(leads["Corvane HQ"], ["172.16.10.10", "172.16.10.20", "172.16.10.30", "172.16.10.40",
+                                               "172.16.10.50"])
         self.assertEqual(leads["Corvane Austin design center"], ["10.32.0.26"])           # the build server
         self.assertEqual(leads["Corvane Dresden service center"], [])                     # only failed VPN logins
         self.assertEqual(leads["Ridgeline Denver office"], ["10.21.0.20", "10.21.1.5"])   # den-fs01, the FortiGate
