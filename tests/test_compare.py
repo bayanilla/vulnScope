@@ -300,7 +300,7 @@ class CompareTests(unittest.TestCase):
         self.assertGreaterEqual(len(ip["islands"]), 3)          # both months of Plant 3 and Segment 6 at least
         hosts = {f"{h}@{isl[names[s['r']]]}" for s in row["seen"] for h in s["related"]}
         j = items.index(ip)
-        self.assertEqual({n["id"] for n in data["nodes"] if j in n.get("sh", ())}, hosts)   # lit in every network
+        self.assertEqual({n["id"] for n in data["nodes"] if j in n.get("sh", ())}, hosts)   # on its hosts in every network
         self.assertEqual(ip["drawn"], len(hosts))
         self.assertEqual(sorted(next(m for m in data["ioc_matches"] if m["value"] == "8.8.8.8")["hosts"]),
                          sorted(hosts))
@@ -604,7 +604,8 @@ class CompareWebTests(unittest.TestCase):
 
 class CompareSampleTests(unittest.TestCase):
     """The two-company sample: Ridgeline (the Gootloader sample and two branch offices) and Corvane
-    (four sites, after Unit 42's Cairn report), loaded into an upload page's data folder and compared."""
+    (four sites, after Unit 42's Cairn report), both also reached by the ARTEX activity of Unit 42's
+    note of 30 October, loaded into an upload page's data folder and compared."""
 
     def test_checked_in_folder_matches_the_generator(self):
         root = os.path.join(os.path.dirname(__file__), "..", "samples", sample_compare.FOLDER)
@@ -616,7 +617,10 @@ class CompareSampleTests(unittest.TestCase):
             for rel in made:
                 with open(os.path.join(tmp, rel), "rb") as a, open(os.path.join(root, rel), "rb") as b:
                     self.assertEqual(a.read(), b.read(), rel)
-        self.assertEqual(sorted(os.listdir(root)), sorted(f for f, *_ in sample_compare.SITES if f != sample_gootloader.FOLDER))
+        self.assertEqual(sorted(os.listdir(root)), ["corvane", "ridgeline", "sites.csv"])     # one folder per company
+        self.assertEqual(sorted(f"{company}/{site}" for company in ("corvane", "ridgeline")
+                                for site in os.listdir(os.path.join(root, company))),
+                         sorted(f for f, *_ in sample_compare.SITES if f != sample_gootloader.FOLDER))
 
     def test_one_command_loads_and_compares_seven_reports(self):
         data = tempfile.mkdtemp()
@@ -649,13 +653,32 @@ class CompareSampleTests(unittest.TestCase):
         self.assertEqual(where(iocs["91.215.85.143"]), {"Ridgeline HQ", "Ridgeline Denver office"})   # the copied beacon
         self.assertEqual(where(vulns["62694"]), {"Corvane Phoenix plant", "Corvane Austin design center",
                                                  "Corvane Dresden service center"})         # the VPN gateways' IKE
+        # ARTEX (Unit 42's note of 30 October) in both companies: the scanner at every new site; the primary
+        # source and the API writer at Corvane HQ's web apps and Ridgeline's two FortiGates; the second
+        # Sub2API host at Ridgeline only; the LLM gateway domains nowhere
+        new_sites = {name for folder, name, _, _ in sample_compare.SITES if folder != sample_gootloader.FOLDER}
+        self.assertEqual(where(iocs[sample_compare.AX_SCANNER]), new_sites)
+        for ip in (sample_compare.AX_SCANNER, sample_compare.AX_PRIMARY, sample_compare.AX_WRITER):
+            self.assertEqual(iocs[ip]["networks"], 2)
+        for ip in (sample_compare.AX_PRIMARY, sample_compare.AX_WRITER):
+            self.assertEqual(where(iocs[ip]), {"Ridgeline Denver office", "Ridgeline Tampa office", "Corvane HQ"})
+        self.assertEqual(where(iocs[sample_compare.AX_SUB2API]), {"Ridgeline Denver office", "Ridgeline Tampa office"})
+        for domain in sample_compare.AX_DOMAINS:
+            self.assertNotIn(domain, iocs)
+        self.assertEqual(where(vulns["190020"]), {"Ridgeline Denver office", "Ridgeline Tampa office"})  # FortiOS
+        self.assertEqual(where(vulns["910201"]), {"Ridgeline Tampa office"})              # a password alone
+        self.assertEqual(where(vulns["910302"]), {"Corvane HQ"})                          # the development API
         leads = {}
         for run_id in runs:
             res = saved.load_results(os.path.join(data, run_id, "out"))
             leads[res["report"]["name"]] = res["summary"]["hosts_to_investigate"]
-        self.assertEqual(leads["Corvane HQ"], ["172.16.10.10", "172.16.10.20"])          # www01 and the partner portal
+        # www01 and the partner portal (Cairn); the sign-in service, supplier portal and development API (ARTEX)
+        self.assertEqual(leads["Corvane HQ"], ["172.16.10.10", "172.16.10.20", "172.16.10.30", "172.16.10.40",
+                                               "172.16.10.50"])
         self.assertEqual(leads["Corvane Austin design center"], ["10.32.0.26"])           # the build server
         self.assertEqual(leads["Corvane Dresden service center"], [])                     # only failed VPN logins
+        self.assertEqual(leads["Ridgeline Denver office"], ["10.21.0.20", "10.21.1.5"])   # den-fs01, the FortiGate
+        self.assertEqual(leads["Ridgeline Tampa office"], ["10.22.0.20", "10.22.1.5"])    # tpa-fs01, the FortiGate
         # the upload page lists the seven reports and opens the comparison
         srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(data, Config()))
         threading.Thread(target=srv.serve_forever, daemon=True).start()

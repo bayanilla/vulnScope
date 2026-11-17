@@ -188,8 +188,8 @@ computer (for example `--llm-base-url http://localhost:11434/v1`).
 
 `example_output/` holds a finished synthetic 250-host run: open `explorer.html`,
 `executive_summary.html` or `technical_report.html` in your browser. Six bundled samples can be
-analyzed from the upload page (select the folder, then **Analyze folder**) or the command line, and a
-fifth loads straight into **Compare reports**:
+analyzed from the upload page (select the folder, then **Analyze folder**) or the command line, and
+the two-company sample makes a report per site and compares them:
 
 ```sh
 python3 -m vulnflow analyze samples/scan_and_telemetry \
@@ -199,7 +199,8 @@ python3 -m vulnflow analyze samples/hosts_onprem_and_aws -o hosts_output       #
 python3 -m vulnflow analyze samples/gootloader_seo_poisoning -o gootloader_output
 python3 -m vulnflow analyze samples/artex_ai_agentic_intrusion -o artex_output          # ARTEX agentic framework
 python3 -m vulnflow analyze samples/cyberstrike_ai_fortigate_intrusion -o cyberstrike_output  # CyberStrikeAI
-python3 -m vulnflow compare-sample      # two companies, seven site reports, compared (for serve's default folder)
+python3 -m vulnflow analyze-sites samples/compare_two_companies   # two companies, six site reports, compared
+python3 -m vulnflow compare-sample      # the same, plus the Gootloader sample as Ridgeline's head office
 ```
 
 All sample data is fabricated. See [the sample guide](samples/README.md) and the
@@ -237,6 +238,27 @@ Windows paths are translated). Picking a folder fills in the path and moves focu
 **Analyze folder**. A **/data** button switches to the `VULNSCOPE_DATA` folder. To share an
 evidence drive instead, or only one inbox folder for locked-down sites, set `VULNSCOPE_BROWSE` in
 `.env`; see [Docker folders](ARCHITECTURE.md#docker-container).
+
+**Several sites or companies in one folder.** One analysis treats everything in the folder as one
+network, so the same address at two companies (two head offices that both use `10.20.0.0/24`) becomes
+one host. To keep them apart, put each site's logs and scans in a folder of its own (one folder per
+company, with a folder per site inside it) and add a `sites.csv` next to the company folders:
+
+```csv
+folder,name,network,description
+corvane/hq,Corvane HQ,Corvane,Head office
+corvane/phoenix,Corvane Phoenix plant,Corvane,
+ridgeline/denver,Ridgeline Denver office,Ridgeline,
+```
+
+The button then reads **Analyze 3 sites and compare**. Each site gets its own report, named and with
+its network from the list (Report details are not used), and the comparison of them opens when they
+are done, with each company drawn as its own cluster on the all-networks map. Only `folder` is
+required: `name` defaults to the site folder's name and `network` to its company folder. An IOC CSV,
+`network_map.csv` or `known_scanners.csv` next to `sites.csv` is used for every site; logs and scans
+go in the site folders. From the command line, `python3 -m vulnflow analyze-sites /path/to/folder`
+writes the reports and the comparison into the upload page's data folder (`--data-dir`, default
+`vulnflow_runs`; in Docker, `docker compose run --rm vulnscope analyze-sites /data/folder`).
 
 **What it reads.** Zeek logs (TSV or JSON, or a Zui/Brim export), Palo Alto TRAFFIC/THREAT, Suricata EVE, generic flow
 CSVs (nfdump, AWS VPC Flow Logs, SIEM exports), Nessus `.nessus` or CSV, and:
@@ -430,20 +452,20 @@ vulnerabilities appear in more than one saved report, and in how many networks.
 
 **All networks in one Explorer.** **Open all networks in the Explorer** at the top of a comparison
 draws every compared report on one Explorer map. Each report is an island (a dashed ring) with its
-own subnets and hosts; outside addresses are merged onto the arc overhead, with beams down to each
-network they reached. Hosts with an IOC match or a vulnerability stay bright and the rest are
-dimmed. Hosts with an IOC or vulnerability that more than one report has get a magenta ring, with a
-beacon when only a few are lit. **Shared items** lists those IOCs and vulnerabilities: pick one to
-light up only its hosts, in every network, or tick **Only items in more than one network**. When
-the shared items would light up more than 400 hosts, the map opens with only the shared IOCs lit. A
-host's card names its network and report, lists what it shares with other reports, and links to
-that report's own Explorer, which has Attack paths, the Timeline and the full lists. To stay quick
-the map draws up to 3,000 hosts: hosts with shared items first, then the other IOC and
-vulnerability hosts, then the rest, taken in turn from each report.
+own subnets and hosts. Reports with the same network sit together inside a solid ring labelled with
+the network's name, each island labelled with its site, so every company is its own cluster. Outside
+addresses are merged onto the arc overhead, with beams down to each network they reached. Hosts with
+an IOC match or a vulnerability stay bright and the rest are dimmed; a teal ring marks an IOC match.
+Hover a host to see the IOCs and vulnerabilities it shares with other reports, or an outside address
+to see how many of the reports it exchanged traffic with. A host's card names its network and
+report, lists what it shares with other reports, and links to that report's own Explorer, which has
+Attack paths, the Timeline and the full lists. To stay quick the map draws up to 3,000 hosts: hosts
+with shared items first, then the other IOC and vulnerability hosts, then the rest, taken in turn
+from each report.
 
 Comparisons are saved in the data folder under `comparisons/<time>/` with `ioc_overlap.csv`,
 `vulnerability_overlap.csv` (one row per item and report), `comparison.json`, and the map as
-`explorer.html` with its data in `explorer.json` (the hosts, subnets, traffic and highlights of
+`explorer.html` with its data in `explorer.json` (the hosts, subnets, traffic and shared items of
 every network, for your own tools). They are listed under **Earlier comparisons**. The reports
 themselves are not changed. From the command line:
 
@@ -454,8 +476,11 @@ python3 -m vulnflow compare nov/out dec/out --network "dec/out=Plant 3"   # set 
 
 To try it, `python3 -m vulnflow compare-sample` (in Docker, `docker compose run --rm vulnscope
 compare-sample`) loads seven sample reports from two fictional companies into the upload page and
-compares them: the Gootloader intrusion and two branch offices of the same company, and an AI-driven
-intrusion after Unit 42's Cairn report at four sites of the other. See
+compares them: the Gootloader intrusion and two branch offices of the same company, an AI-driven
+intrusion after Unit 42's Cairn report at four sites of the other, and ARTEX activity from Unit 42's
+note of 30 October whose addresses reach both. Or choose
+`samples/compare_two_companies` under **Analyze folder**: its `sites.csv` makes a report for each of
+its six sites and opens their comparison. See
 [the Compare sample](samples/README.md#the-compare-sample-two-companies-seven-sites).
 
 Vulnerabilities are matched by Nessus plugin and IOCs by indicator, never by internal address,

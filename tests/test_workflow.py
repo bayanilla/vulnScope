@@ -528,8 +528,9 @@ class BundledSamplesTests(unittest.TestCase):
                              ["artex_ai_agentic_intrusion", "compare_two_companies", "cyberstrike_ai_fortigate_intrusion",
                               "gootloader_seo_poisoning", "hosts_onprem_and_aws",
                               "scan_and_telemetry", "telemetry_only"])
-            self.assertEqual(len(paths), 85)
-            self.assertEqual(len(os.listdir(os.path.join(root, "compare_two_companies"))), 6)   # six sites
+            self.assertEqual(len(paths), 91)
+            self.assertEqual(sorted(os.listdir(os.path.join(root, "compare_two_companies"))),
+                             ["corvane", "ridgeline", "sites.csv"])               # a folder per company
             self.assertTrue(os.path.isfile(os.path.join(root, "scan_and_telemetry", "quarterly_scan.nessus")))
             self.assertFalse(any(name.endswith((".nessus", "scan.csv"))
                                  for name in os.listdir(os.path.join(root, "telemetry_only"))))
@@ -815,6 +816,10 @@ class DockerEntrypointTests(unittest.TestCase):
                          ["compare-sample", "--data-dir", "/runs/x"])
         self.assertEqual(self.run_entrypoint(["compare-sample", "--data-dir=/runs/x", "--again"]),
                          ["compare-sample", "--data-dir=/runs/x", "--again"])
+        self.assertEqual(self.run_entrypoint(["analyze-sites", "/data/two"]),
+                         ["analyze-sites", "/data/two", "--data-dir=/runs/web"])
+        self.assertEqual(self.run_entrypoint(["analyze-sites", "/data/two", "--data-dir", "/runs/x"]),
+                         ["analyze-sites", "/data/two", "--data-dir", "/runs/x"])
         self.assertEqual(self.run_entrypoint(["ls", "/runs"]), ("shell", ["ls", "/runs"]))
 
 

@@ -507,7 +507,7 @@ class SuricataFuzz(FuzzCase):
             self.run_reader(suricata.parse, path)
             self.run_detected(path)
 
-        @given(mutated(head("compare_two_companies/ridgeline_tampa/suricata_eve.json", 30)))
+        @given(mutated(head("compare_two_companies/ridgeline/tampa/suricata_eve.json", 30)))
         def test_damaged_eve(self, data):
             path = self.write("eve.json", data)
             self.run_reader(suricata.parse, path)
@@ -578,7 +578,7 @@ class PipelineFuzz(FuzzCase):
         @given(mutated(head("scan_and_telemetry/zeek_conn.log", 80)),
                mutated(head("scan_and_telemetry/paloalto_traffic.csv", 60)),
                mutated(head("scan_and_telemetry/quarterly_scan.nessus", 150)),
-               mutated(head("compare_two_companies/ridgeline_tampa/suricata_eve.json", 40)))
+               mutated(head("compare_two_companies/ridgeline/tampa/suricata_eve.json", 40)))
         def test_damaged_folder_end_to_end(self, conn, pa, scan, eve):
             from vulnflow.correlate import correlate
             from vulnflow.normalize import load

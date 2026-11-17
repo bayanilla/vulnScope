@@ -137,6 +137,28 @@ def _compare(args) -> int:
     return 0
 
 
+def _analyze_sites(args) -> int:
+    """One report per site of a folder's sites list, then a comparison of them (sites.py)."""
+    from . import sites
+    if not os.path.isdir(args.folder):
+        print(f"error: folder not found: {args.folder}", file=sys.stderr)
+        return 2
+    try:
+        runs, cid = sites.analyze(args.data_dir, args.folder, _cfg(args), workdir=args.workdir,
+                                  log=lambda m: print(m, file=sys.stderr))
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    where = os.path.abspath(args.data_dir)
+    print(f"Analyzed {len(runs)} site(s) into {where}:")
+    for run_id in runs:
+        print(f"  /runs/{run_id}/")
+    print(f"and compared them: /compare/{cid}/")
+    print(f"Start the upload page on that folder (vulnflow serve --data-dir {args.data_dir}) and open "
+          "Compare reports to see them.")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="vulnflow", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -263,6 +285,13 @@ def main(argv=None) -> int:
                     help="the upload page's data folder (default vulnflow_runs, as for serve)")
     cs.add_argument("--again", action="store_true", help="add another set even if the seven reports are already there")
 
+    st = sub.add_parser("analyze-sites", help="analyze a folder with a sites list (sites.csv) as one report per site, "
+                                              "then compare them, into the upload page's data folder")
+    st.add_argument("folder", help="folder with sites.csv and one subfolder per site")
+    st.add_argument("--data-dir", default="vulnflow_runs",
+                    help="the upload page's data folder (default vulnflow_runs, as for serve)")
+    common(st)
+
     fb = sub.add_parser("filebeat-to-zeek",
                         help="turn a Filebeat/Elastic export (CSV or NDJSON) of Zeek logs back into Zeek logs")
     fb.add_argument("files", nargs="+", help="exported CSV/NDJSON file(s), plain or .gz")
@@ -312,8 +341,10 @@ def main(argv=None) -> int:
             print(f"and compared them: /compare/{cid}/")
         print("On the upload page, open Compare reports to see them.")
         return 0
-    if args.cmd in ("analyze", "explore", "serve"):
+    if args.cmd in ("analyze", "explore", "serve", "analyze-sites"):
         os.umask(0o077)          # reports, normalized logs and spooled data are private to this account
+    if args.cmd == "analyze-sites":
+        return _analyze_sites(args)
     if args.cmd == "samples":
         from .samples import generate_bundles
         for p in generate_bundles(args.outdir):
@@ -367,6 +398,13 @@ def main(argv=None) -> int:
             return 2
 
     from .pipeline import input_files, run
+    from .sites import find as find_sites
+    for folder in args.files:
+        listed = find_sites(folder) if os.path.isdir(folder) else None
+        if listed:
+            print(f"note: {folder} has a sites list ({os.path.basename(listed)}); this makes one report of "
+                  f"everything in it. `vulnflow analyze-sites {folder}` makes one report per site and compares "
+                  "them, so each network's sites stay apart.", file=sys.stderr)
     if args.cmd == "explore" and not args.out:
         args.out = os.path.join("vulnflow_out", os.path.basename(os.path.abspath(args.files[0])) or "explore")
     overrides = dict(x.split("=", 1) for x in args.format)

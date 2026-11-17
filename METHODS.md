@@ -251,6 +251,9 @@ Compare reports reads finished report folders and changes none of them.
   the host count adds the reports' hosts together.
 - **Networks.** A report's network is its Network field (Report details or `--network-name`), else
   its report name, else its folder name. Names that differ only in case or spacing are one network.
+  A folder analyzed with a `sites.csv` gives each site's report the network from the list, or the
+  site's company folder (`corvane` for `corvane/hq`), so the same address at two companies stays two
+  hosts in two reports.
 - **Same analysis.** A report and its reopened copy, or one folder given twice (same analysis time,
   name and counts), count once, with a note.
 - **Looking for IOCs again (re-hunt).** Every IOC any chosen report matched, and every indicator
@@ -271,16 +274,16 @@ Compare reports reads finished report folders and changes none of them.
   from another analysis than its `results.json`, is left off with a note. Internal addresses stay
   on their report's island (on the map and in `explorer.json` a host's id is `<address>@<island>`).
   Outside addresses are the same everywhere, so each is drawn once, with its sessions and alerts
-  added over the networks that reached it. Three levels of highlight: a host is **lit** when it has
-  an IOC or vulnerability that the comparison found in more than one report; **highlighted** when
-  it has an IOC match or a vulnerability of its own; **dimmed** otherwise. The IOCs are the
-  comparison's (each analysis' own matches plus the re-hunt's), so a host can be lit for an IOC its
+  added over the networks that reached it. A host with an IOC match or a vulnerability is drawn as
+  usual and the rest are **dimmed**; the hover and host cards list the IOCs and vulnerabilities a
+  host shares with other reports (those the comparison found in more than one report). The IOCs are
+  the comparison's (each analysis' own matches plus the re-hunt's), so a host can share an IOC its
   own report never matched.
-- **What the map leaves out.** Over 3,000 hosts it keeps the lit hosts first, then the
-  highlighted, then the rest, taking each report's hosts in turn and each report's riskiest first,
-  so one large network can't crowd the others off. Host cards keep their first 24 outside
-  addresses and peers, and each outside address beams down to 12 hosts, the worst of each network
-  in turn. The report's own Explorer (linked from every card) has everything. Attack paths and the
+- **What the map leaves out.** Over 3,000 hosts it keeps the hosts with shared items first, then
+  the other IOC and vulnerability hosts, then the rest, taking each report's hosts in turn and each
+  report's riskiest first, so one large network can't crowd the others off. Host cards keep their
+  first 24 outside addresses and peers, and each outside address beams down to 12 hosts, the worst
+  of each network in turn. The report's own Explorer (linked from every card) has everything. Attack paths and the
   Timeline follow one network's traffic, so they are only in each report's own Explorer.
 
 ## Processing limits
