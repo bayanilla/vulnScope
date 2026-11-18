@@ -7,7 +7,8 @@ and optional Nessus results, then writes an **executive summary**, a **technical
 interactive **Explorer** of the hosts involved. When scan findings are present, it correlates
 vulnerable services with observed reachability and investigation leads. With telemetry alone, it
 reports observed connections, IPS/IDS alerts and exact IOC matches, and marks vulnerability status
-as **unknown**.
+as **unknown**. Inputs are streamed into Parquet and correlated with DuckDB, so multi-GB log sets
+fit in bounded memory.
 
 **Proof of concept.** VulnScope is a local investigation aid for analysts. It reads files you
 already have; it never scans, probes or contacts the hosts and addresses in your data. Scores and
@@ -15,15 +16,11 @@ indicators come from fixed, documented rules. An AI model is used only if you ch
 optional Security Assistant or article briefs. Reports prioritize investigation; they do not
 confirm a compromise, establish exposure on their own, or replace host forensics.
 
-The command-line package is `vulnflow`. VulnScope Explorer is the interactive network view.
-This repository (MAX) is the scaled version for multi-GB inputs; it streams parsers into Parquet
-and correlates with DuckDB.
+The command-line package is `vulnflow`.
 
 ## Contents
 
 - [Start VulnScope](#start-vulnscope)
-  - [Update VulnScope (Docker)](#update-vulnscope-docker)
-  - [Port in use or page won't load](#port-in-use-or-page-wont-load)
 - [Analyze your logs and scans](#analyze-your-logs-and-scans)
 - [Explore hosts](#explore-hosts)
 - [Ask the Security Assistant](#ask-the-security-assistant)
@@ -38,13 +35,12 @@ and correlates with DuckDB.
 
 ### With Docker (Linux, macOS, Windows, air-gapped networks)
 
-One image holds VulnScope, DuckDB and [Zeek](https://zeek.org) for linux/amd64 and linux/arm64
-(Intel/AMD PCs, servers and Apple silicon Macs), so packet captures work out of the box. You need
-Docker Desktop on macOS and Windows, or Docker Engine with the Compose plugin on Linux.
+One image holds VulnScope, DuckDB and [Zeek](https://zeek.org) for linux/amd64 and linux/arm64, so
+packet captures work out of the box. You need Docker Desktop on macOS and Windows, or Docker Engine
+with the Compose plugin on Linux.
 
-**Ready-made image (nothing to build).** Each release publishes the image to
-`ghcr.io/bayanilla/vulnscope-max`. From the [latest release](https://github.com/bayanilla/vulnscope_max/releases/latest)
-download `compose.yaml` and `env.example` into a folder of their own, then:
+From the [latest release](https://github.com/bayanilla/vulnscope_max/releases/latest), download
+`compose.yaml` and `env.example` into a folder of their own, then:
 
 ```sh
 cp env.example .env           # optional: set VULNSCOPE_DATA, VULNSCOPE_RUNS, port, memory
@@ -52,197 +48,77 @@ docker compose pull           # download the image
 docker compose up -d          # start the upload page
 ```
 
-**Build it yourself** from this repository instead (for changes not released yet):
+Open **http://127.0.0.1:8765/**. Results go to `VULNSCOPE_RUNS` (default `./vulnscope-out`). Stop
+it with `docker compose down`.
 
-```sh
-git clone https://github.com/bayanilla/vulnscope_max.git
-cd vulnscope_max
-cp .env.example .env          # optional: set VULNSCOPE_DATA, VULNSCOPE_RUNS, port, memory
-docker compose up -d          # builds once, then starts the upload page
-```
+To build the image from source instead, clone this repository, `cp .env.example .env`, and run
+`docker compose up -d`. For networks with no internet, each release also carries the image as a
+file to `docker load`; see [Air-gapped networks](ARCHITECTURE.md#air-gapped-networks-and-enclaves).
 
-Either way, open **http://127.0.0.1:8765/** (Docker uses 8765 on your computer because 8080 is
-often taken by Burp Suite or OWASP ZAP; see [Port in use](#port-in-use-or-page-wont-load)). Results go to `VULNSCOPE_RUNS` (default
-`./vulnscope-out`). Stop it with `docker compose down`. For enclaves with no internet, each release
-also has the image as a file per architecture (`vulnscope-max-<version>-image-amd64.tar.gz` for
-Intel/AMD, `-arm64` for Apple silicon and ARM servers) to carry across and `docker load`, with the
-steps in the release's `LOAD.txt`; see [Air-gapped networks](ARCHITECTURE.md#air-gapped-networks-and-enclaves).
-
-### Update VulnScope (Docker)
-
-The image holds a copy of the code taken when it was built (or released), so restarting Docker or
-the container keeps running the old version.
-
-With the **ready-made image**, download the new version and restart on it:
-
-```sh
-docker compose pull && docker compose up -d
-```
-
-If you pinned a version with `VULNSCOPE_IMAGE=ghcr.io/bayanilla/vulnscope-max:1.2.0` in `.env`,
-change the number first. Offline, `docker load` the newer image file, then `docker compose up -d`.
-
-If you **built it yourself**, rebuild:
-
-```sh
-cd vulnscope_max                       # the folder you cloned
-git pull --ff-only origin main         # get the new version
-docker compose up -d --build           # rebuild the image and restart (a minute or two)
-```
-
-Then reload the page in the browser and **run Analyze again** on your data. Each run's
-`explorer.html` and reports keep the version they were made with, so older runs do not pick up new
-features or fixes. Your `.env`, run folders, settings and branding are not touched.
-
-To check that it worked, `docker compose ps` should show the container as `Up` (not
-`Restarting`), and `docker compose logs --tail 30` shows recent errors.
-
-| Problem | What to do |
-|---|---|
-| `git pull` refuses: "Your local changes would be overwritten" | Someone edited files in the folder. `git status` lists them. Keep a copy with `git stash` (put it back later with `git stash pop`), or discard them with `git checkout -- <file>`, then pull again. `.env` is not tracked, so your settings are safe. |
-| macOS: `docker: command not found` or `docker-credential-desktop` not found | Docker Desktop's tools are not on your PATH. Run `export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"`, or add that line to `~/.zshrc`. |
-| The page looks unchanged after updating | You restarted without `--build` (or `pull`), or are looking at an old run. Update as above, reload, and analyze again. |
-| `docker compose pull`: "denied" or "unauthorized" | The image is not public yet, or the name in `VULNSCOPE_IMAGE` is wrong. Check the [package page](https://github.com/bayanilla/vulnscope_max/pkgs/container/vulnscope-max), or build it yourself. |
-| Explorer, theme or view choices look different | The browser remembers them per address (`127.0.0.1:8765` and `127.0.0.1:8080` are separate). Pick them again, or clear the site's data. |
-| Air-gapped bundle | Load the newer image file from the release and `docker compose up -d`, or build a new bundle on a connected computer, `docker load` the new image, unpack the new source over the old folder (keep your `.env`), then `docker compose up -d --no-build`. See [Air-gapped networks](ARCHITECTURE.md#air-gapped-networks-and-enclaves). |
+**Update.** The image holds the code it was built with, so a restart keeps the old version.
+Run `docker compose pull && docker compose up -d` (or, from source, `git pull` then
+`docker compose up -d --build`), then **analyze your data again**: each run's reports and Explorer
+keep the version they were made with. Your `.env`, runs, settings and branding are kept.
 
 ### With Python
 
-With Python 3.10 or later, install the one dependency, [DuckDB](https://duckdb.org), in the same
-Python you will run VulnScope with (activate your virtual environment first, or use the interpreter
-in VS Code's status bar):
+With Python 3.10 or later, in the environment you will run VulnScope from:
 
 ```sh
-python3 -m pip install -r requirements.txt
-python3 -m vulnflow serve            # upload page on http://127.0.0.1:8080/
+python3 -m pip install -r requirements.txt   # DuckDB, the one dependency
+python3 -m vulnflow serve                    # upload page on http://127.0.0.1:8080/
 ```
 
-`start_upload_page.py` does the same from VS Code's Run button and opens the browser. Without the
-install step VulnScope stops with `ModuleNotFoundError: No module named 'duckdb'`. Packet captures
-also need Zeek (`brew install zeek`, a Linux package, or `VULNSCOPE_ZEEK=/path/to/zeek`).
+`python3 start_upload_page.py` does the same, picks a free port and opens the browser. Packet
+captures also need Zeek on the PATH (or `VULNSCOPE_ZEEK=/path/to/zeek`).
 
-### Port in use or page won't load
-
-VulnScope never changes your computer's network or proxy settings. If the upload page does not
-start or does not open, check these on your system.
-
-**The port is already in use.** Docker uses port **8765** on your computer; the Python
-`serve` command uses **8080**. Another program on this computer may already be listening there:
-often a local proxy (Burp Suite, OWASP ZAP and mitmproxy all default to 8080), another web app, or
-another VulnScope (an older copy, or one started from the other compose file). You see:
-
-- Docker: `Bind for 127.0.0.1:8765 failed: port is already allocated`, `ports are not available`
-  (Docker Desktop), or on Linux
-  `failed to bind host port ... address already in use`, and the container does not start.
-- Python: `OSError: [Errno 48] Address already in use` (macOS), `[Errno 98]` (Linux) or
-  `[WinError 10048]` (Windows).
-
-Find out what is using the port (the commands use 8765, the Docker port; for Python use 8080):
-
-| System | Command |
-|---|---|
-| macOS | `lsof -nP -iTCP:8765 -sTCP:LISTEN` |
-| Linux | `sudo ss -ltnp 'sport = :8765'` |
-| Windows (PowerShell) | `Get-Process -Id (Get-NetTCPConnection -LocalPort 8765 -State Listen).OwningProcess` |
-| Windows (Command Prompt) | `netstat -ano \| findstr :8765`, then `tasklist /FI "PID eq <pid>"` |
-| Docker | `docker ps --filter publish=8765` (another container holding the port) |
-
-Then either stop that program, or run VulnScope on another port:
-
-- **Docker:** set `VULNSCOPE_PORT=8090` in `.env` (the same for the ready-made and the self-built
-  `compose.yaml`), run `docker compose up -d`, and open **http://127.0.0.1:8090/**. Do not edit the
-  `ports:` line in `compose.yaml`: the `8080` on its right is the port inside the container, and
-  changing it stops the page from answering. The ready-made `compose.yaml` runs as its own project
-  (`vulnscope-release`), so it and a self-built copy can run side by side on different ports.
-- **Python:** `python3 -m vulnflow serve --port 8090`, then open **http://127.0.0.1:8090/**.
-  `start_upload_page.py` already moves to the next free port on its own and prints which one.
-
-Theme, view and Explorer choices are remembered per address, so on a new port pick them again.
-
-**The page will not load behind a proxy.** If your browser or operating system sends web traffic
-through a proxy, it may also send `http://127.0.0.1:8765/` there, and the proxy refuses or cannot
-reach it (an error page from the proxy, a timeout, or "access denied"). Add `127.0.0.1` and
-`localhost` to the proxy bypass list:
-
-- **Windows:** Settings > Network & internet > Proxy > Manual proxy setup, add
-  `127.0.0.1;localhost` under "Use the proxy server except for addresses", and tick
-  "Don't use the proxy server for local (intranet) addresses".
-- **macOS:** System Settings > Network > (your connection) > Details > Proxies, add `127.0.0.1`
-  and `localhost` to "Bypass proxy settings for these hosts & domains".
-- **Firefox** has its own setting: Settings > Network Settings, "No proxy for".
-- **PAC file or group policy:** if a managed PAC file sends everything to the proxy or the settings
-  are locked, ask your IT or proxy team to exempt `127.0.0.1` and `localhost`.
-
-Chrome and Edge already skip the proxy for `localhost` and `127.0.0.1` unless a policy or PAC file
-says otherwise. A proxy on another machine (such as `proxy.corp.example:8080`) does not conflict
-with VulnScope's port; only a program listening on this computer does. Always open the page as
-`127.0.0.1` or `localhost`: other names for this computer are refused on purpose (see
-[Upload page security](ARCHITECTURE.md#upload-page-security)).
-
-If you set `HTTP_PROXY` or `HTTPS_PROXY` in the environment VulnScope runs in, its own outbound
-calls (IOC article previews, Cloudflare Radar, the AI provider) use that proxy too. Add
-`NO_PROXY=localhost,127.0.0.1` there if you point the Security Assistant at a model on this
-computer (for example `--llm-base-url http://localhost:11434/v1`).
+If the page does not start or load (port in use, a proxy in the way, an update that doesn't show),
+see [Troubleshooting](docs/TROUBLESHOOTING.md).
 
 ### Try it without your own data
 
 `example_output/` holds a finished synthetic 250-host run: open `explorer.html`,
-`executive_summary.html` or `technical_report.html` in your browser. Six bundled samples can be
-analyzed from the upload page (select the folder, then **Analyze folder**) or the command line, and
-the two-company sample makes a report per site and compares them:
+`executive_summary.html` or `technical_report.html` in your browser. To analyze a bundled sample:
 
 ```sh
-python3 -m vulnflow analyze samples/scan_and_telemetry \
-    --article-preview-cache samples/scan_and_telemetry/article_previews.json -o example_output
-python3 -m vulnflow analyze samples/telemetry_only -o telemetry_output        # no scan, includes OT
-python3 -m vulnflow analyze samples/hosts_onprem_and_aws -o hosts_output       # 4,324 hosts, on-prem + AWS
 python3 -m vulnflow analyze samples/gootloader_seo_poisoning -o gootloader_output
-python3 -m vulnflow analyze samples/artex_ai_agentic_intrusion -o artex_output          # ARTEX agentic framework
-python3 -m vulnflow analyze samples/cyberstrike_ai_fortigate_intrusion -o cyberstrike_output  # CyberStrikeAI
-python3 -m vulnflow analyze-sites samples/compare_two_companies   # two companies, six site reports, compared
-python3 -m vulnflow compare-sample      # the same, plus the Gootloader sample as Ridgeline's head office
+python3 -m vulnflow compare-sample      # seven site reports from two companies, plus their comparison
 ```
 
-All sample data is fabricated. See [the sample guide](samples/README.md) and the
-[screenshot gallery](screenshots/README.md). Already using vulnScope PRO? Read
-[the upgrade notes](UPGRADE.md).
+All sample data is fabricated. [The sample guide](samples/README.md) describes every sample and
+scenario, and the [screenshot gallery](screenshots/README.md) shows the reports and views.
 
 ## Analyze your logs and scans
 
 1. On the upload page, enter a folder path on the computer running the server, or click
    **Browse…**, then **Analyze folder**. Every file in it and its subfolders is read where it sits;
    nothing is copied. Formats are detected by content, so any mix of files works. You can instead
-   upload telemetry and scan files under **Analyze files** (up to 1 GB per upload by default).
+   upload files under **Analyze files** (up to 1 GB per upload by default).
 2. Optionally list your internal networks. The default is RFC 1918, CGNAT, loopback, link-local and
    ULA ranges.
 3. Optionally open **Report details** to give the run a name, the **network** or site the data
-   comes from, and a description. They appear at the top of the reports and in the Explorer, the
-   run folder is named after the report, and [Compare reports](#compare-reports) counts reports with
-   the same network as one network.
-4. While the run works, the page shows your logo (or the Múcaro mark) turning slowly with an
-   elapsed timer. One analysis runs at a time; a second is refused with a message.
-5. The results page links the reports, the Explorer and the Security Assistant.
+   comes from, and a description. They appear in the reports and the Explorer, name the run folder,
+   and let [Compare reports](#compare-reports) group reports from the same network.
+4. When the run finishes, the results page links the reports, the Explorer and the Security
+   Assistant. One analysis runs at a time.
 
-From the command line the same run is:
+From the command line:
 
 ```sh
 python3 -m vulnflow analyze /path/to/case -o out --internal-net 10.0.0.0/8
 python3 -m vulnflow analyze /path/to/case -o out --name "Plant 3 November" --network-name "Plant 3"
-python3 -m vulnflow explore ~/Documents/case-logs        # analyze and open the Explorer
+python3 -m vulnflow explore /path/to/case        # analyze and open the Explorer
 ```
 
-**Browse.** On a Mac running natively, **Browse…** opens the system's Choose Folder dialog. In
-Docker, Compose shares your home folder **read-only** and Browse walks it like a file picker
-(`/Users/you` on macOS, `/home/you` on Linux, `/host` for `C:\Users\you` on Windows; pasted
-Windows paths are translated). Picking a folder fills in the path and moves focus to
-**Analyze folder**. A **/data** button switches to the `VULNSCOPE_DATA` folder. To share an
-evidence drive instead, or only one inbox folder for locked-down sites, set `VULNSCOPE_BROWSE` in
-`.env`; see [Docker folders](ARCHITECTURE.md#docker-container).
+**In Docker**, Compose shares your home folder **read-only** and **Browse** walks it (`/Users/you`
+on macOS, `/home/you` on Linux, `/host` for `C:\Users\you` on Windows; pasted Windows paths are
+translated). To share an evidence drive or a single inbox folder instead, set `VULNSCOPE_BROWSE`
+in `.env`; see [Docker folders](ARCHITECTURE.md#docker-container).
 
-**Several sites or companies in one folder.** One analysis treats everything in the folder as one
-network, so the same address at two companies (two head offices that both use `10.20.0.0/24`) becomes
-one host. To keep them apart, put each site's logs and scans in a folder of its own (one folder per
-company, with a folder per site inside it) and add a `sites.csv` next to the company folders:
+**Several sites or companies in one folder.** One analysis treats everything in a folder as one
+network, so the same private address at two sites becomes one host. To keep sites apart, give each
+its own folder (one folder per company, a folder per site inside it) and add a `sites.csv` next to
+the company folders:
 
 ```csv
 folder,name,network,description
@@ -251,71 +127,55 @@ corvane/phoenix,Corvane Phoenix plant,Corvane,
 ridgeline/denver,Ridgeline Denver office,Ridgeline,
 ```
 
-The button then reads **Analyze 3 sites and compare**. Each site gets its own report, named and with
-its network from the list (Report details are not used), and the comparison of them opens when they
-are done, with each company drawn as its own cluster on the all-networks map. Only `folder` is
-required: `name` defaults to the site folder's name and `network` to its company folder. An IOC CSV,
-`network_map.csv` or `known_scanners.csv` next to `sites.csv` is used for every site; logs and scans
-go in the site folders. From the command line, `python3 -m vulnflow analyze-sites /path/to/folder`
-writes the reports and the comparison into the upload page's data folder (`--data-dir`, default
-`vulnflow_runs`; in Docker, `docker compose run --rm vulnscope analyze-sites /data/folder`).
+The button then reads **Analyze 3 sites and compare**: each site gets its own report, and their
+comparison opens when they are done. Only `folder` is required; `name` defaults to the site folder
+and `network` to the company folder. An IOC CSV, `network_map.csv` or `known_scanners.csv` next to
+`sites.csv` applies to every site. From the command line: `python3 -m vulnflow analyze-sites /path/to/folder`.
 
-**What it reads.** Zeek logs (TSV or JSON, or a Zui/Brim export), Palo Alto TRAFFIC/THREAT, Suricata EVE, generic flow
-CSVs (nfdump, AWS VPC Flow Logs, SIEM exports), Nessus `.nessus` or CSV, and:
+**What it reads.** Zeek logs (TSV or JSON, or a Zui/Brim export), Palo Alto TRAFFIC/THREAT,
+Suricata EVE, generic flow CSVs (nfdump, AWS VPC Flow Logs, SIEM exports), Nessus `.nessus` or CSV,
+and:
 
-- **Packet captures.** `.pcap`/`.pcapng` files, plain or `.gz`, are run through Zeek into a
-  temporary folder, analyzed as Zeek logs, then deleted. Each capture is listed in the input table
-  with the Zeek version and logs produced; a capture Zeek can't read is reported and the run
-  continues.
-- **Zeek logs shipped by Filebeat.** A Kibana Discover CSV or NDJSON export of Filebeat's Zeek
-  module is turned back into Zeek records, reversing the ECS field renames. To get clean Zeek logs
-  for another tool: `python3 -m vulnflow filebeat-to-zeek kibana_export.csv -o zeek_logs/`.
-- **IOC CSV.** A typed `type,indicator[,source_url]` file (`ip`, `domain`, `url`, `hash`, `cve`,
-  `package`) in the folder, uploaded, or passed with `--ioc-csv`. Exact matches are reported.
-- **Network map.** An optional `network_map.csv` (`cidr,name,type`) marks cloud networks such as
-  AWS VPCs. Without it nothing changes.
-- **Known scanners.** An optional `known_scanners.csv` (`address,name`, one address or range per
-  line) lists scanners you run yourself. Hosts whose traffic looks like scanning are always
-  reported; the ones on this list are labelled "expected" instead of "review".
+- **Packet captures** (`.pcap`/`.pcapng`, plain or `.gz`), run through Zeek into a temporary folder.
+  A capture Zeek can't read is reported and the run continues.
+- **Zeek logs shipped by Filebeat**, from a Kibana Discover CSV or NDJSON export. To get plain Zeek
+  logs for another tool: `python3 -m vulnflow filebeat-to-zeek kibana_export.csv -o zeek_logs/`.
+- **IOC CSV**: `type,indicator[,source_url]` (`ip`, `domain`, `url`, `hash`, `cve`, `package`), in
+  the folder, uploaded, or passed with `--ioc-csv`. Exact matches are reported.
+- **Network map** (optional): `network_map.csv` (`cidr,name,type`) marks cloud networks such as AWS
+  VPCs.
+- **Known scanners** (optional): `known_scanners.csv` (`address,name`) lists scanners you run
+  yourself, so they are labelled "expected" instead of "review".
 
-[Methods](METHODS.md#inputs-and-normalization) lists every format, how it is detected, and what
-each source can and cannot contribute. Force a format with `--format file.csv=paloalto` if
-detection guesses wrong.
+[Methods](METHODS.md#inputs-and-normalization) lists every format, how it is detected, and what each
+source can and cannot contribute. Force a format with `--format file.csv=paloalto` if detection
+guesses wrong.
 
-**Large inputs.** Inputs are streamed, written to Parquet by sensor and day, and de-duplicated
-with DuckDB. DuckDB sizes its memory and threads to the machine and spills to disk beyond that;
-plan for free disk of about the size of the uncompressed logs. `--workdir` (or
-`VULNSCOPE_WORKDIR`) moves the temporary files. See
-[Large inputs](ARCHITECTURE.md#large-inputs-and-resource-sizing) for sizing and overrides.
+**Large inputs.** DuckDB sizes its memory and threads to the machine and spills to disk beyond that;
+plan for free disk of about the size of the uncompressed logs. `--workdir` (or `VULNSCOPE_WORKDIR`)
+moves the temporary files. See [Large inputs](ARCHITECTURE.md#large-inputs-and-resource-sizing).
 
 ## Explore hosts
 
-`explorer.html` is written with every run. It is a single offline file with three.js bundled
-inside. It needs Chrome or Edge 80+, Firefox 113+ or Safari 16.4+ (2023 or later), whose built-in
-gzip decoder unpacks the report data; an older browser shows a note saying so. The view switcher offers:
+`explorer.html` is written with every run: a single offline file that opens in Chrome or Edge 80+,
+Firefox 113+ or Safari 16.4+. The view switcher offers:
 
-- **3D** (default where WebGL works). Each subnet is a platform and each host a pillar whose
-  height is its risk score (outside exposure without a scan). Risky paths and the most significant
-  outside addresses, on an arc overhead, are drawn. It opens on the Low view, turning slowly left.
-  Drag to rotate, right-drag or Shift-drag to pan, middle-drag to move the picture up or down,
-  scroll to zoom. The same mouse controls work in the Timeline.
-- **Flat** (or the 2 key, remembered; `explorer.html?2d` always opens flat).
-- **Attack paths**, the most likely ways in drawn like a transit map (internet origin, entry,
-  first and second pivot). **Simulate fix** is a what-if that shows how much path risk fixing or
-  isolating one host would remove; nothing on the network changes.
-- **Timeline** (I key, or `explorer.html#timeline`), a tunnel through time where every flow is a
-  chord at the moment it happened, with alerts as rings and IOC lookups as pink dots. Alerts the
-  log gave no time are listed apart under **Alerts with no time** rather than placed at a guess.
+- **3D** (the default where WebGL works). Each subnet is a platform and each host a pillar whose
+  height is its risk score. Risky paths and the most significant outside addresses, on an arc
+  overhead, are drawn. Drag to rotate, right-drag or Shift-drag to pan, middle-drag to move the
+  picture up or down, scroll to zoom.
+- **Flat** (the 2 key; `explorer.html?2d` always opens flat).
+- **Attack paths**, the most likely ways in drawn like a transit map (internet origin, entry, first
+  and second pivot). **Simulate fix** shows how much path risk fixing or isolating one host would
+  remove; nothing on the network changes.
+- **Timeline** (the I key, or `explorer.html#timeline`), a tunnel through time where every flow is a
+  chord at the moment it happened, with alerts as rings and IOC lookups as dots.
 
-Click a host, or pick it from the host list (grouped by subnet, riskiest first; **By subnet**
-switches to a flat list), and the camera flies to it. A subnet's header also counts the addresses
-there that were probed and never answered; they are not hosts and are not drawn. Hosts whose
-traffic looks like scanning are named **Scanner (review)** or **Expected scanner**. The left side shows outside addresses that
-exchanged traffic with it; the right side shows internal peers with an estimated likelihood that
-a compromise could spread there. The panel lists every recorded IP with session counts and
-connection tuples. **Focus** pivots to a peer; Esc or **← All hosts** goes back. The **?** at the
-right of the top buttons explains the current view in a note centered under the picture; the note
-also opens by itself for 15 seconds when a view opens. Deep links work:
+Click a host, or pick it from the host list (grouped by subnet, riskiest first), and the camera
+flies to it. The left side shows outside addresses that exchanged traffic with it; the right side
+shows internal peers with an estimated likelihood that a compromise could spread there. The panel
+lists every recorded IP with session counts and connection tuples. **Focus** pivots to a peer; Esc
+or **← All hosts** goes back. The **?** button explains the current view. Deep links work:
 `explorer.html#host=10.0.1.10`.
 
 Drawing limits keep large runs responsive; [Methods](METHODS.md#explorer-drawing-and-sampling)
@@ -337,16 +197,15 @@ To use a model instead, open **Security Assistant settings** and pick a provider
 | `openai` | OpenAI's API or an OpenAI-hosted gateway | `OPENAI_API_KEY` |
 | `local` | Any OpenAI-compatible server you run (Ollama, vLLM, LM Studio, llama.cpp) | usually none |
 
-No vendor is preselected. With a hosted provider, correlated results (not raw logs) leave your
-network; **Redact IPs and hostnames** replaces them with tokens and refuses to send if any survive.
-If the endpoint is neither OpenAI's API nor this computer, the settings page warns that questions,
-run data and the key will go to that server; keep it only if you set it up.
-The same commands work from the terminal (`brief`, `ask`, `analyze --llm`); see
-[Methods](METHODS.md#security-assistant) for flags and safeguards.
+With a hosted provider, correlated results (not raw logs) leave your network; **Redact IPs and
+hostnames** replaces them with tokens and refuses to send if any survive. If the endpoint is
+neither OpenAI's API nor this computer, the settings page warns that questions, run data and the
+key will go to that server. The same features work from the terminal (`brief`, `ask`,
+`analyze --llm`); see [Methods](METHODS.md#security-assistant) for flags and safeguards.
 
 **Article briefs.** When IOC matches carry source article links and you have chosen OpenAI,
-**Generate article briefs with OpenAI** on the results page summarizes each article with Múcaro's
-article prompt. Nothing is sent until you click it.
+**Generate article briefs with OpenAI** on the results page summarizes each article. Nothing is
+sent until you click it.
 
 ## Interpret and validate the report
 
@@ -369,22 +228,19 @@ so the reports never overstate them:
 
 **Worked example:** analyze the bundled Gootloader sample and open `hr-ws-07` (10.20.10.27) in the
 Explorer. Follow its download, the beacon to an outside address and the SMB and RDP sessions to
-the domain controllers in the Timeline. Give the
-host owner the finding, the session tuples and times, and the suggested Zeek or Palo Alto filter.
-They can confirm on the host (EDR, memory, logs) whether the activity happened and whether the
-service should be reachable.
+the domain controllers in the Timeline. Give the host owner the finding, the session tuples and
+times, and the suggested Zeek or Palo Alto filter. They can confirm on the host (EDR, memory, logs)
+whether the activity happened and whether the service should be reachable.
 
 Absence of traffic means "not observed by these sensors". Scanned hosts never seen on the wire,
 and active servers never scanned, are listed as coverage gaps rather than scored as safe. An IOC
 match is a lead for review, not proof of compromise.
 
 **What counts as a host.** A host is an internal address that started a session or answered one.
-Addresses a scanner probed that never answered are counted on a separate line (with the most
-probed ranges, and how many a firewall log shows as blocked) and listed in
-`normalized/probed_addresses.csv`, so a large scan no longer inflates the host count. A
-**Scanning hosts** section lists hosts that probed many addresses or ports with mostly failed
-sessions; those not in your `known_scanners.csv`, and not the Nessus scanner, are marked **Review**.
-Detection only labels hosts; it does not change scores.
+Addresses that were probed but never answered are counted separately and listed in
+`normalized/probed_addresses.csv`. A **Scanning hosts** section lists hosts that probed many
+addresses or ports with mostly failed sessions; those not in your `known_scanners.csv`, and not the
+Nessus scanner, are marked **Review**. Detection only labels hosts; it does not change scores.
 
 **Check the sensor.** The reports warn when Zeek estimated 1% or more packet loss, or when fewer
 than 2% of sessions show any answer (the sensor probably sees one direction only). Either way,
@@ -394,43 +250,28 @@ hosts and sessions may be missing; fix the capture before relying on counts.
 
 Each run writes to its output folder (`vulnflow_runs/<id>/out/` on the upload page):
 
-- **Executive summary** and **technical report**, as Markdown and standalone HTML.
-- **Explorer**: `explorer.html`, a single offline file. Its data is packed (gzip) inside the page,
-  which unpacks it with the browser's own decoder (no bundled library), so it still opens straight
-  from disk with no network. Big reports show **Unpacking report data…** instead of freezing the tab;
-  data that would unpack past 1 GB, or a damaged file, gets a clear note instead of a crash. Chrome
-  and Edge hold only about 512 MB of unpacked data; a bigger report there says to use Firefox or Safari. On busy networks
-  each host keeps its top 200 outside addresses and 200 internal peers in the page (addresses with
-  IPS alerts always stay); every count and view still uses the full lists. Opened through the upload
-  page (a new run or **Open report**), the Explorer loads a host's full lists when you click it,
-  from `normalized/explorer_contacts.parquet`. Opened from disk, a **LISTS CAPPED** badge and a note
-  in the host's card say so.
+- **Executive summary** and **technical report**, as Markdown and standalone HTML. Print or save
+  them as PDF from your browser.
+- **Explorer**: `explorer.html`, a single offline file. On busy networks each host keeps its top
+  200 outside addresses and internal peers in the page; counts use the full lists, and the upload
+  page loads a host's full lists when you click it. Very large reports may need Firefox or Safari;
+  see [Configured limits](docs/LIMITS.md).
 - **CSV and JSON:** `correlated_findings.csv` for ticketing; `results.json` for automation.
-- **Normalized inputs:** `normalized/flows.csv`, `findings.csv`, `threats.csv` (IPS/IDS alerts),
-  `zeek_events.jsonl`, `ot_events.jsonl`. [Compare reports](#compare-reports) searches them again.
-  The flows are also in `normalized/flows.parquet` (compressed, quick to query with DuckDB or
-  pandas), and every host's full Explorer lists in `normalized/explorer_contacts.parquet`.
-  The flows and Zeek event copies are about as large as the input; for large runs tick
-  **Skip full copies of flows and Zeek events** (or `--no-normalized-copies`,
-  `VULNSCOPE_NORMALIZED_COPIES=0`) to leave them out. Without them the Explorer keeps only the
-  top 200 rows of a busy host's lists, also when opened through the upload page.
-  `normalized/probed_addresses.csv` lists every internal address that was probed and never
-  answered (who probed it, ports, attempts, whether a firewall blocked it); these are not hosts.
+- **Normalized inputs** under `normalized/`: `flows.csv` and `flows.parquet`, `findings.csv`,
+  `threats.csv` (IPS/IDS alerts), `zeek_events.jsonl`, `ot_events.jsonl`, `probed_addresses.csv`
+  and `explorer_contacts.parquet`. The flow and Zeek event copies are about as large as the input;
+  tick **Skip full copies of flows and Zeek events** (or `--no-normalized-copies`) to leave them out.
 - **Hostile activity diagram** as `hostile_activity.svg`.
 - **Security Assistant** brief and an audit log of every question and answer (`ai_chat_log.md`),
   when used.
-- **Print or save PDF** from your browser; the HTML reports print cleanly.
 
-The HTML files work offline and embed the branding, theme, matched IOC source links and any
-article overviews they were made with. Live lookups such as Cloudflare Radar are offered only when
-the page is served by the upload page. Runs are kept until you delete them from the data folder.
+The HTML files work offline and embed the branding, theme, matched IOC source links and article
+overviews they were made with. Runs are kept until you delete them from the data folder.
 
 **Reopen a saved report:** on the upload page, choose a completed report's output folder (the one
-with `results.json` and `explorer.html`). The button changes to **Open report**; the summaries,
-technical report, Explorer and Timeline are redrawn with the current version and branding, the
-raw-data files are served from that folder, and nothing is reanalyzed or changed. `results.json`
-alone keeps the report data but not the traffic the Explorer is drawn from, so keep
-`explorer.html` with it. A `results.json` written by a newer VulnScope is refused.
+with `results.json` and `explorer.html`). The button changes to **Open report**; the reports and
+Explorer are redrawn with the current version and branding, and nothing is reanalyzed or changed.
+Keep `explorer.html` with `results.json`: it holds the traffic the Explorer is drawn from.
 
 ## Compare reports
 
@@ -439,74 +280,44 @@ vulnerabilities appear in more than one saved report, and in how many networks.
 
 1. Tick the reports to compare. The list holds every run saved by this upload page, newest first.
    To include a report saved somewhere else, open it on the upload page first (**Open report**).
-2. Check each report's **Network**. It comes from Report details; change it here for this
-   comparison if needed (your browser remembers the change). Reports with the same network count
-   as one network.
+2. Check each report's **Network**. Reports with the same network count as one network.
 3. Leave **Look for every IOC matched in any chosen report in all of them** ticked, and optionally
    add an IOC CSV, to search each report's saved data again: an indicator learned after a report
    was made, or matched in only one report, is found in the others too.
 4. Click **Compare**. The comparison has IOC, Vulnerability and Report tabs. Each row shows how
-   many reports, networks and hosts it was seen in, and one square per report, oldest first:
+   many reports, networks and hosts it was seen in, with one square per report, oldest first:
    filled when the analysis found it, striped when only the new search did. Click a row for the
    hosts in each report.
 
-**All networks in one Explorer.** **Open all networks in the Explorer** at the top of a comparison
-draws every compared report on one Explorer map. Each report is an island (a dashed ring) with its
-own subnets and hosts. Reports with the same network sit together inside a solid ring labelled with
-the network's name, each island labelled with its site, so every company is its own cluster. Outside
-addresses are merged onto the arc overhead, with beams down to each network they reached. Hosts with
-an IOC match or a vulnerability stay bright and the rest are dimmed; a teal ring marks an IOC match.
-Hover a host to see the IOCs and vulnerabilities it shares with other reports, or an outside address
-to see how many of the reports it exchanged traffic with. A host's card names its network and
-report, lists what it shares with other reports, and links to that report's own Explorer, which has
-Attack paths, the Timeline and the full lists. To stay quick the map draws up to 3,000 hosts: hosts
-with shared items first, then the other IOC and vulnerability hosts, then the rest, taken in turn
-from each report.
+**Open all networks in the Explorer** draws every compared report on one map, each network as its
+own labelled cluster, with outside addresses merged onto the arc overhead. Hover a host to see what
+it shares with other reports; its card links to that report's own Explorer.
 
-Comparisons are saved in the data folder under `comparisons/<time>/` with `ioc_overlap.csv`,
-`vulnerability_overlap.csv` (one row per item and report), `comparison.json`, and the map as
-`explorer.html` with its data in `explorer.json` (the hosts, subnets, traffic and shared items of
-every network, for your own tools). They are listed under **Earlier comparisons**. The reports
-themselves are not changed. From the command line:
+Comparisons are saved in the data folder under `comparisons/<time>/` (`ioc_overlap.csv`,
+`vulnerability_overlap.csv`, `comparison.json`, and the map). The reports themselves are not
+changed. From the command line:
 
 ```sh
 python3 -m vulnflow compare vulnflow_runs/ -o compare_out --ioc-csv new_iocs.csv
 python3 -m vulnflow compare nov/out dec/out --network "dec/out=Plant 3"   # set a report's network
 ```
 
-To try it, `python3 -m vulnflow compare-sample` (in Docker, `docker compose run --rm vulnscope
-compare-sample`) loads seven sample reports from two fictional companies into the upload page and
-compares them: the Gootloader intrusion and two branch offices of the same company, an AI-driven
-intrusion after Unit 42's Cairn report at four sites of the other, and ARTEX activity from Unit 42's
-note of 30 October whose addresses reach both. Or choose
-`samples/compare_two_companies` under **Analyze folder**: its `sites.csv` makes a report for each of
-its six sites and opens their comparison. See
-[the Compare sample](samples/README.md#the-compare-sample-two-companies-seven-sites).
-
 Vulnerabilities are matched by Nessus plugin and IOCs by indicator, never by internal address,
-since the same private address in two networks is two different machines. A report and its
-reopened copy count once. Reports made before this version didn't save their IPS/IDS alerts, so
-an IP seen only in an alert isn't found again in them; the comparison says so. See
+since the same private address in two networks is two different machines. See
 [Comparing reports](METHODS.md#comparing-reports) for the rules.
 
 ## Branding and themes
 
 **Branding** (linked from the upload page) replaces the name before "VulnScope" and adds a small
-PNG, JPEG, GIF or WebP logo (up to 512 KB; SVG is refused) at Small or Medium size. The upload
-page, command line, reports and Explorer all use it, and the logo turns during Analyze. Branding is
-saved per user in `~/.vulnscope/branding.json` (or `$VULNSCOPE_HOME`; in Docker, inside the runs
-folder). It is password protected; set a different password with
-`python3 -m vulnflow branding-password` and the `VULNSCOPE_BRANDING_PASSWORD_HASH` it prints.
-Branding is local to your computer and is never part of the repository.
+PNG, JPEG, GIF or WebP logo (up to 512 KB) at Small or Medium size, used by the upload page,
+command line, reports and Explorer. Changing it needs a password. Set your own before first use:
+run `python3 -m vulnflow branding-password`, then start the server with the
+`VULNSCOPE_BRANDING_PASSWORD_HASH` it prints. Branding is saved per user in
+`~/.vulnscope/branding.json` (or `$VULNSCOPE_HOME`; in Docker, inside the runs folder).
 
-The upload page, settings, results and reports share a theme picker: Graphite (the default), SOC
-Dark, Amphibious, Olive Drab, Matrix, High Contrast and Light. The browser remembers the choice, and
-the Explorer, Attack paths and Timeline follow it. Comparisons and reopened reports can't read that
-choice, so they open in Graphite. Ones made before this version open in SOC Dark; reopen the report
-or compare again to update them. Every theme except SOC Dark uses the same restrained layout (flat
-surfaces, one accent colour, colour reserved for alerts, vulnerable paths and severity); they differ
-only in palette. Light also draws the Explorer on a white canvas with its own clearer severity
-colours, steel blue for hosts connecting out and stronger lines.
+The pages share a theme picker: Graphite (the default), SOC Dark, Amphibious, Olive Drab, Matrix,
+High Contrast and Light. The browser remembers the choice, and the Explorer follows it.
+Comparisons and reopened reports open in Graphite.
 
 ## Privacy and practical limits
 
@@ -528,14 +339,16 @@ Review sensitive inputs before sharing an export. VulnScope does not encrypt rep
 
 ## Further documentation
 
+- [Troubleshooting](docs/TROUBLESHOOTING.md): port in use, proxies, updates that don't show, Docker
+  on macOS.
 - [Methods, inputs, and interpretation limits](METHODS.md): supported formats, correlation and
   scoring, Explorer estimates, outbound network use, and what VulnScope cannot establish.
 - [Architecture](ARCHITECTURE.md): pipeline and module responsibilities, large-input design,
   Docker container, offline bundle, and upload page security.
-- [Development and verification](DEVELOPMENT.md): tests, benchmarks, Docker builds and samples.
+- [Development and verification](DEVELOPMENT.md): tests, benchmarks, Docker builds and releases.
 - [Local API](API.md): the upload page's HTTP routes.
-- [Upgrading from vulnScope PRO](UPGRADE.md).
 - [Configured limits](docs/LIMITS.md): numeric bounds in one table.
+- [Changelog](CHANGELOG.md) and [upgrading from vulnScope PRO](UPGRADE.md).
 
 ## License
 

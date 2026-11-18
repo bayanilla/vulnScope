@@ -1,8 +1,7 @@
 # Upgrading from vulnScope PRO
 
-VulnScope MAX is the scaled edition of vulnScope PRO, kept in its own repository while it is
-tested. The `vulnflow` command line, the upload page on port 8080 and the report formats remain
-the same.
+VulnScope MAX is the scaled edition of vulnScope PRO. The `vulnflow` command line, the Python
+upload page on port 8080 and the report formats remain the same; the Docker image uses port 8765.
 
 ## What changed
 
@@ -45,8 +44,17 @@ python3 -m pip install -r requirements.txt
 ```
 
 With Docker: `git pull --ff-only origin main && docker compose up -d --build`, then analyze again.
-A plain restart keeps the old version. Step-by-step instructions, fixes for common problems and
-offline bundles are in [Update VulnScope (Docker)](README.md#update-vulnscope-docker).
+A plain restart keeps the old version. Fixes for common problems are in
+[Troubleshooting](docs/TROUBLESHOOTING.md#problems-after-an-update); what each release changed is in
+the [Changelog](CHANGELOG.md).
 
 Restarting clears API keys held in server memory. Run folders, settings and branding stay on disk.
 Reports made by an earlier version stay as they were; analyze the inputs again to get new features.
+
+## Reports made before 0.1.0
+
+- They did not save their IPS/IDS alerts, so in [Compare reports](README.md#compare-reports) an IP
+  seen only in an alert is not found again in them; the comparison says so.
+- Comparisons made before 0.1.0 open in the SOC Dark theme. Compare again to update them.
+
+Analyze the inputs again to bring an old report up to date.
