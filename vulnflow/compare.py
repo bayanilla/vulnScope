@@ -23,7 +23,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
-from . import resources, saved
+from . import db, resources, saved
 from .errors import UserError
 from .ioc_archive import FIELD_KINDS, TYPES, Matcher, indicator_value, read_archives
 from .runname import RUN_ID
@@ -296,7 +296,7 @@ def _flow_pairs(path: str, ips: list[str], workdir: str | None) -> list[tuple]:
     ``ips``. DuckDB reads the file in a streaming scan, so a multi-GB file is fine."""
     import duckdb
     tmp = tempfile.mkdtemp(prefix="vulnscope-compare-", dir=workdir)
-    con = duckdb.connect()
+    con = db.connect()
     try:
         budget = resources.plan(workdir=tmp)
         con.execute(f"SET temp_directory = {_sql_text(os.path.join(tmp, 'spill'))}")

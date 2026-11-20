@@ -17,9 +17,7 @@ import weakref
 from datetime import datetime, timedelta, timezone
 from itertools import islice
 
-import duckdb
-
-from . import resources
+from . import db, resources
 from .schema import Flow, OTEvent, ZeekEvent
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -84,7 +82,7 @@ class Store:
             os.makedirs(base, exist_ok=True)
         self.dir = tempfile.mkdtemp(prefix="vulnscope-work-", dir=base)
         self.budget = budget or resources.plan(memory_limit, self.dir)
-        self.con = duckdb.connect(os.path.join(self.dir, "work.duckdb"))
+        self.con = db.connect(os.path.join(self.dir, "work.duckdb"))
         tmp = os.path.join(self.dir, "duckdb_tmp")
         os.makedirs(tmp, exist_ok=True)
         self.con.execute(f"SET temp_directory = '{_q(tmp)}'")
@@ -449,7 +447,7 @@ class Store:
 def contact_rows(path: str, host: str) -> list[tuple]:
     """One host's rows from an Explorer contacts file (Store.write_contacts): (side, row JSON,
     connection examples), outside addresses ('a') then internal peers ('p'), each in rank order."""
-    con = duckdb.connect()
+    con = db.connect()
     try:
         con.execute("SET threads = 2")
         return con.execute("SELECT side, row, ex FROM read_parquet(?) WHERE host = ? ORDER BY side, rank",
@@ -564,7 +562,7 @@ class PartWriter:
 
     def _con(self):
         if self.con is None:
-            self.con = duckdb.connect()
+            self.con = db.connect()
             # one batch at a time: little memory, no threads competing with the other workers
             self.con.execute("SET threads = 1")
             self.con.execute("SET memory_limit = '512MiB'")

@@ -142,10 +142,9 @@ def is_parquet(path: str) -> bool:
 
 
 def _duckdb():
-    import duckdb
-    # A flow log never needs an extension: Parquet is built in. Never fetch one from the network.
-    con = duckdb.connect(config={"autoinstall_known_extensions": False,
-                                 "autoload_known_extensions": False})
+    from .. import db
+    # A flow log never needs an extension: Parquet is built in. db.connect never fetches one.
+    con = db.connect()
     con.execute("SET threads = 1")
     return con
 
