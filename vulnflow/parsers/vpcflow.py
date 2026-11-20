@@ -73,6 +73,15 @@ _DEFAULT_IN_TEXT = re.compile(r"(?:^|[\s\"'])2 (?:\d{12}|unknown) (?:eni-[0-9a-z
 PARQUET_MAGIC = b"PAR1"
 
 
+def _csv_row(line: str) -> list[str]:
+    """One CSV line split into cells. NUL bytes (damaged files) are dropped first: Python 3.10's csv
+    module refuses them, and detection must never fail on a file that is not a flow log."""
+    try:
+        return next(csv.reader([line.replace("\x00", "")]), [])
+    except csv.Error:
+        return []
+
+
 def _field(name) -> str:
     s = str(name).strip().strip('"').strip()
     if s.startswith("${") and s.endswith("}"):        # the format string as typed in the AWS console
@@ -84,7 +93,7 @@ def header_fields(line: str) -> list[str] | None:
     """The field names when ``line`` is a VPC flow log header (space or comma separated)."""
     if "srcaddr" not in line.lower():
         return None
-    cols = next(csv.reader([line]), []) if "," in line else line.split()
+    cols = _csv_row(line) if "," in line else line.split()
     names = [_field(c) for c in cols]
     has = set(names)
     if {"srcaddr", "dstaddr"} <= has and has & {"action", "log-status", "interface-id", "start", "version"}:
@@ -120,7 +129,7 @@ def looks_like(head: str, first: str) -> bool:
             msg = rec.get("message", rec.get("@message"))
             return isinstance(msg, str) and default_record(msg) is not None
         return False
-    cols = {c.strip().strip('"').lower() for c in next(csv.reader([first]), [])}
+    cols = {c.strip().strip('"').lower() for c in _csv_row(first)}
     return bool(cols & {"message", "@message"}) and bool(_DEFAULT_IN_TEXT.search(head))
 
 
@@ -186,14 +195,14 @@ def _text_rows(path: str, stats: ParseStats):
                 continue
             if first:
                 first = False
-                cols = [c.strip().lower() for c in next(csv.reader([line]), [])]
+                cols = [c.strip().lower() for c in _csv_row(line)]
                 for name in ("message", "@message"):
                     if name in cols and "srcaddr" not in cols:
                         msg_col = cols.index(name)
                 if msg_col is not None:
                     continue                         # CloudWatch CSV header
             if msg_col is not None:
-                vals = next(csv.reader([line]), [])
+                vals = _csv_row(line)
                 line = vals[msg_col].strip() if msg_col < len(vals) else ""
             elif line.startswith("{"):
                 try:
@@ -213,7 +222,7 @@ def _text_rows(path: str, stats: ParseStats):
                 fields, comma = names, "," in line
                 continue
             if fields:
-                vals = next(csv.reader([line]), []) if comma else _strip_iso(line).split()
+                vals = _csv_row(line) if comma else _strip_iso(line).split()
                 if len(vals) == len(fields):
                     yield dict(zip(fields, vals))
                     continue
