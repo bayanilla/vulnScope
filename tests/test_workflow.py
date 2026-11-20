@@ -600,7 +600,7 @@ class BundledSamplesTests(unittest.TestCase):
                     self.assertEqual(a.read(), b.read(), os.path.basename(path))
             files = _input_files([root], tmp)
             fmts = {os.path.basename(p): detect(p) for p in files}
-            self.assertEqual(fmts["aws_vpcflow_prod_us-east-2.log"], "generic")
+            self.assertEqual(fmts["aws_vpcflow_prod_us-east-2.log"], "aws_vpcflow")
             self.assertEqual(fmts["estate_scan.nessus"], "nessus")
             res, paths = run(files, os.path.join(tmp, "out"), article_previews=False)
             with open(paths["explorer.html"], encoding="utf-8") as fh:

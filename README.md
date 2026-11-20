@@ -133,7 +133,8 @@ and `network` to the company folder. An IOC CSV, `network_map.csv` or `known_sca
 `sites.csv` applies to every site. From the command line: `python3 -m vulnflow analyze-sites /path/to/folder`.
 
 **What it reads.** Zeek logs (TSV or JSON, or a Zui/Brim export), Palo Alto TRAFFIC/THREAT,
-Suricata EVE, generic flow CSVs (nfdump, AWS VPC Flow Logs, SIEM exports), Nessus `.nessus` or CSV,
+Suricata EVE, AWS VPC Flow Logs (text, CloudWatch exports or local Parquet), generic flow CSVs
+(nfdump, SIEM exports), Nessus `.nessus` or CSV,
 and:
 
 - **Packet captures** (`.pcap`/`.pcapng`, plain or `.gz`), run through Zeek into a temporary folder.
