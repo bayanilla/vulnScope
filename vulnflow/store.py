@@ -564,6 +564,27 @@ class FlowView:
                 yield row_to_flow(r)
         cur.close()
 
+    def counts(self, column: str = "stream") -> dict[str, int]:
+        """Events per ``column`` value ("stream", or "protocol" for OT events), counted by DuckDB
+        from the Parquet files instead of reading every event back into Python."""
+        if not self._len or not _has_parquet(self.path):
+            return {}
+        assert column in ("stream", "protocol")
+        return {k: int(n) for k, n in self.store.con.execute(
+            f"SELECT {column}, count(*) FROM read_parquet('{_q(os.path.join(self.path, '*.parquet'))}') "
+            f"GROUP BY {column}").fetchall()}
+
+    def of_stream(self, stream: str):
+        """Only the events of one stream, in input order (a filter DuckDB applies on the files)."""
+        if not self._len or not _has_parquet(self.path):
+            return
+        for r in self.store.con.execute(
+                f"SELECT ts, uid, src_ip, dst_ip, source, fields FROM read_parquet("
+                f"'{_q(os.path.join(self.path, '*.parquet'))}') WHERE stream = ? ORDER BY ord", [stream]).fetchall():
+            yield ZeekEvent(ts=EPOCH + timedelta(microseconds=r[0]) if r[0] is not None else None,
+                            stream=stream, uid=r[1], src_ip=r[2], dst_ip=r[3],
+                            fields=json.loads(r[5]) if r[5] is not None else {}, source=r[4])
+
     def __getitem__(self, i):
         if isinstance(i, slice):
             return list(self)[i]

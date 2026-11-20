@@ -106,6 +106,14 @@ def _key_match(alias: str = "f") -> str:
     return _KEY_MATCH.replace("f.", f"{alias}.").format(win=_win(alias))
 
 
+def _counts(events, column: str) -> dict:
+    """Events per stream or protocol: asked of DuckDB for a disk-backed spool, counted here for a
+    plain list (tests and small callers)."""
+    if hasattr(events, "counts"):
+        return events.counts(column)
+    return dict(Counter(getattr(e, column) for e in events))
+
+
 def _port(v):
     return None if v == -1 else v
 
@@ -164,9 +172,15 @@ class Correlator:
             self.max_sev[fd.host_ip] = max(self.max_sev[fd.host_ip], fd.severity)
         self._blast_cache = {}
         self._blast_data = {}
-        self.threats_by_dst: dict[str, list] = defaultdict(list)
-        for t in ds.threats:
-            self.threats_by_dst[t.dst_ip].append(t)
+        # IPS/IDS alerts live in DuckDB next to the flows, so "which alerts hit this finding's
+        # service inside its scan window" is one join for all findings (see prepare), not a
+        # Python filter per finding. ``aid`` is the alert's position in ds.threats (time order).
+        self.threats = list(ds.threats)
+        self.store.insert_rows(
+            "alerts", {"aid": "BIGINT", "ts": "TIMESTAMP", "src_ip": "VARCHAR", "dst_ip": "VARCHAR",
+                       "dst_port": "INTEGER", "blocked": "BOOLEAN"},
+            ((i, naive(t.ts), t.src_ip, t.dst_ip, t.dst_port, t.blocked) for i, t in enumerate(self.threats)))
+        self._kalerts: dict[int, tuple[list, list]] = {}
         self.suspects: dict[str, datetime | None] = {}   # host -> when it was first flagged for investigation
         self._kid: dict[tuple, int] = {}
         self._agg, self._top, self._contact, self._returns = {}, {}, {}, {}
@@ -212,6 +226,17 @@ class Correlator:
             ((kid, h, p, pr, hl, wi, naive(lo), naive(hi))
              for (h, p, pr, hl, w), kid in self._kid.items()
              for wi, (lo, hi) in enumerate(w or ((None, None),))))
+        # alerts on each finding's service: same host, the finding's port (or an alert without a
+        # port, or a host-level finding), inside one of the finding's scan windows
+        hit: dict[int, list] = {}
+        for kid, aid in con.execute("""
+                SELECT DISTINCT k.kid, a.aid FROM xkeys k JOIN alerts a
+                  ON a.dst_ip = k.host AND (k.host_level OR a.dst_port IS NULL OR a.dst_port = k.port)
+                WHERE k.lo IS NULL OR a.ts IS NULL OR a.ts BETWEEN k.lo AND k.hi
+                ORDER BY k.kid, a.aid""").fetchall():
+            hit.setdefault(kid, []).append(self.threats[aid])
+        self._kalerts = {kid: ([t for t in ts if not t.blocked], [t for t in ts if t.blocked])
+                         for kid, ts in hit.items()}
         m = _key_match()
         for row in con.execute(f"""
                 SELECT k.kid, count(*), count(*) FILTER (f.est), count(*) FILTER (f.action = 'deny'),
@@ -304,7 +329,8 @@ class Correlator:
 
     def _capture_loss(self) -> float | None:
         worst = None
-        for e in self.ds.zeek_events:
+        events = self.ds.zeek_events
+        for e in (events.of_stream("capture_loss") if hasattr(events, "of_stream") else events):
             if e.stream == "capture_loss":
                 try:
                     pct = float(e.fields.get("percent_lost"))
@@ -435,10 +461,9 @@ class Correlator:
     # A finding is "corroborated" only when an IPS/IDS alert and post-contact host
     # behaviour agree. Even then only host forensics can confirm a compromise.
     def _threats_to(self, fd: Finding) -> tuple[list, list]:
-        windows = self.windows(fd)
-        hits = [t for t in self.threats_by_dst.get(fd.host_ip, [])
-                if (fd.port == 0 or t.dst_port in (None, fd.port)) and self._in_windows(windows, t.ts)]
-        return [t for t in hits if not t.blocked], [t for t in hits if t.blocked]
+        """(alerts that passed, alerts that were blocked) on this finding's service, in time
+        order, from the join in prepare()."""
+        return self._kalerts.get(self._kid[self._key(fd)], ((), ()))
 
     def _return_peers(self, kid: int) -> list[tuple]:
         """[(peer, first contact, sessions back, ports)] in first-contact order."""
@@ -703,9 +728,9 @@ class Correlator:
             "hosts_to_investigate": sorted(investigate),
             "hosts_possible_spread": sorted(spread),
             "threat_alerts": len(ds.threats),
-            "zeek_event_counts": dict(sorted(Counter(e.stream for e in ds.zeek_events
-                                                     if e.stream != "capture_loss").items())),
-            "ot_protocol_counts": dict(sorted(Counter(e.protocol for e in ds.ot_events).items())),
+            "zeek_event_counts": dict(sorted((k, n) for k, n in _counts(ds.zeek_events, "stream").items()
+                                             if k != "capture_loss")),
+            "ot_protocol_counts": dict(sorted(_counts(ds.ot_events, "protocol").items())),
             "hosts_internet_exposed": sum(1 for h in host_list if h["internet_exposed"]),
             "window_start": _iso(min(times)) if times else None,
             "window_end": _iso(max(times)) if times else None,
