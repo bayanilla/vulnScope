@@ -199,6 +199,25 @@ class Store:
             UNION SELECT dst_ip FROM flows
                   WHERE established OR action = 'reject' OR bytes_in > 0""").fetchall()}
 
+    def flow_ips(self) -> list[str]:
+        """Every distinct address in the clean flows, as source or destination."""
+        return [r[0] for r in self.con.execute(
+            "SELECT src_ip FROM flows UNION SELECT dst_ip FROM flows").fetchall()]
+
+    def pair_counts(self, ips) -> list[tuple[str, str, int]]:
+        """(source, destination, sessions) for every address pair with one of ``ips`` on either side."""
+        ips = sorted(set(ips))
+        if not ips:
+            return []
+        self.insert_rows("pair_ips", {"ip": "VARCHAR"}, ((ip,) for ip in ips))
+        try:
+            return self.con.execute("""
+                SELECT src_ip, dst_ip, count(*) FROM flows
+                WHERE src_ip IN (SELECT ip FROM pair_ips) OR dst_ip IN (SELECT ip FROM pair_ips)
+                GROUP BY src_ip, dst_ip""").fetchall()
+        finally:
+            self.con.execute("DROP TABLE pair_ips")
+
     def broadcast_ips(self) -> set[str]:
         """IPv4 broadcast-like destinations: 255.255.255.255, or an address ending in .255 that only
         ever received UDP/ICMP (subnet broadcasts such as NetBIOS or discovery). They are not hosts,
@@ -442,6 +461,27 @@ class Store:
             COPY (SELECT ts, src_ip, src_port, dst_ip, dst_port, proto, action, established,
                          bytes_out, bytes_in, app, src_zone, dst_zone, source FROM flows ORDER BY seq)
             TO '{_q(path)}' (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 122880)""")
+
+    def export_flows_csv(self, path: str) -> None:
+        """The cleaned flows as normalized/flows.csv, written by DuckDB instead of a Python loop
+        over every session. The file is the same as the csv module wrote: ISO times in UTC,
+        True/False, CRLF line ends, and text cells that a spreadsheet would run as a formula
+        prefixed with an apostrophe (see report._cell)."""
+        def safe(c):
+            return (f"CASE WHEN length({c}) > 1 AND {c}[1] IN ('=', '+', '-', '@', chr(9), chr(13)) "
+                    f"THEN chr(39) || {c} ELSE nullif({c}, '') END AS {c}")
+        self.con.execute(f"""
+            COPY (SELECT strftime(ts, '%Y-%m-%dT%H:%M:%S')
+                         || CASE WHEN epoch_us(ts) % 1000000 = 0 THEN ''
+                                 ELSE '.' || lpad(CAST(epoch_us(ts) % 1000000 AS VARCHAR), 6, '0') END
+                         || '+00:00' AS ts,
+                         src_ip, src_port, dst_ip, dst_port, {safe('proto')}, {safe('action')},
+                         CASE WHEN established THEN 'True' ELSE 'False' END AS established,
+                         bytes_out, bytes_in, {safe('app')}, {safe('src_zone')}, {safe('dst_zone')},
+                         {safe('source')}
+                  FROM flows ORDER BY seq)
+            TO '{_q(path)}' (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"', ESCAPE '"',
+                             NEW_LINE '\\r\\n')""")
 
 
 def contact_rows(path: str, host: str) -> list[tuple]:

@@ -168,8 +168,7 @@ class Matcher:
 def match_archive(ds, archive: dict, observed_hosts: set[str] | None = None) -> list[dict]:
     """Exact matches in normalized traffic, findings, and named Zeek fields."""
     m = Matcher(archive, set(ds.scanned_hosts) or (observed_hosts or set()))
-    for flow in ds.flows:
-        m.flow(flow.src_ip, flow.dst_ip)
+    _match_flows(ds, m)
     for event in ds.threats:
         m.flow(event.src_ip, event.dst_ip, label="IDS/IPS alert")
     for finding in ds.findings:
@@ -177,6 +176,19 @@ def match_archive(ds, archive: dict, observed_hosts: set[str] | None = None) -> 
     for event in ds.zeek_events:
         m.event(event.stream, event.src_ip, event.dst_ip, event.fields)
     return m.matches()
+
+
+def _match_flows(ds, m: Matcher) -> None:
+    """Sessions to or from an address in the archive.
+
+    Asked of DuckDB instead of walking every session in Python: each distinct address in the
+    traffic is compared with the archive once (the same comparison as before), then one query
+    counts the sessions per address pair for the addresses that matched. The Python work now
+    grows with the number of matching pairs, not with the number of sessions."""
+    store = ds.flow_store()
+    hits = [ip for ip in store.flow_ips() if ("ip", indicator_value("ip", ip)) in m.archive]
+    for src, dst, n in store.pair_counts(hits):
+        m.flow(src, dst, n)
 
 
 def markdown_section(matches: list[dict]) -> str:
