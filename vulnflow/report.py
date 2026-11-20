@@ -744,6 +744,12 @@ def write_all(res: dict, ds, outdir: str, copies: bool = True) -> dict[str, str]
     """Write every output. ``copies`` False skips the full normalized copies of the input
     (flows.csv, zeek_events.jsonl, ot_events.jsonl), which are about as large as the input."""
     os.makedirs(os.path.join(outdir, "normalized"), mode=0o700, exist_ok=True)
+    from .results_schema import problems
+    wrong = problems(res, limit=5)
+    if wrong:                                   # a bug in this program, not in the input: say so, keep the run
+        import sys
+        print("warning: results.json does not fit its declared format (docs/results.schema.json): "
+              + "; ".join(wrong), file=sys.stderr)
     paths = write_reports(res, outdir)
     from . import explore
     p = os.path.join(outdir, "explorer.html")

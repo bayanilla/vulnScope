@@ -9,11 +9,12 @@ and fold the answers into an explainable 0-100 risk score.
 from __future__ import annotations
 
 import ipaddress
+import os
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-from . import scanners
+from . import scanners, sqlfile
 from .normalize import Dataset
 from .schema import SEVERITY_NAMES, Finding, Flow
 from .store import naive, utc
@@ -106,6 +107,15 @@ def _key_match(alias: str = "f") -> str:
     return _KEY_MATCH.replace("f.", f"{alias}.").format(win=_win(alias))
 
 
+# The correlator's queries live in model.sql; these are the fixed fragments they are built with.
+MODEL = sqlfile.Model(os.path.join(os.path.dirname(__file__), "model.sql"), {
+    "zones": ", ".join(f"'{z}'" for z in sorted(EXTERNAL_ZONES)),
+    "key_match": _key_match(), "win": _win(), "win_g": _win("g"),
+    "win_prior": _win("g").replace("k.", "c."),
+    "lateral_ports": _LATERAL_SQL, "exfil_bytes": str(EXFIL_BYTES),
+})
+
+
 def _counts(events, column: str) -> dict:
     """Events per stream or protocol: asked of DuckDB for a disk-backed spool, counted here for a
     plain list (tests and small callers)."""
@@ -128,19 +138,12 @@ class Correlator:
             "SELECT src_ip FROM flows UNION SELECT dst_ip FROM flows").fetchall()]
         self.store.insert_rows("ipnet", {"ip": "VARCHAR", "internal": "BOOLEAN"},
                                ((ip, self.net.internal(ip)) for ip in ips))
-        zones = ", ".join(f"'{z}'" for z in sorted(EXTERNAL_ZONES))
         # The vulnerability scanner's own probes (address from Nessus plugin 19506) are not use of a
         # service, so sessions it starts are left out of everything scored below. They still show
         # that sensors cover a host ("seen"), which counts all flows.
         self.scanner_ips = sorted(getattr(ds, "scanner_ips", ()) or ())
         self.store.insert_rows("scanners", {"ip": "VARCHAR"}, ((ip,) for ip in self.scanner_ips))
-        con.execute(f"""
-            CREATE OR REPLACE TABLE fx AS
-            SELECT f.*, s.internal AS src_int, d.internal AS dst_int,
-                   (NOT s.internal OR f.src_zone IN ({zones})) AS ext_src,
-                   (f.action = 'allow' AND f.established) AS est
-            FROM flows f JOIN ipnet s ON s.ip = f.src_ip JOIN ipnet d ON d.ip = f.dst_ip
-            WHERE f.src_ip NOT IN (SELECT ip FROM scanners)""")
+        con.execute(MODEL("flows_in_scope"))
         self.scanner_sessions = con.execute(
             "SELECT count(*) FROM flows WHERE src_ip IN (SELECT ip FROM scanners)").fetchone()[0]
         self.internal_ips = {r[0] for r in con.execute("SELECT ip FROM ipnet WHERE internal").fetchall()}
@@ -152,20 +155,13 @@ class Correlator:
         wanted = self.internal_ips | {fd.host_ip for fd in ds.findings}
         self.store.insert_rows("wanted", {"ip": "VARCHAR"}, ((ip,) for ip in wanted))
         self.in_count, self.out_count = {}, {}
-        for ip, n_in, n_out in con.execute("""
-                SELECT ip, sum(i), sum(o) FROM (
-                    SELECT dst_ip AS ip, 1 AS i, 0 AS o FROM flows
-                    UNION ALL SELECT src_ip, 0, 1 FROM flows) JOIN wanted USING (ip)
-                GROUP BY ip""").fetchall():
+        for ip, n_in, n_out in con.execute(MODEL("session_counts_per_host")).fetchall():
             if n_in:
                 self.in_count[ip] = int(n_in)
             if n_out:
                 self.out_count[ip] = int(n_out)
         self.adj: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
-        for src, dst, ports in con.execute("""
-                SELECT src_ip, dst_ip, list(DISTINCT coalesce(CAST(dst_port AS VARCHAR), 'None') || '/' || proto)
-                FROM fx WHERE est AND src_int AND dst_int AND src_ip <> dst_ip
-                GROUP BY src_ip, dst_ip""").fetchall():
+        for src, dst, ports in con.execute(MODEL("internal_adjacency")).fetchall():
             self.adj[src][dst].update(ports)
         self.max_sev = Counter()
         for fd in ds.findings:
@@ -229,44 +225,20 @@ class Correlator:
         # alerts on each finding's service: same host, the finding's port (or an alert without a
         # port, or a host-level finding), inside one of the finding's scan windows
         hit: dict[int, list] = {}
-        for kid, aid in con.execute("""
-                SELECT DISTINCT k.kid, a.aid FROM xkeys k JOIN alerts a
-                  ON a.dst_ip = k.host AND (k.host_level OR a.dst_port IS NULL OR a.dst_port = k.port)
-                WHERE k.lo IS NULL OR a.ts IS NULL OR a.ts BETWEEN k.lo AND k.hi
-                ORDER BY k.kid, a.aid""").fetchall():
+        for kid, aid in con.execute(MODEL("alerts_per_finding")).fetchall():
             hit.setdefault(kid, []).append(self.threats[aid])
         self._kalerts = {kid: ([t for t in ts if not t.blocked], [t for t in ts if t.blocked])
                          for kid, ts in hit.items()}
-        m = _key_match()
-        for row in con.execute(f"""
-                SELECT k.kid, count(*), count(*) FILTER (f.est), count(*) FILTER (f.action = 'deny'),
-                       count(*) FILTER (f.action = 'reject'),
-                       count(DISTINCT f.src_ip) FILTER (f.est AND f.ext_src),
-                       count(DISTINCT f.src_ip) FILTER (f.est AND NOT f.ext_src),
-                       min(f.ts), max(f.ts), coalesce(sum(f.bytes_out + f.bytes_in) FILTER (f.est), 0)
-                FROM xkeys k JOIN fx f ON {m} GROUP BY k.kid""").fetchall():
+        for row in con.execute(MODEL("exposure_per_finding")).fetchall():
             self._agg[row[0]] = row[1:]
-        for kid, ip, n, ext in con.execute(f"""
-                SELECT kid, src_ip, n, ext FROM (
-                    SELECT k.kid, f.src_ip, count(*) AS n, bool_or(f.ext_src) AS ext,
-                           row_number() OVER (PARTITION BY k.kid ORDER BY count(*) DESC, min(f.seq)) AS rn
-                    FROM xkeys k JOIN fx f ON {m} WHERE f.est GROUP BY k.kid, f.src_ip)
-                WHERE rn <= 8 ORDER BY kid, rn""").fetchall():
+        for kid, ip, n, ext in con.execute(MODEL("top_sources_per_finding")).fetchall():
             self._top.setdefault(kid, []).append([ip, int(n), bool(ext)])
         # first contact by each outside address that completed a session to the service
-        con.execute(f"""
-            CREATE OR REPLACE TABLE contact AS
-            SELECT k.kid, f.src_ip AS peer, min(f.ts) AS t0, min(f.seq) AS first
-            FROM xkeys k JOIN fx f ON {m} WHERE f.est AND f.ext_src GROUP BY k.kid, f.src_ip""")
+        con.execute(MODEL("first_contact"))
         for kid, peer, t0 in con.execute("SELECT kid, peer, t0 FROM contact ORDER BY kid, first").fetchall():
             self._contact.setdefault(kid, []).append((peer, utc(t0)))
         # the vulnerable host later connects back out to that address
-        for kid, peer, n, ports in con.execute(f"""
-                SELECT c.kid, c.peer, count(*), list(DISTINCT coalesce(f.dst_port, -1))
-                FROM contact c JOIN xkeys k USING (kid)
-                JOIN fx f ON f.src_ip = k.host AND f.dst_ip = c.peer
-                WHERE f.est AND (c.t0 IS NULL OR f.ts IS NULL OR f.ts >= c.t0) AND {_win()}
-                GROUP BY c.kid, c.peer""").fetchall():
+        for kid, peer, n, ports in con.execute(MODEL("return_connections")).fetchall():
             self._returns[(kid, peer)] = (int(n), [_port(p) for p in ports])
         # anchors depend on alerts and return connections, both known now
         anchors = []
@@ -276,32 +248,13 @@ class Correlator:
             if t0 is not None:
                 anchors.append((kid, naive(t0)))
         self.store.insert_rows("anchors", {"kid": "BIGINT", "t0": "TIMESTAMP"}, set(anchors))
-        for (kid,) in con.execute(f"""
-                SELECT DISTINCT a.kid FROM anchors a JOIN xkeys k USING (kid)
-                JOIN fx f ON f.src_ip = k.host
-                WHERE f.action = 'allow' AND f.ts < a.t0 AND {_win()}""").fetchall():
+        for (kid,) in con.execute(MODEL("activity_before_anchor")).fetchall():
             self._before[kid] = True
         # Written as joins, not a correlated NOT EXISTS: DuckDB 1.5 fails to bind that form
         # ("Failed to bind column reference") when timed and untimed findings are mixed.
-        for kid, ip, ports in con.execute(f"""
-                WITH cand AS (
-                    SELECT a.kid, k.host, a.t0, k.wi, k.lo, k.hi, f.dst_ip, f.dst_port
-                    FROM anchors a JOIN xkeys k USING (kid) JOIN fx f ON f.src_ip = k.host
-                    WHERE f.est AND f.ts >= a.t0 AND f.dst_int AND f.dst_port IN ({_LATERAL_SQL}) AND {_win()}),
-                prior AS (
-                    SELECT DISTINCT c.kid, c.dst_ip
-                    FROM (SELECT DISTINCT kid, host, t0, wi, lo, hi, dst_ip FROM cand) c
-                    JOIN fx g ON g.src_ip = c.host AND g.dst_ip = c.dst_ip
-                    WHERE g.action = 'allow' AND g.ts < c.t0 AND {_win('g').replace('k.', 'c.')})
-                SELECT kid, dst_ip, list(DISTINCT dst_port) FROM cand ANTI JOIN prior USING (kid, dst_ip)
-                GROUP BY kid, dst_ip""").fetchall():
+        for kid, ip, ports in con.execute(MODEL("new_lateral_sessions")).fetchall():
             self._new_lat.setdefault(kid, {})[ip] = set(ports)
-        for kid, ip, n in con.execute(f"""
-                SELECT a.kid, f.dst_ip, sum(f.bytes_out) AS n
-                FROM anchors a JOIN xkeys k USING (kid) JOIN fx f ON f.src_ip = k.host
-                WHERE f.est AND f.ts >= a.t0 AND NOT f.dst_int AND {_win()}
-                GROUP BY a.kid, f.dst_ip HAVING sum(f.bytes_out) >= {EXFIL_BYTES}
-                ORDER BY a.kid, min(f.seq)""").fetchall():
+        for kid, ip, n in con.execute(MODEL("large_outbound_transfers")).fetchall():
             self._exfil.setdefault(kid, []).append((ip, int(n)))
 
     def prepare_spread(self):
@@ -312,19 +265,7 @@ class Correlator:
         self.store.insert_rows("suspects", {"ip": "VARCHAR", "t": "TIMESTAMP"},
                                ((ip, naive(t)) for ip, t in self.suspects.items()))
         # joins instead of a correlated EXISTS, for the same DuckDB binder issue as in prepare()
-        for kid, src, port, proto, ts in self.con.execute(f"""
-                WITH prior AS (       -- the suspect's normal pre-incident traffic to this host
-                    SELECT DISTINCT k.kid, s.ip FROM xkeys k JOIN suspects s ON s.t IS NOT NULL
-                    JOIN fx g ON g.src_ip = s.ip AND g.dst_ip = k.host
-                    WHERE g.ts < s.t AND {_win('g')})
-                SELECT kid, src_ip, dst_port, proto, ts FROM (
-                    SELECT k.kid, f.src_ip, f.dst_port, f.proto, f.ts,
-                           row_number() OVER (PARTITION BY k.kid ORDER BY f.seq) AS rn
-                    FROM xkeys k JOIN fx f ON {_key_match()} JOIN suspects s ON s.ip = f.src_ip
-                    ANTI JOIN prior p ON p.kid = k.kid AND p.ip = f.src_ip
-                    WHERE f.est AND f.src_ip <> k.host
-                      AND NOT (s.t IS NOT NULL AND f.ts IS NOT NULL AND f.ts < s.t))
-                WHERE rn = 1""").fetchall():
+        for kid, src, port, proto, ts in self.con.execute(MODEL("lateral_spread")).fetchall():
             self._spread[kid] = (src, port, proto, utc(ts))
 
     def _capture_loss(self) -> float | None:
@@ -346,21 +287,11 @@ class Correlator:
             return
         self.store.insert_rows("bhosts", {"ip": "VARCHAR"}, ((h,) for h in hosts))
         data = {h: {"lateral": {}, "ext_total": 0, "ext_top": []} for h in hosts}
-        for src, port, n, first in con.execute(f"""
-                SELECT f.src_ip, f.dst_port, count(*), min(f.seq) FROM fx f JOIN bhosts b ON b.ip = f.src_ip
-                WHERE f.est AND f.dst_int AND f.dst_port IN ({_LATERAL_SQL})
-                GROUP BY f.src_ip, f.dst_port""").fetchall():
+        for src, port, n, first in con.execute(MODEL("lateral_protocols_per_host")).fetchall():
             name = LATERAL_PORTS[port]
             n0, f0 = data[src]["lateral"].get(name, (0, first))
             data[src]["lateral"][name] = (n0 + n, min(f0, first))
-        for src, total, dst, n in con.execute("""
-                SELECT src_ip, total, dst_ip, n FROM (
-                    SELECT f.src_ip, f.dst_ip, count(*) AS n,
-                           count(*) OVER (PARTITION BY f.src_ip) AS total,
-                           row_number() OVER (PARTITION BY f.src_ip ORDER BY count(*) DESC, min(f.seq)) AS rn
-                    FROM fx f JOIN bhosts b ON b.ip = f.src_ip
-                    WHERE f.est AND NOT f.dst_int GROUP BY f.src_ip, f.dst_ip)
-                WHERE rn <= 5 ORDER BY src_ip, rn""").fetchall():
+        for src, total, dst, n in con.execute(MODEL("external_destinations_per_host")).fetchall():
             data[src]["ext_total"] = int(total)
             data[src]["ext_top"].append([dst, int(n)])
         self._blast_data.update(data)
@@ -666,10 +597,7 @@ class Correlator:
             internal_seen |= {ip for t in ds.threats for ip in (t.src_ip, t.dst_ip)
                               if self.net.internal(ip)}
         servers: dict[str, list] = defaultdict(list)     # ip -> [(service, sessions)] most used first
-        for ip, svc, n in self.con.execute("""
-                SELECT dst_ip, CAST(dst_port AS VARCHAR) || '/' || proto, count(*) FROM fx
-                WHERE est AND dst_int AND dst_port IS NOT NULL
-                GROUP BY dst_ip, dst_port, proto ORDER BY dst_ip, count(*) DESC, min(seq)""").fetchall():
+        for ip, svc, n in self.con.execute(MODEL("unscanned_servers")).fetchall():
             servers[ip].append((svc, int(n)))
         scanned = set(ds.scanned_hosts)
         alert_ips = {ip for t in ds.threats for ip in (t.src_ip, t.dst_ip) if self.net.internal(ip)}
@@ -744,12 +672,7 @@ class Correlator:
         }
         network_leads = []
         if not vulnerability_data_available:
-            rows = self.con.execute("""
-                WITH c AS (SELECT dst_ip AS host, src_ip AS peer, min(ts) AS contact FROM fx
-                           WHERE est AND ext_src GROUP BY dst_ip, src_ip)
-                SELECT c.host, c.peer, count(*) FROM c JOIN fx f ON f.src_ip = c.host AND f.dst_ip = c.peer
-                WHERE f.est AND (c.contact IS NULL OR f.ts IS NULL OR f.ts >= c.contact)
-                GROUP BY c.host, c.peer""").fetchall()
+            rows = self.con.execute(MODEL("network_leads")).fetchall()
             for host, peer, n in sorted(r for r in rows if r[0] in hosts):
                 network_leads.append({"host": host, "peer": peer, "sessions": int(n),
                                       "note": "Host connected to an outside address after inbound contact; this may be legitimate traffic."})

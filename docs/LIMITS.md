@@ -8,6 +8,7 @@ Numeric bounds in one place. Each row names where the value is set; change it th
 | Upload chunk | 64 KB | uploads stream to disk in chunks | `vulnflow/multipart.py` |
 | `.gz` expansion | 200× | of compressed size, minimum 256 MB; `VULNSCOPE_MAX_GZ_BYTES` | `vulnflow/parsers/_util.py` |
 | Parser batch | 100,000 | records per Parquet batch | `vulnflow/store.py` |
+| Native readers | on | DuckDB parses ordinary Zeek conn logs and Palo Alto CSV; `VULNSCOPE_NATIVE_READERS=0` uses the Python parsers for everything | `vulnflow/parsers/native.py` |
 | Parse workers | 1 per CPU | at most one per input file and one per GiB of the memory ceiling; inputs under 64 MB use one process; `VULNSCOPE_PARSE_WORKERS` | `vulnflow/normalize.py` |
 | De-duplication skew | 2 s | cross-sensor match window; `--dedup-skew` | `vulnflow/store.py` |
 | Scan window | 7 days | telemetry before/after a host's scan; `--scan-window-days` | `vulnflow/cli.py` |

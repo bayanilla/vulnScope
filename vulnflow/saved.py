@@ -72,6 +72,10 @@ def check_results(res) -> dict:
             raise SavedRunError(f"results.json \"{key}\" must be a list.")
     if "article_briefs" in res and not isinstance(res["article_briefs"], dict):
         raise SavedRunError("results.json \"article_briefs\" must be an object.")
+    from .results_schema import problems
+    wrong = problems(res, limit=3, required=False)    # an older copy wrote fewer keys; types must still fit
+    if wrong:
+        raise SavedRunError("This results.json doesn't fit the VulnScope results format: " + "; ".join(wrong) + ".")
     return res
 
 

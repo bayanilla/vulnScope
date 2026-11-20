@@ -415,29 +415,32 @@ class Store:
         random sample of everything else. Returns (rows iterator, sampled)."""
         cols = "ts, src_ip, dst_ip, dst_port, action, established, proto"
         base = "FROM flows WHERE ts IS NOT NULL AND src_ip <> dst_ip"
-        hot = "(list_contains(?, src_ip) OR list_contains(?, dst_ip))"
-        con, fl = self.con, sorted(flagged)
+        con = self.con
         total = self.flow_span()[0]
         cur = con.cursor()
         sampled = total > cap
         if not sampled:
             cur.execute(f"SELECT {cols} {base} ORDER BY seq")
         else:
+            # Flagged addresses are a table and each flow is tested by a join. (Searching a list of
+            # addresses for every flow, per tier, was most of the Timeline's build time.) The tiers
+            # read flows directly, in its own row order, so each sample is the one a list search gave.
+            self.insert_rows("timeline_flagged", {"ip": "VARCHAR"}, ((ip,) for ip in sorted(set(flagged))))
+            hot = "(src_ip IN (SELECT ip FROM timeline_flagged) OR dst_ip IN (SELECT ip FROM timeline_flagged))"
             half = cap // 2
-            tiers = [(f"{hot}", [fl, fl]), (f"action <> 'allow' AND NOT {hot}", [fl, fl]),
-                     (f"action = 'allow' AND NOT {hot}", [fl, fl])]
-            counts = [int(con.execute(f"SELECT count(*) {base} AND {w}", a).fetchone()[0]) for w, a in tiers]
+            tiers = [hot, f"action <> 'allow' AND NOT {hot}", f"action = 'allow' AND NOT {hot}"]
+            counts = [int(n or 0) for n in con.execute(
+                "SELECT " + ", ".join(f"count(*) FILTER ({w})" for w in tiers) + f" {base}").fetchone()]
             take = [min(counts[0], half)]
             take.append(min(counts[1], half - take[0]))
             take.append(min(counts[2], cap - take[0] - take[1]))
-            parts, args = [], []
-            for (w, a), n, k in zip(tiers, counts, take):
+            parts = []
+            for w, n, k in zip(tiers, counts, take):
                 if not k:
                     continue
                 sample = "" if k >= n else f" USING SAMPLE reservoir({k} ROWS) REPEATABLE (7)"
                 parts.append(f"SELECT * FROM (SELECT {cols}, seq {base} AND {w}){sample}")
-                args += a
-            cur.execute(" UNION ALL ".join(parts) + " ORDER BY seq", args)
+            cur.execute(" UNION ALL ".join(parts) + " ORDER BY seq")
 
         def rows():
             try:
