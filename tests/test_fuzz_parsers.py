@@ -1,6 +1,6 @@
 """Fuzz tests for every input reader: Zeek (TSV, JSON, Zui/Brim array, .gz), Filebeat CSV/NDJSON,
-Palo Alto CSV, Nessus (.nessus XML and CSV), Suricata EVE, generic flow CSV, format detection and
-the PCAP hand-off.
+Palo Alto CSV, Nessus (.nessus XML and CSV), Suricata EVE, AWS VPC Flow Logs, generic flow CSV,
+format detection and the PCAP hand-off.
 
 Analysts load data from networks that may be compromised, so a reader must survive anything a
 file can hold. For thousands of generated files (valid records with hostile values, random byte
@@ -45,7 +45,7 @@ except ImportError:  # pragma: no cover - the tests below skip
     st = None
 
 from vulnflow.errors import UserError
-from vulnflow.parsers import FORMATS, detect, filebeat, generic, nessus, paloalto, suricata, zeek
+from vulnflow.parsers import FORMATS, detect, filebeat, generic, nessus, paloalto, suricata, vpcflow, zeek
 from vulnflow.schema import Finding, Flow, ParseStats, ThreatEvent, ZeekEvent
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -537,8 +537,30 @@ class GenericFlowFuzz(FuzzCase):
             path = self.write("blob.log", data)
             self.run_detected(path)
             for parse in (zeek.parse, filebeat.parse, paloalto.parse, suricata.parse, generic.parse,
-                          nessus.parse_csv, nessus.parse_xml):
+                          vpcflow.parse, nessus.parse_csv, nessus.parse_xml):
                 self.run_reader(parse, path)
+
+
+class VpcFlowFuzz(FuzzCase):
+    if st is not None:
+        @given(mutated(head("hosts_onprem_and_aws/aws_vpcflow_prod_us-east-2.log")), st.booleans())
+        def test_damaged_flow_log(self, data, gz):
+            path = self.write("vpcflow.log", data, gz=gz)
+            self.run_reader(vpcflow.parse, path)
+            self.run_detected(path)
+
+        @given(st.lists(st.lists(hostile_text, min_size=14, max_size=14), min_size=1, max_size=8),
+               st.booleans())
+        def test_hostile_default_format_records(self, rows, header):
+            lines = ["version account-id interface-id srcaddr dstaddr srcport dstport protocol packets bytes "
+                     "start end action log-status"] if header else []
+            for r in rows:
+                r = [c.replace("\n", " ").replace("\r", " ").replace(" ", "_") or "-" for c in r]
+                r[0], r[12], r[13] = "2", "ACCEPT" if len(r[1]) % 2 else "REJECT", "OK"
+                lines.append(" ".join(r))
+            path = self.write("vpc.log", "\n".join(lines) + "\n")
+            self.run_reader(vpcflow.parse, path)
+            self.run_detected(path)
 
 
 class PcapHandoffFuzz(FuzzCase):

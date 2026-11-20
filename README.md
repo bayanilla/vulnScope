@@ -81,7 +81,8 @@ and marks vulnerability status as **unknown**. Details: [Architecture](ARCHITECT
 | Zeek | TSV or JSON, Zui/Brim exports, Filebeat via Kibana CSV or NDJSON | Connections and protocol logs |
 | Palo Alto | TRAFFIC and THREAT | Sessions and IPS alerts |
 | Suricata | EVE JSON | IDS alerts |
-| Flow records | nfdump, AWS VPC Flow Logs, SIEM CSV exports | Connections |
+| AWS VPC Flow Logs | Text with or without a header, CloudWatch and Athena exports, local Parquet; plain or `.gz` | Connections, with both directions of a session joined |
+| Flow records | nfdump, SIEM CSV exports | Connections |
 | Packet captures | `.pcap`, `.pcapng`, plain or `.gz` | Run through Zeek offline |
 | Nessus | `.nessus` or CSV | Vulnerability findings |
 | IOC list | CSV: `type,indicator[,source_url]` | Exact matches on IPs, domains, URLs, hashes, CVEs, packages |

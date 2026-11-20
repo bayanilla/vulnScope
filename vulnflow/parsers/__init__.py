@@ -4,12 +4,13 @@ from __future__ import annotations
 import gzip
 import os
 
-from . import filebeat, generic, nessus, paloalto, suricata, zeek
+from . import filebeat, generic, nessus, paloalto, suricata, vpcflow, zeek
 
 FORMATS = {
     "zeek": ("flows", zeek.parse),
     "filebeat_zeek": ("flows", filebeat.parse),
     "paloalto": ("flows", paloalto.parse),
+    "aws_vpcflow": ("flows", vpcflow.parse),
     "suricata": ("flows", suricata.parse),
     "generic": ("flows", generic.parse),
     "nessus": ("findings", nessus.parse_xml),
@@ -19,6 +20,9 @@ FORMATS = {
 
 def detect(path: str) -> str:
     """Guess a file's format from its first few KB."""
+    if vpcflow.is_parquet(path):
+        # the only Parquet input read today is AWS VPC Flow Logs; anything else falls through as before
+        return "aws_vpcflow" if vpcflow.parquet_is_vpc(path) else "generic"
     opener = gzip.open if path.lower().endswith(".gz") else open
     with opener(path, "rt", encoding="utf-8-sig", errors="replace") as fh:
         head = fh.read(16384)
@@ -28,6 +32,8 @@ def detect(path: str) -> str:
         return "nessus"
     if filebeat.looks_like(head, first):
         return "filebeat_zeek"
+    if vpcflow.looks_like(head, first):
+        return "aws_vpcflow"
     if head.startswith("#separator") or "\n#fields" in head or first.startswith("#fields"):
         return "zeek"
     if first.lstrip().startswith("[") and '"_path"' in head[:4096]:

@@ -534,8 +534,10 @@ def _write(outdir, zeek, pan, threats, vpc, rng):
                      "start end action log-status\n")
             for r in sorted(vpc[which], key=lambda r: r["ts"]):
                 s = int(r["ts"].timestamp())
+                # an accepted TCP session is at least SYN, ACK and data: never one packet
+                least = 3 if r["action"] == "ACCEPT" and str(r["proto"]) == "6" else 1
                 fh.write(f"2 {ACCOUNT[which]} {eni} {r['s']} {r['d']} {r['sp']} {r['dp']} {r['proto']} "
-                         f"{max(1, r['bytes'] // 900)} {r['bytes']} {s} {s + 60} {r['action']} OK\n")
+                         f"{max(least, r['bytes'] // 900)} {r['bytes']} {s} {s + 60} {r['action']} OK\n")
         paths.append(p)
 
     p = os.path.join(outdir, "network_map.csv")         # optional: names the ranges so AWS stands out

@@ -6,6 +6,10 @@ again to get a release's changes. Upgrading from vulnScope PRO: see [UPGRADE.md]
 
 ## Unreleased
 
+- **AWS VPC Flow Logs** have their own reader. It also reads records with no header line,
+  CloudWatch exports and local Parquet files. It joins each session's request and reply, which AWS
+  logs separately, so replies no longer show up as sessions to the client's port and received bytes
+  are counted.
 - **Several sites in one folder.** A `sites.csv` next to per-company folders makes one report per
   site and opens their comparison (`vulnflow analyze-sites`).
 - **All-networks map:** each company is drawn as its own labelled cluster; hovering a host shows
