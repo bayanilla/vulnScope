@@ -102,7 +102,7 @@ class Store:
     def _write_csv(self, rows, name: str) -> str:
         path = os.path.join(self.dir, name)
         with open(path, "w", newline="", encoding="utf-8") as fh:
-            csv.writer(fh).writerows(rows)
+            write_csv_rows(fh, rows)
         return path
 
     def _read_csv_sql(self, path: str, columns: dict[str, str]) -> str:
@@ -756,6 +756,35 @@ def flow_row(ord_: int, f: Flow, sensor: str, fid: int, days: dict) -> tuple:
             f.dst_zone, f.source, sensor, fid, day)
 
 
+def _csv_cell(value) -> str:
+    if value is None:
+        return ""
+    text = value if isinstance(value, str) else str(value)
+    if any(c in text for c in ',"\r\n'):
+        return '"' + text.replace('"', '""') + '"'
+    return text
+
+
+def csv_lines(rows):
+    """Rows as csv.writer writes them (default dialect), built by hand."""
+    for row in rows:
+        line = ",".join(_csv_cell(v) for v in row)
+        yield (line or ('""' if len(row) == 1 else "")) + "\r\n"     # a lone empty cell is written quoted
+
+
+def write_csv_rows(fh, rows) -> None:
+    """csv.writer(fh).writerows(rows), also where the csv module cannot write a value: before
+    Python 3.11 it refuses text holding a NUL character, which a damaged log can contain."""
+    rows = rows if isinstance(rows, list) else list(rows)
+    start = fh.tell()
+    try:
+        csv.writer(fh).writerows(rows)
+    except csv.Error:
+        fh.seek(start)
+        fh.truncate()
+        fh.writelines(csv_lines(rows))
+
+
 def write_flow_parquet(con, workdir: str, rows: list[tuple], name: str) -> None:
     """Write flow rows (FLOW_COLUMNS order) to ``flows_parquet/<name>.parquet`` through a CSV file
     (fast, needs no numpy/arrow)."""
@@ -763,7 +792,7 @@ def write_flow_parquet(con, workdir: str, rows: list[tuple], name: str) -> None:
     os.makedirs(out, exist_ok=True)
     path = os.path.join(workdir, f"{name}.csv")
     with open(path, "w", newline="", encoding="utf-8") as fh:
-        csv.writer(fh).writerows(rows)
+        write_csv_rows(fh, rows)
     try:
         cols = ", ".join(f"'{k}': '{v}'" for k, v in _CSV_TYPES.items())
         source = (f"read_csv('{_q(path)}', columns={{{cols}}}, header=false, delim=',', quote='\"', "

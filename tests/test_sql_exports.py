@@ -67,6 +67,35 @@ class IocFlows(unittest.TestCase):
         self.assertEqual({m["value"]: m["observed"] for m in got},
                          {"203.0.113.5": {"network session": 2}, "2001:db8::1": {"network session": 1}})
 
+class CsvRowsByHand(unittest.TestCase):
+    """store.csv_lines must write what csv.writer writes; it stands in where csv.writer refuses."""
+
+    def test_same_text_as_the_csv_module(self):
+        import csv
+        import io
+        import random
+        from vulnflow import store
+        rng = random.Random(3)
+        bits = ["a", ",", '"', "\r", "\n", " ", "", "x y", "é", "'", "=1+1", "\t", ";"]
+        rows = [tuple(rng.choice([None, True, False, 0, -7, 1.5, 10 ** 12,
+                                  "".join(rng.choice(bits) for _ in range(rng.randint(0, 4)))])
+                      for _ in range(rng.randint(1, 6))) for _ in range(2000)]
+        want = io.StringIO()
+        csv.writer(want).writerows(rows)
+        self.assertEqual("".join(store.csv_lines(rows)), want.getvalue())
+
+    def test_nul_text_is_written_on_every_python(self):
+        import io
+        from unittest import mock
+        from vulnflow import store
+        rows = [("a\x00b", None, 1, "x,y")]
+        for refuse in (False, True):
+            fh = io.StringIO("kept,")
+            fh.seek(0, 2)
+            with mock.patch.object(store.csv, "writer", side_effect=store.csv.Error("no")) if refuse else mock.patch.object(store, "csv", store.csv):
+                store.write_csv_rows(fh, rows)
+            self.assertEqual(fh.getvalue(), 'kept,a\x00b,,1,"x,y"\r\n')
+
 
 if __name__ == "__main__":
     unittest.main()
