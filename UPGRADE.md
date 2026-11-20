@@ -32,7 +32,7 @@ python3 -m pip install -r requirements.txt
 python3 -m vulnflow serve --port 8081      # pick another port if PRO is running on 8080
 ```
 
-Or use Docker; see [Start VulnScope](README.md#start-vulnscope).
+Or use Docker; see [Quickstart](README.md#quickstart).
 
 ## Update an existing MAX installation
 
@@ -53,7 +53,7 @@ Reports made by an earlier version stay as they were; analyze the inputs again t
 
 ## Reports made before 0.1.0
 
-- They did not save their IPS/IDS alerts, so in [Compare reports](README.md#compare-reports) an IP
+- They did not save their IPS/IDS alerts, so in [Compare reports](docs/COMPARE.md) an IP
   seen only in an alert is not found again in them; the comparison says so.
 - Comparisons made before 0.1.0 open in the SOC Dark theme. Compare again to update them.
 
