@@ -235,17 +235,21 @@ def _epoch(value):
 # -- joining the two directions of a session ------------------------------------------------
 
 class _Dir:
+    """What one direction of a session (one endpoint -> the other) logged, over all its records."""
     __slots__ = ("eni", "flags", "accept", "reject", "start", "order")
 
     def __init__(self, order):
-        self.eni: dict = {}           # interface -> [bytes, packets]
+        # interface -> [bytes, packets]. Kept per interface because, when both endpoints are in the
+        # VPC, each one's interface logs the same packets: summing them would count traffic twice.
+        self.eni: dict = {}
         self.flags = 0
         self.accept = self.reject = False
         self.start = None
-        self.order = order
+        self.order = order            # record number of the first record, for "logged first"
 
 
 class _Session:
+    """One session being joined: its two directions (index 0 = from key[0] to key[1])."""
     __slots__ = ("dirs", "last", "proto")
 
     def __init__(self, proto):
@@ -255,21 +259,29 @@ class _Session:
 
 
 class _Joiner:
+    """Joins records into sessions while streaming; ``add`` and ``finish`` yield finished Flows."""
+
     def __init__(self, stats: ParseStats):
         self.stats = stats
         self.open: dict = {}
         self.seen = 0
         self.newest = None
-        self.replies = 0              # sessions with records in both directions (so far)
+        # Sessions with records in both directions so far. Non-zero means this file logs replies, so
+        # a session without one really got no answer. A session written out before the first reply
+        # in the file is judged by the one-direction rule instead (rare: needs a 15-minute lead).
+        self.replies = 0
         self.capped = False
 
     def add(self, src, sport, dst, dport, proto, nbytes, packets, start, end, action, flags, eni):
         a = (src, -1 if sport is None else sport)        # -1: no port (keeps the key sortable)
         b = (dst, -1 if dport is None else dport)
+        # The key is the same for a record and its reply (endpoints in sorted order); d says which
+        # way this record went. Who the client is gets decided only at write-out, once both are in.
         key = (a, b, proto) if a <= b else (b, a, proto)
         d = 0 if key[0] == a else 1
         sess = self.open.get(key)
         stamp = end if end is not None else start
+        # The same endpoints and ports after a long silence are a new session (e.g. a reused port).
         if sess is not None and stamp is not None and sess.last is not None and stamp - sess.last > IDLE_SECONDS:
             yield self._flow(key, self.open.pop(key))
             sess = None
@@ -349,6 +361,7 @@ class _Joiner:
         req = out if out is not None else back
         bytes_out = max((t[0] for t in out.eni.values()), default=0) if out else 0
         bytes_in = max((t[0] for t in back.eni.values()), default=0) if back else 0
+        # The client's records decide allow/deny: a security group or NACL acts on the request.
         if out is not None:
             action = "allow" if out.accept else "deny" if out.reject else "allow"
         else:                                     # only the reply was logged
@@ -365,15 +378,17 @@ class _Joiner:
                     established = not (sess.proto == "tcp" and (
                         (req.flags and not req.flags & ~(SYN | RST)) or 0 < packets < 2))
             elif not back.accept:
-                established = False
+                established = False               # the reply was blocked (e.g. an outbound NACL)
             elif sess.proto == "tcp":
                 if back.flags:
+                    # SYN-ACK in the reply: the handshake happened. A client with flags but no SYN
+                    # is a session already open when logging began, so it was established too.
                     established = bool(back.flags & SYN_ACK) or (bool(out.flags) and not out.flags & SYN)
                     if not established and back.flags & RST and not back.flags & SYN_ACK:
                         action = "reject"         # the host answered with a reset: refused
-                else:
+                else:                             # no flags (version 2): SYN-ACK plus more, not a lone RST
                     established = max((t[1] for t in back.eni.values()), default=0) > 1
-            else:
+            else:                                 # UDP/ICMP: anything that came back is an answer
                 established = bytes_in > 0
         start = req.start if out is None else out.start
         if start is None:
@@ -384,6 +399,9 @@ class _Joiner:
 
 
 def _addr(rec, pkt, plain):
+    """(address, whether the pkt-* field replaced the plain one). srcaddr/dstaddr name the
+    interface's side of the packet: a NAT gateway's own address, or an EKS node instead of its pod.
+    pkt-srcaddr/pkt-dstaddr (custom formats) hold the packet's real source and destination."""
     v = rec.get(pkt)
     ip = clean_ip(v) if v not in (None, "-") else None
     return ip or clean_ip(rec.get(plain)), ip is not None and ip != clean_ip(rec.get(plain))
