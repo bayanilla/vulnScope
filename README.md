@@ -2,7 +2,7 @@
 
 **Network telemetry and vulnerability scans, correlated into reports for system owners.**
 
-![VulnScope Explorer: each subnet is a platform and each host a pillar sized by risk](screenshots/explorer_current_overview.jpg)
+![VulnScope Explorer in 3D: each subnet is a platform and each host a pillar sized by risk, with outside addresses on the arc overhead (ARTEX sample)](screenshots/explorer_3d_artex.jpg)
 
 VulnScope reads the logs and scans you already have and shows which vulnerable services were
 actually reached, from where, and what happened next. Each run writes an executive summary, a
@@ -136,6 +136,8 @@ sensor looks unreliable (packet loss, or one-direction capture).
 Attack paths view of the likeliest ways in, and a Timeline of every flow. Click a host to see who
 it talked to inside and out. Press **?** in any view for help; the
 [Explorer guide](docs/EXPLORER.md) covers the controls.
+
+![Explorer overview of the synthetic 250-host example run, with the host list ranked by priority](screenshots/explorer_current_overview.jpg)
 
 For a guided walk-through, analyze the Gootloader sample and follow `hr-ws-07` in the Timeline.
 [Methods](METHODS.md) explains every score and estimate.

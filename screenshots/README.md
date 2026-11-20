@@ -10,6 +10,12 @@ Examples of the upload workflow, reports, and Explorer. Click a preview to open 
 
 The focused host graph sits beside a Security Assistant answer about the findings and observed connections.
 
+### 3D Explorer
+
+<a href="explorer_3d_artex.jpg"><img src="explorer_3d_artex.jpg" alt="3D Explorer of the ARTEX sample with outside addresses on the arc overhead" width="720"></a>
+
+The ARTEX sample in 3D: subnets as platforms, hosts as pillars sized by risk, and the outside addresses that reached in on the INTERNET arc.
+
 ### Explorer overview
 
 <a href="explorer_current_overview.jpg"><img src="explorer_current_overview.jpg" alt="Current Explorer overview of the sample network" width="720"></a>
