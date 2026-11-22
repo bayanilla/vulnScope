@@ -95,6 +95,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      packages: read          # pull the image back even while the new package is still private
     env:
       IMAGE: ${{ needs.image.outputs.image }}
       VERSION: ${{ needs.image.outputs.version }}
@@ -103,6 +104,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Save each architecture exactly as published
         run: |
           mkdir -p assets
