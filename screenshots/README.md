@@ -18,9 +18,9 @@ The ARTEX sample in 3D: subnets as platforms, hosts as pillars sized by risk, an
 
 ### Explorer overview
 
-<a href="explorer_current_overview.jpg"><img src="explorer_current_overview.jpg" alt="Current Explorer overview of the sample network" width="720"></a>
+<a href="explorer_current_overview.jpg"><img src="explorer_current_overview.jpg" alt="Explorer overview of the sample network in 3D" width="720"></a>
 
-The sample network is grouped by subnet, with a prioritized host list and observed connections.
+The Explorer opens in 3D: each subnet is a platform, hosts are pillars sized by risk, and the top outside addresses sit on the INTERNET arc. The host list on the left is grouped by subnet.
 
 ### Focused host
 

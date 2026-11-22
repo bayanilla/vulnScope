@@ -144,7 +144,7 @@ Attack paths view of the likeliest ways in, and a Timeline of every flow. Click 
 it talked to inside and out. Press **?** in any view for help; the
 [Explorer guide](docs/EXPLORER.md) covers the controls.
 
-![Explorer overview of the synthetic 250-host example run, with the host list ranked by priority](screenshots/explorer_current_overview.jpg)
+![Explorer overview of the synthetic 250-host example run in 3D, with the host list grouped by subnet](screenshots/explorer_current_overview.jpg)
 
 For a guided walk-through, analyze the Gootloader sample and follow `hr-ws-07` in the Timeline.
 [Methods](METHODS.md) explains every score and estimate.
