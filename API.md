@@ -11,14 +11,14 @@ CSRF token: a `csrf` form field, a `csrf` JSON field, or an `X-CSRF-Token` heade
 | Method and path | Purpose |
 | --- | --- |
 | `GET /` | The upload page. |
-| `POST /analyze-folder` | Analyzes a folder in place. Form fields: `path`, optional `internal_nets`, `report_name`, `report_network`, `report_description`. A completed report's output folder (with `results.json`) is reopened instead, without reanalyzing. |
+| `POST /analyze-folder` | Analyzes a folder in place (multipart: `path`, optional `internal_nets`, `ioc_archive` IOC CSV, `skip_copies=1` and the `report_*` fields). A completed report's output folder (with `results.json`) is reopened instead, without reanalyzing; a folder with a `sites.csv` is analyzed one report per site and then compared. |
 | `POST /folder-kind` | Whether `path` is a completed report's output folder (JSON `{"report": true}`); the page then labels its button Open report. |
-| `POST /analyze` | Analyzes uploaded files (multipart: `telemetry`, `scans`, `ioc_archive`, optional `internal_nets` and the `report_*` fields). |
+| `POST /analyze` | Analyzes uploaded files (multipart: `folder`, `telemetry`, `scans`, `ioc_archive`, optional `internal_nets`, `skip_copies=1` and the `report_*` fields). |
 | `POST /browse` | Lists the subfolders of `path` for the in-page folder picker. |
 | `POST /pick-folder` | Opens the macOS Choose Folder dialog (native runs on a Mac only). |
 | `POST /locate-folder` | Finds a folder picked in the browser among the shared folders, from its `name` and sample file names, sizes and times. |
 | `GET /settings`, `POST /settings` | Security Assistant provider, model, endpoint, key and redaction. |
-| `GET /branding`, `POST /branding` | Branding page and its changes (name prefix, logo, logo size). |
+| `GET /branding`, `POST /branding` | Branding page and its changes (name prefix, logo, logo size). No password. |
 | `GET /runs/<id>/` | Results page for a run; other paths under it serve that run's reports. |
 | `GET /runs/<id>/ai-status` | Whether a Security Assistant provider is ready, and where data goes. |
 | `POST /runs/<id>/brief` | Writes the Security Assistant brief for the run. |

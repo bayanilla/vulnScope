@@ -1,4 +1,4 @@
-# VulnScope MAX + Zeek, ready-made image: nothing to build. Put this file in a folder of its own,
+# VulnScope + Zeek, ready-made image: nothing to build. Put this file in a folder of its own,
 # next to a .env copied from env.example (or the repository's .env.example), then:
 #
 #   docker compose pull                  # download the image (first time and to update)
@@ -7,8 +7,8 @@
 #   docker compose run --rm vulnscope analyze /data/case1 -o /runs/case1
 #   docker compose down
 #
-# Pin a version with VULNSCOPE_IMAGE=ghcr.io/bayanilla/vulnscope-max:1.2.0 in .env.
-# Offline: `docker load -i vulnscope-max-<version>-image-<arch>.tar.gz`, then `docker compose up -d`.
+# Pin a version with VULNSCOPE_IMAGE=ghcr.io/bayanilla/vulnscope:1.2.0 in .env.
+# Offline: `docker load -i vulnscope-<version>-image-<arch>.tar.gz`, then `docker compose up -d`.
 # The services below must stay the same as compose.yaml apart from image/build/pull_policy
 # (tests/test_release.py checks this).
 # Its own project name, so it never replaces a container started from a source checkout.
@@ -16,7 +16,7 @@ name: vulnscope-release
 
 services:
   vulnscope:
-    image: ${VULNSCOPE_IMAGE:-ghcr.io/bayanilla/vulnscope-max:latest}
+    image: ${VULNSCOPE_IMAGE:-ghcr.io/bayanilla/vulnscope:latest}
     pull_policy: missing            # fetched only by `docker compose pull` or when not loaded yet
     restart: unless-stopped
     ports:

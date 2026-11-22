@@ -1,4 +1,4 @@
-"""Ground-truth dataset for Zeek + Nessus correlation accuracy in VulnScope MAX.
+"""Ground-truth dataset for Zeek + Nessus correlation accuracy in VulnScope.
 
 Writes data/ (inputs) and expected.json (hand-derived answers, one per scenario).
 """

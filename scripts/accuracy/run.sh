@@ -4,13 +4,13 @@
 #
 #   scripts/accuracy/run.sh DATA_DIR WORK_DIR
 #
-# IMAGE (default vulnscope-max:ci), ZEEK_IMAGE and SURICATA_IMAGE can be overridden.
+# IMAGE (default vulnscope:ci), ZEEK_IMAGE and SURICATA_IMAGE can be overridden.
 # Nothing downloaded here is committed or put in the image; it lives in DATA_DIR only.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DATA="$(mkdir -p "$1" && cd "$1" && pwd)"
 WORK="$(mkdir -p "$2" && cd "$2" && pwd)"
-IMAGE="${IMAGE:-vulnscope-max:ci}"
+IMAGE="${IMAGE:-vulnscope:ci}"
 ZEEK_IMAGE="${ZEEK_IMAGE:-zeek/zeek:9.0.1}"
 SURICATA_IMAGE="${SURICATA_IMAGE:-jasonish/suricata:8.0.8}"
 

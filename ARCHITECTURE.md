@@ -66,7 +66,8 @@ The same path in text:
 ```text
 Folder path, Browse, upload, or command line
   → format detection by content (PCAP → Zeek logs; Filebeat export → Zeek records)
-  → streaming parsers, batches of records
+  → streaming parsers, batches of records; ordinary Zeek conn logs and Palo Alto CSV are read
+    by DuckDB directly (native readers), anything unusual by the Python parser
   → Parquet (flows; Zeek/OT events zstd-compressed), one process per input file in parallel,
     in a temporary working directory
   → DuckDB: sort, de-duplicate across sensors, join with scan findings
@@ -78,14 +79,18 @@ Folder path, Browse, upload, or command line
 | Module | Knowledge hidden behind its interface |
 | --- | --- |
 | `vulnflow/parsers/` | Format detection and per-source field rules: Zeek TSV/JSON and Zui/Brim exports, Palo Alto, Suricata, generic flows, Nessus, Filebeat ECS reversal |
+| `vulnflow/parsers/native.py` | DuckDB readers for ordinary Zeek conn TSV and Palo Alto CSV; any file they cannot take whole goes to the Python parser (`VULNSCOPE_NATIVE_READERS=0` turns them off) |
 | `vulnflow/pcap.py` | Finding Zeek, running it on a capture into a temporary folder, reporting unreadable captures |
 | `vulnflow/normalize.py`, `schema.py` | Canonical `Flow`, `ThreatEvent`, `Finding` and Zeek/OT event records; IP, protocol and time normalization |
+| `vulnflow/db.py` | The one place a DuckDB connection is opened: refuses DuckDB older than 1.2 and 1.3.0, and turns off extension downloads |
 | `vulnflow/store.py` | Batched Parquet writing, cross-sensor de-duplication and DuckDB queries |
+| `vulnflow/model.sql`, `sqlfile.py` | The correlator's named SQL queries in one file, and the loader for them |
 | `vulnflow/resources.py` | DuckDB memory, thread and spill sizing; one-job-at-a-time slot; limit-hit messages |
 | `vulnflow/correlate.py` | Exposure, blast radius, indicator grading, scoring weights and coverage |
 | `vulnflow/netmap.py` | Optional network map parsing and on-prem/cloud labeling |
 | `vulnflow/scanners.py` | Scanner detection from traffic, the optional `known_scanners.csv`, the one-way sensor check |
 | `vulnflow/ioc_archive.py`, `article_preview.py`, `article_brief.py` | IOC CSV matching, source previews, optional OpenAI article briefs |
+| `vulnflow/results_schema.py` | The declared shape of `results.json` (published as `docs/results.schema.json`); fresh and reopened reports are checked against it |
 | `vulnflow/report.py`, `diagram.py`, `visual.py`, `explore.py` | Report shape and wording, themes, the hostile activity diagram, Explorer data |
 | `vulnflow/static/` | Explorer, 3D, Attack paths and Timeline views (three.js bundled) |
 | `vulnflow/llm.py`, `offline_assistant.py` | Provider adapters, grounding, redaction, and the built-in offline assistant |
@@ -173,7 +178,7 @@ docker compose run --rm vulnscope zeek -C -r /data/capture.pcap local     # Zeek
 ```
 
 Without Compose:
-`docker run --rm -p 127.0.0.1:8765:8080 -e VULNSCOPE_PUBLIC_PORT=8765 -v "$PWD/data:/data:ro" -v "$PWD/out:/runs" vulnscope-max`
+`docker run --rm -p 127.0.0.1:8765:8080 -e VULNSCOPE_PUBLIC_PORT=8765 -v "$PWD/data:/data:ro" -v "$PWD/out:/runs" vulnscope`
 (`VULNSCOPE_PUBLIC_PORT` must match the port on the left, or the page refuses the browser's address).
 
 **Isolation.** The port is published on the host's `127.0.0.1` only. Inside the container the server
@@ -189,7 +194,7 @@ Reading large folders through Docker Desktop is slower than a native run; for th
 Mac, the native Python install is faster.
 
 **Behind a TLS-inspecting proxy**, give the build your proxy's CA so it can download DuckDB:
-`docker build --secret id=ca,src=corp-ca.pem -t vulnscope-max .`
+`docker build --secret id=ca,src=corp-ca.pem -t vulnscope .`
 
 ### Air-gapped networks and enclaves
 
@@ -200,7 +205,7 @@ the four small files, carry them across, then:
 
 ```sh
 sha256sum -c SHA256SUMS --ignore-missing
-docker load -i vulnscope-max-1.2.0-image-amd64.tar.gz
+docker load -i vulnscope-1.2.0-image-amd64.tar.gz
 cp env.example .env           # set VULNSCOPE_DATA, VULNSCOPE_RUNS, and VULNSCOPE_OFFLINE=1
 docker compose up -d          # the image is already loaded, so nothing is pulled
 ```
@@ -217,13 +222,13 @@ scripts/docker/offline-bundle.sh linux/amd64     # Intel/AMD PCs and servers
 scripts/docker/offline-bundle.sh linux/arm64     # Apple silicon Macs, ARM servers
 ```
 
-It writes `dist/vulnscope-max-<version>-<arch>/` with the saved image, this source tree,
+It writes `dist/vulnscope-<version>-<arch>/` with the saved image, this source tree,
 `SHA256SUMS` and `LOAD.txt`. Carry that folder across, then on the enclave side:
 
 ```sh
 sha256sum -c SHA256SUMS
-docker load -i vulnscope-max-image-amd64.tar.gz
-mkdir vulnscope && tar -xzf vulnscope-max-source.tar.gz -C vulnscope && cd vulnscope
+docker load -i vulnscope-image-amd64.tar.gz
+mkdir vulnscope && tar -xzf vulnscope-source.tar.gz -C vulnscope && cd vulnscope
 cp .env.example .env          # set VULNSCOPE_DATA, VULNSCOPE_RUNS, and VULNSCOPE_OFFLINE=1
 docker compose up -d --no-build
 ```

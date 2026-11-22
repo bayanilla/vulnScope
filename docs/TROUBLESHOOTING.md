@@ -78,8 +78,8 @@ To check the container, `docker compose ps` should show it as `Up` (not `Restart
 | The page looks unchanged | You restarted without `pull` (release image) or `--build` (from source), or you are looking at an old run. Update, reload the page, and analyze again: each run keeps the version it was made with. |
 | `git pull` refuses: "Your local changes would be overwritten" | Files in your clone were edited. `git status` lists them. Keep a copy with `git stash` (restore it later with `git stash pop`), or discard them with `git checkout -- <file>`, then pull again. `.env` is not tracked, so your settings are safe. |
 | macOS: `docker: command not found` or `docker-credential-desktop` not found | Docker Desktop's tools are not on your PATH. Run `export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"`, or add that line to `~/.zshrc`. |
-| `docker compose pull`: "denied" or "unauthorized" | The image name in `VULNSCOPE_IMAGE` is wrong, or a registry login is getting in the way (`docker logout ghcr.io`). Check the [package page](https://github.com/bayanilla/vulnscope_max/pkgs/container/vulnscope-max), or build from source. |
-| A pinned version does not change | If `.env` pins `VULNSCOPE_IMAGE=ghcr.io/bayanilla/vulnscope-max:<version>`, change the number first. |
+| `docker compose pull`: "denied" or "unauthorized" | The image name in `VULNSCOPE_IMAGE` is wrong, or a registry login is getting in the way (`docker logout ghcr.io`). Check the [package page](https://github.com/bayanilla/vulnScope/pkgs/container/vulnscope), or build from source. |
+| A pinned version does not change | If `.env` pins `VULNSCOPE_IMAGE=ghcr.io/bayanilla/vulnscope:<version>`, change the number first. |
 | Explorer, theme or view choices look different | The browser remembers them per address (`127.0.0.1:8765` and `127.0.0.1:8080` are separate). Pick them again, or clear the site's data. |
 | Air-gapped installation | `docker load` the newer image file from the release, then `docker compose up -d`. For a bundle built from source, see [Air-gapped networks](../ARCHITECTURE.md#air-gapped-networks-and-enclaves). |
 
@@ -88,4 +88,5 @@ To check the container, `docker compose ps` should show it as `Up` (not `Restart
 | Problem | What to do |
 |---|---|
 | `ModuleNotFoundError: No module named 'duckdb'` | DuckDB is installed in a different Python than the one running VulnScope. Activate your virtual environment, then `python3 -m pip install -r requirements.txt` with the same `python3`. |
+| "DuckDB … is installed, and it gives wrong or no results for this analysis" | That DuckDB version is refused: older than 1.2 cannot run the analysis and 1.3.0 silently drops rows. Run `python3 -m pip install -r requirements.txt` (it asks for `duckdb>=1.2,!=1.3.0,<2`). |
 | "Packet captures need Zeek to be analyzed" | Zeek is not installed or not on the PATH. Install it (`brew install zeek` or your Linux package) or set `VULNSCOPE_ZEEK=/path/to/zeek`, or use the Docker image, which includes Zeek. |

@@ -18,9 +18,9 @@ The ARTEX sample in 3D: subnets as platforms, hosts as pillars sized by risk, an
 
 ### Explorer overview
 
-<a href="explorer_current_overview.jpg"><img src="explorer_current_overview.jpg" alt="Current Explorer overview of the sample network" width="720"></a>
+<a href="explorer_current_overview.jpg"><img src="explorer_current_overview.jpg" alt="Explorer overview of the sample network in 3D" width="720"></a>
 
-The sample network is grouped by subnet, with a prioritized host list and observed connections.
+The Explorer opens in 3D: each subnet is a platform, hosts are pillars sized by risk, and the top outside addresses sit on the INTERNET arc. The host list on the left is grouped by subnet.
 
 ### Focused host
 
@@ -30,11 +30,11 @@ Outside addresses appear to the left, connected internal hosts to the right, and
 
 ## Upload workflow and reports
 
-<a href="upload_current.jpg"><img src="upload_current.jpg" alt="Current Múcaro VulnScope upload page" width="600"></a>
+<a href="upload_current.jpg"><img src="upload_current.jpg" alt="The upload page: report details, options, then a folder to analyze" width="600"></a>
 
-The upload page accepts a local folder or selected telemetry, scan, and IOC CSV files.
+The upload page: optional report details, then Options used by either way of analyzing (internal networks, an IOC CSV, skipping the large copies), a folder to analyze in place, and uploads folded under **Upload files instead**.
 
-<a href="upload_olive_drab.jpg"><img src="upload_olive_drab.jpg" alt="Upload page with the Olive Drab map background" width="600"></a>
+<a href="upload_olive_drab.jpg"><img src="upload_olive_drab.jpg" alt="The upload page in the Olive Drab theme" width="600"></a>
 
 Olive Drab uses a subdued map backdrop; SOC Dark and Matrix use signal lines, while Light uses a soft gradient.
 

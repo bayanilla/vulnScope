@@ -37,7 +37,6 @@ Numeric bounds in one place. Each row names where the value is set; change it th
 | Packet-loss warning | 1% | Zeek's estimated capture loss | `vulnflow/report.py` |
 | Branding name | 40 | characters before "VulnScope" | `vulnflow/branding.py` |
 | Branding logo | 512 KB, 2,048 px | file size, longest side | `vulnflow/branding.py` |
-| Branding unlock | 30 min, 5 attempts | unlock lifetime; free attempts before a doubling lockout | `vulnflow/web/branding_page.py` |
 | Report network name | 60 | characters | `vulnflow/runname.py` |
 | Compare upload | 64 MB | IOC CSVs added on the Compare page | `vulnflow/web/compare_page.py` |
 | Compare hosts | 12 / 1,000 | related hosts per report drawn on the page / per CSV cell (`comparison.json` has all) | `vulnflow/compare.py` |

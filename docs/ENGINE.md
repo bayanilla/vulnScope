@@ -1,4 +1,7 @@
-# What ULTRA changes from MAX
+# Engine changes since VulnScope MAX
+
+These changes were made in the former VulnScope ULTRA repository and came into vulnScope with it.
+MAX and ULTRA below name the two former repositories.
 
 ULTRA starts from VulnScope MAX (commit `621599b`) and keeps every feature: the upload page,
 Compare, the Security Assistant, PCAP input, and the Explorer with its 3D, Timeline and Attack

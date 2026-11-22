@@ -9,8 +9,9 @@ actually reached, from where, and what happened next. Each run writes an executi
 technical report and an interactive Explorer. It never scans, probes or contacts the hosts in your
 data.
 
-This repository is **VulnScope ULTRA**: VulnScope MAX with a faster engine and the same reports.
-What changed and what did not is in [docs/ULTRA.md](docs/ULTRA.md). Incident triage cases live in
+This is the one VulnScope repository. It replaces vulnScope PRO, VulnScope MAX and VulnScope ULTRA:
+it carries all of MAX's features with ULTRA's faster engine and the same reports (see
+[docs/ENGINE.md](docs/ENGINE.md) and [UPGRADE.md](UPGRADE.md)). Incident triage cases live in
 their own tool: [vulnscope_incident](https://github.com/bayanilla/vulnscope_incident).
 
 > **Proof of concept, for local use.** The upload page has no login and can read any folder your
@@ -22,7 +23,7 @@ The command-line package is `vulnflow`.
 ## Quickstart
 
 **Docker** (Linux, macOS, Windows, air-gapped networks). Download `compose.yaml` and `env.example`
-from the [latest release](https://github.com/bayanilla/vulnscope_max/releases/latest) into an empty
+from the [latest release](https://github.com/bayanilla/vulnScope/releases/latest) into an empty
 folder, then:
 
 ```sh
@@ -100,12 +101,13 @@ If detection guesses a format wrong, force it with `--format file.csv=paloalto`.
 
 On the upload page:
 
-1. Enter a folder path or click **Browse…**, then **Analyze folder**. Files are read where they
-   sit; nothing is copied. You can also upload files (up to 1 GB each by default).
-2. Optionally list your internal networks. The default is RFC 1918, CGNAT, loopback, link-local and
-   ULA ranges.
-3. Optionally open **Report details** to name the run and its network. These label the reports and
-   group runs in Compare reports.
+1. Optionally fill in **Report details** to name the run and its network. These label the reports
+   and group runs in Compare reports.
+2. Optionally set **Options**: your internal networks (the default is RFC 1918, CGNAT, loopback,
+   link-local and ULA ranges), an IOC CSV, and **Skip full copies** for large inputs. They apply to
+   a folder run and to uploads alike.
+3. Enter a folder path or click **Browse…**, then **Analyze folder**. Files are read where they
+   sit; nothing is copied. Or open **Upload files instead** (up to 1 GB per upload by default).
 
 From the command line:
 
@@ -142,7 +144,7 @@ Attack paths view of the likeliest ways in, and a Timeline of every flow. Click 
 it talked to inside and out. Press **?** in any view for help; the
 [Explorer guide](docs/EXPLORER.md) covers the controls.
 
-![Explorer overview of the synthetic 250-host example run, with the host list ranked by priority](screenshots/explorer_current_overview.jpg)
+![Explorer overview of the synthetic 250-host example run in 3D, with the host list grouped by subnet](screenshots/explorer_current_overview.jpg)
 
 For a guided walk-through, analyze the Gootloader sample and follow `hr-ws-07` in the Timeline.
 [Methods](METHODS.md) explains every score and estimate.
@@ -186,7 +188,7 @@ Every numeric bound is listed in [Configured limits](docs/LIMITS.md).
 
 Run `docker compose pull && docker compose up -d` (from source: `git pull`, then
 `docker compose up -d --build`), then analyze your data again. Each run keeps the version it was
-made with. Settings, runs and branding are kept. Coming from vulnScope PRO? See
+made with. Settings, runs and branding are kept. Coming from PRO, MAX or ULTRA? See
 [UPGRADE.md](UPGRADE.md).
 
 ## Documentation
@@ -203,6 +205,8 @@ made with. Settings, runs and branding are kept. Coming from vulnScope PRO? See
 | [Development](DEVELOPMENT.md) | Tests, benchmarks, builds and releases |
 | [Local API](API.md) | The upload page's HTTP routes |
 | [Configured limits](docs/LIMITS.md) | Every numeric bound in one table |
+| [Engine](docs/ENGINE.md) | The DuckDB engine changes carried over from ULTRA, and their speed |
+| [Upgrade](UPGRADE.md) | Moving from vulnScope PRO, VulnScope MAX or ULTRA |
 | [Changelog](CHANGELOG.md) | Notable changes per release |
 
 ## License

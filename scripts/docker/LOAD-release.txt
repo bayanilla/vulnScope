@@ -1,4 +1,4 @@
-VulnScope MAX + Zeek @VERSION@, ready-made image
+VulnScope + Zeek @VERSION@, ready-made image
 =================================================
 
 Needs Docker (Docker Engine with the Compose plugin on Linux, Docker Desktop on macOS/Windows).
@@ -16,7 +16,7 @@ Nothing is built on your computer. Put compose.yaml and env.example in a folder 
       amd64 = Intel/AMD PCs and servers, arm64 = Apple silicon Macs and ARM servers
       sha256sum -c SHA256SUMS --ignore-missing   (macOS: shasum -a 256 -c SHA256SUMS --ignore-missing;
                                                   Windows: Get-FileHash <file> and compare)
-      docker load -i vulnscope-max-@VERSION@-image-amd64.tar.gz
+      docker load -i vulnscope-@VERSION@-image-amd64.tar.gz
     In .env also set VULNSCOPE_OFFLINE=1 (skips IOC article previews), keep the Security
     Assistant on the built-in offline provider and leave CLOUDFLARE_RADAR_API_TOKEN unset.
 
