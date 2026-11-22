@@ -79,6 +79,12 @@ With telemetry alone, VulnScope reports observed connections, IPS/IDS alerts and
 and marks vulnerability status as **unknown**. Details: [Architecture](ARCHITECTURE.md) and
 [Methods](METHODS.md).
 
+<a href="docs/diagrams/vulnscope-end-to-end.png"><img src="docs/diagrams/vulnscope-end-to-end.png" alt="VulnScope end to end: submit telemetry and a scan, the analysis steps, and the results" width="900"></a>
+
+The whole path from submitting files to the results. The parts of the tool and how they connect are
+in the [architecture diagram](docs/diagrams/vulnscope-architecture.png). Both are draw.io files you
+can edit; see [Diagrams](ARCHITECTURE.md#diagrams).
+
 ## What it reads
 
 | Input | Formats | What it adds |
@@ -198,6 +204,7 @@ made with. Settings, runs and branding are kept. Coming from PRO, MAX or ULTRA? 
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Port in use, proxies, updates that don't show, Docker on macOS |
 | [Methods](METHODS.md) | Formats, correlation and scoring, Explorer estimates, what VulnScope cannot establish |
 | [Architecture](ARCHITECTURE.md) | Pipeline, large inputs, Docker, air-gapped bundle, upload page security |
+| [Diagrams](ARCHITECTURE.md#diagrams) | Architecture and end-to-end workflow, as draw.io files and pictures |
 | [Explorer](docs/EXPLORER.md) | Views, controls, deep links, supported browsers |
 | [Compare reports](docs/COMPARE.md) | Comparisons, several sites, the all-networks map |
 | [Security Assistant](docs/SECURITY_ASSISTANT.md) | Providers, redaction, article briefs, command-line use |

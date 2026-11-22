@@ -2,6 +2,20 @@
 
 Examples of the upload workflow, reports, and Explorer. Click a preview to open the full-size image.
 
+## Diagrams
+
+### Architecture
+
+<a href="../docs/diagrams/vulnscope-architecture.png"><img src="../docs/diagrams/vulnscope-architecture.png" alt="VulnScope architecture diagram" width="800"></a>
+
+Inputs, the Docker image, the analysis chain from parsers to reports, the upload page, the Security Assistant, Compare, the run folder and the optional outbound connections.
+
+### End to end
+
+<a href="../docs/diagrams/vulnscope-end-to-end.png"><img src="../docs/diagrams/vulnscope-end-to-end.png" alt="VulnScope end-to-end workflow diagram" width="800"></a>
+
+Submitting network telemetry and a vulnerability scan, the analysis steps, and the results. The draw.io files are in [docs/diagrams](../docs/diagrams/).
+
 ## Explorer and Security Assistant
 
 ### Security Assistant drawer
