@@ -156,17 +156,28 @@ def _typed_value(value: str, kind: str, set_sep: str, empty: str, unset: str):
 
 
 def _flatten(rec: dict) -> dict:
-    """Zui/Brim exports nest connection IDs ({"id": {"orig_h": ...}}); Zeek writes "id.orig_h"."""
-    if not any(isinstance(v, dict) for v in rec.values()):
-        return rec
-    out = {}
-    for k, v in rec.items():
-        if isinstance(v, dict):
-            for k2, v2 in _flatten(v).items():
-                out[f"{k}.{k2}"] = v2
-        else:
-            out[k] = v
-    return out
+    """Zui/Brim exports nest connection IDs ({"id": {"orig_h": ...}}); Zeek writes "id.orig_h".
+    Some shippers (SimpleRock, Logstash and Elastic pipelines) rename them "id_orig_h"; those are
+    given the Zeek name too, unless the record already has it."""
+    if any(isinstance(v, dict) for v in rec.values()):
+        out = {}
+        for k, v in rec.items():
+            if isinstance(v, dict):
+                for k2, v2 in _flatten(v).items():
+                    out[f"{k}.{k2}"] = v2
+            else:
+                out[k] = v
+        rec = out
+    if any(k in rec for k in UNDERSCORE_IDS):
+        rec = dict(rec)
+        for under, dotted in UNDERSCORE_IDS.items():
+            if under in rec and dotted not in rec:
+                rec[dotted] = rec.pop(under)
+    return rec
+
+
+# Connection ID fields as some log shippers spell them, and Zeek's own names.
+UNDERSCORE_IDS = {f"id_{side}_{part}": f"id.{side}_{part}" for side in ("orig", "resp") for part in ("h", "p")}
 
 
 def _json_array(fh, chunk: int = 1 << 20):
