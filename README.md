@@ -10,8 +10,8 @@ technical report and an interactive Explorer. It never scans, probes or contacts
 data.
 
 This repository is **VulnScope ULTRA**: VulnScope MAX with a faster engine and the same reports.
-What changed and what did not is in [docs/ULTRA.md](docs/ULTRA.md). Incident cases, a first
-step towards Incident Analysis, are described in [docs/INCIDENTS.md](docs/INCIDENTS.md).
+What changed and what did not is in [docs/ULTRA.md](docs/ULTRA.md). Incident triage cases live in
+their own tool: [vulnscope_incident](https://github.com/bayanilla/vulnscope_incident).
 
 > **Proof of concept, for local use.** The upload page has no login and can read any folder your
 > account (or the container) can. It listens on `127.0.0.1` only. Read
