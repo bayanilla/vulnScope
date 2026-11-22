@@ -240,3 +240,28 @@ class ParserSecurityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SharedPageOfflineTests(unittest.TestCase):
+    """Pages VulnScope writes to disk may be shared and opened anywhere: each one carries a
+    Content-Security-Policy that stops it loading anything from the network."""
+
+    POLICY = re.compile(r'<head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="([^"]+)">')
+
+    def check(self, page):
+        m = self.POLICY.search(page)
+        self.assertIsNotNone(m, "no Content-Security-Policy right after <head>")
+        rules = dict((d.strip().split(" ", 1) + [""])[:2] for d in m[1].split(";"))
+        self.assertEqual(rules["default-src"], "'none'")
+        self.assertEqual(rules["connect-src"], "'self'")
+        self.assertEqual(rules["base-uri"], "'none'")
+        for d in ("img-src", "font-src", "script-src", "style-src"):
+            self.assertNotRegex(rules[d], r"https?:|\*", d)
+
+    def test_report_explorer_and_comparison_pages(self):
+        from vulnflow import compare, explore
+        from vulnflow.report import md_to_html
+        self.check(md_to_html("# Report\n\ntext", "Report"))
+        self.check(md_to_html("# Report\n\ntext", "Report", inserts={}))
+        self.check(explore.html({"report": {"name": "x"}, "ioc_matches": []}))
+        self.check(compare.page({"reports": [], "iocs": [], "vulns": [], "summary": {}}))
