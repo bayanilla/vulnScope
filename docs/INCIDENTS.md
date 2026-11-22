@@ -23,6 +23,10 @@ python -m vulnflow incident verify cases/demo
 `run` prints each file's status and writes `cases/demo/reports/baseline-v1/` with
 `incident_report.json`, `.md` and `.html`. Open the HTML file in a browser.
 
+From the upload page: choose **Investigate an incident** at the top, fill in the case and give a
+folder, files to upload, or both. The case is saved under `<data dir>/cases/<name>_<date-time>/`
+(the same layout, so the commands above work on it) and its page opens at `/cases/<id>/`.
+
 ## What a case folder holds
 
 | Path | What |
@@ -71,6 +75,6 @@ only; `results.json` is unchanged.
 
 ## Not in this step
 
-Windows EVTX, Linux, CloudTrail, Azure and the other network formats; Nessus as context; the web
-pages, background jobs and sign-in; the AI interpretation; S3 storage. Host names and accounts in
+Windows EVTX, Linux, CloudTrail, Azure and the other network formats; Nessus as context; background jobs and sign-in (the
+upload page runs a case while the browser waits, like an analysis); the AI interpretation; S3 storage. Host names and accounts in
 the scope are recorded but not yet used to filter events.
