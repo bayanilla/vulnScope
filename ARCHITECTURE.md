@@ -173,7 +173,7 @@ docker compose run --rm vulnscope zeek -C -r /data/capture.pcap local     # Zeek
 ```
 
 Without Compose:
-`docker run --rm -p 127.0.0.1:8765:8080 -e VULNSCOPE_PUBLIC_PORT=8765 -v "$PWD/data:/data:ro" -v "$PWD/out:/runs" vulnscope-max`
+`docker run --rm -p 127.0.0.1:8765:8080 -e VULNSCOPE_PUBLIC_PORT=8765 -v "$PWD/data:/data:ro" -v "$PWD/out:/runs" vulnscope`
 (`VULNSCOPE_PUBLIC_PORT` must match the port on the left, or the page refuses the browser's address).
 
 **Isolation.** The port is published on the host's `127.0.0.1` only. Inside the container the server
@@ -189,7 +189,7 @@ Reading large folders through Docker Desktop is slower than a native run; for th
 Mac, the native Python install is faster.
 
 **Behind a TLS-inspecting proxy**, give the build your proxy's CA so it can download DuckDB:
-`docker build --secret id=ca,src=corp-ca.pem -t vulnscope-max .`
+`docker build --secret id=ca,src=corp-ca.pem -t vulnscope .`
 
 ### Air-gapped networks and enclaves
 
@@ -200,7 +200,7 @@ the four small files, carry them across, then:
 
 ```sh
 sha256sum -c SHA256SUMS --ignore-missing
-docker load -i vulnscope-max-1.2.0-image-amd64.tar.gz
+docker load -i vulnscope-1.2.0-image-amd64.tar.gz
 cp env.example .env           # set VULNSCOPE_DATA, VULNSCOPE_RUNS, and VULNSCOPE_OFFLINE=1
 docker compose up -d          # the image is already loaded, so nothing is pulled
 ```
@@ -217,13 +217,13 @@ scripts/docker/offline-bundle.sh linux/amd64     # Intel/AMD PCs and servers
 scripts/docker/offline-bundle.sh linux/arm64     # Apple silicon Macs, ARM servers
 ```
 
-It writes `dist/vulnscope-max-<version>-<arch>/` with the saved image, this source tree,
+It writes `dist/vulnscope-<version>-<arch>/` with the saved image, this source tree,
 `SHA256SUMS` and `LOAD.txt`. Carry that folder across, then on the enclave side:
 
 ```sh
 sha256sum -c SHA256SUMS
-docker load -i vulnscope-max-image-amd64.tar.gz
-mkdir vulnscope && tar -xzf vulnscope-max-source.tar.gz -C vulnscope && cd vulnscope
+docker load -i vulnscope-image-amd64.tar.gz
+mkdir vulnscope && tar -xzf vulnscope-source.tar.gz -C vulnscope && cd vulnscope
 cp .env.example .env          # set VULNSCOPE_DATA, VULNSCOPE_RUNS, and VULNSCOPE_OFFLINE=1
 docker compose up -d --no-build
 ```

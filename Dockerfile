@@ -1,4 +1,4 @@
-# VulnScope MAX with Zeek: PCAP -> Zeek logs -> VulnScope, the same on Linux, macOS and Windows.
+# VulnScope with Zeek: PCAP -> Zeek logs -> VulnScope, the same on Linux, macOS and Windows.
 #
 #   docker compose up -d            # upload page on http://127.0.0.1:8765/ (inside: 8080)
 #   docker compose run --rm vulnscope analyze /data/case1 -o /runs/case1

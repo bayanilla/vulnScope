@@ -9,8 +9,9 @@ actually reached, from where, and what happened next. Each run writes an executi
 technical report and an interactive Explorer. It never scans, probes or contacts the hosts in your
 data.
 
-This repository is **VulnScope ULTRA**: VulnScope MAX with a faster engine and the same reports.
-What changed and what did not is in [docs/ULTRA.md](docs/ULTRA.md). Incident triage cases live in
+This is the one VulnScope repository. It replaces vulnScope PRO, VulnScope MAX and VulnScope ULTRA:
+it carries all of MAX's features with ULTRA's faster engine and the same reports (see
+[docs/ENGINE.md](docs/ENGINE.md) and [UPGRADE.md](UPGRADE.md)). Incident triage cases live in
 their own tool: [vulnscope_incident](https://github.com/bayanilla/vulnscope_incident).
 
 > **Proof of concept, for local use.** The upload page has no login and can read any folder your
@@ -22,7 +23,7 @@ The command-line package is `vulnflow`.
 ## Quickstart
 
 **Docker** (Linux, macOS, Windows, air-gapped networks). Download `compose.yaml` and `env.example`
-from the [latest release](https://github.com/bayanilla/vulnscope_max/releases/latest) into an empty
+from the [latest release](https://github.com/bayanilla/vulnScope/releases/latest) into an empty
 folder, then:
 
 ```sh
@@ -186,7 +187,7 @@ Every numeric bound is listed in [Configured limits](docs/LIMITS.md).
 
 Run `docker compose pull && docker compose up -d` (from source: `git pull`, then
 `docker compose up -d --build`), then analyze your data again. Each run keeps the version it was
-made with. Settings, runs and branding are kept. Coming from vulnScope PRO? See
+made with. Settings, runs and branding are kept. Coming from PRO, MAX or ULTRA? See
 [UPGRADE.md](UPGRADE.md).
 
 ## Documentation

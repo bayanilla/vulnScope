@@ -1,5 +1,5 @@
 """Upload page: the Options shared by both ways of analyzing (IOC CSV with a folder run) and the
-folded upload form. (Incident cases moved to the separate Ultra Incident tool.)"""
+folded upload form. (Incident cases moved to the separate vulnscope_incident tool.)"""
 import json
 import os
 import re
@@ -68,7 +68,7 @@ class UploadOptionsTests(unittest.TestCase):
     # -- the upload page ------------------------------------------------------------------------
     def test_upload_page_has_options_and_folded_upload(self):
         _, page, _ = self.get("/")
-        self.assertNotIn('<nav class="modes"', page)          # incident cases moved to Ultra Incident
+        self.assertNotIn('<nav class="modes"', page)          # incident cases moved to vulnscope_incident
         self.assertNotIn('href="/investigate"', page)
         self.assertIn('id="shared-options"', page)
         self.assertEqual(page.count('id="ioc_archive"'), 1)

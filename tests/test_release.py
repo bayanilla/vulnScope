@@ -38,7 +38,7 @@ class ReleaseComposeTests(unittest.TestCase):
 
     def test_release_compose_pulls_and_never_builds(self) -> None:
         text = (ROOT / "compose.release.yaml").read_text(encoding="utf-8")
-        self.assertIn("image: ${VULNSCOPE_IMAGE:-ghcr.io/bayanilla/vulnscope-max:latest}", text)
+        self.assertIn("image: ${VULNSCOPE_IMAGE:-ghcr.io/bayanilla/vulnscope:latest}", text)
         self.assertNotIn("build:", text)
         self.assertNotIn("pull_policy: never", text)
 

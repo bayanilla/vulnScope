@@ -133,7 +133,7 @@ and peak memory for the pipeline, uploads and folder runs. Run one benchmark at 
 ## Docker
 
 ```sh
-docker compose build                                   # or: docker build -t vulnscope-max .
+docker compose build                                   # or: docker build -t vulnscope .
 docker compose run --rm vulnscope analyze /opt/vulnscope/samples/gootloader_seo_poisoning -o /runs/demo
 scripts/docker/offline-bundle.sh linux/arm64           # air-gapped bundle; see ARCHITECTURE.md
 ```
@@ -154,7 +154,7 @@ git tag v1.2.0 && git push origin v1.2.0      # or GitHub: Releases > Draft a ne
 1. **CI**: the whole `ci.yml` (hygiene, tests, Explorer, Docker image, accuracy) runs on the tagged
    commit. Nothing is published if any job fails.
 2. **Image**: builds linux/amd64 and linux/arm64 (arm64 under QEMU) and pushes
-   `ghcr.io/bayanilla/vulnscope-max:1.2.0`, `:1.2` and `:latest`. A pre-release tag such as
+   `ghcr.io/bayanilla/vulnscope:1.2.0`, `:1.2` and `:latest`. A pre-release tag such as
    `v1.2.0-rc1` gets only its own tag and never moves `latest`.
 3. **Release**: pulls each architecture back from ghcr.io, checks it starts, saves it with
    `docker save` (about 190 MB each, gzipped) and attaches both files, `compose.yaml` (a copy of
