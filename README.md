@@ -79,10 +79,10 @@ With telemetry alone, VulnScope reports observed connections, IPS/IDS alerts and
 and marks vulnerability status as **unknown**. Details: [Architecture](ARCHITECTURE.md) and
 [Methods](METHODS.md).
 
-<a href="docs/diagrams/vulnscope-end-to-end.png"><img src="docs/diagrams/vulnscope-end-to-end.png" alt="VulnScope end to end: submit telemetry and a scan, the analysis steps, and the results" width="900"></a>
+<a href="screenshots/diagram_end_to_end.png"><img src="screenshots/diagram_end_to_end.png" alt="VulnScope end to end: submit telemetry and a scan, the analysis steps, and the results" width="900"></a>
 
 The whole path from submitting files to the results. The parts of the tool and how they connect are
-in the [architecture diagram](docs/diagrams/vulnscope-architecture.png). Both are draw.io files you
+in the [architecture diagram](screenshots/diagram_architecture.png). Both are draw.io files you
 can edit; see [Diagrams](ARCHITECTURE.md#diagrams).
 
 ## What it reads

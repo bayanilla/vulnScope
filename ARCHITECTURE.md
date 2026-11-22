@@ -6,7 +6,7 @@ standard.
 
 ## Diagrams
 
-Two draw.io diagrams, each with a PNG of the same drawing. Open the `.drawio` file in draw.io
+Two draw.io diagrams in `docs/diagrams/`, each with a PNG of the same drawing in `screenshots/`. Open the `.drawio` file in draw.io
 (desktop app or app.diagrams.net) to edit it, then export the PNG again.
 
 - [Architecture](docs/diagrams/vulnscope-architecture.drawio): inputs, the Docker image, the
@@ -16,9 +16,9 @@ Two draw.io diagrams, each with a PNG of the same drawing. Open the `.drawio` fi
   vulnerability scan, the analysis steps, and the results, including the error path and the
   telemetry-only branch.
 
-![VulnScope architecture](docs/diagrams/vulnscope-architecture.png)
+![VulnScope architecture](screenshots/diagram_architecture.png)
 
-![VulnScope end to end](docs/diagrams/vulnscope-end-to-end.png)
+![VulnScope end to end](screenshots/diagram_end_to_end.png)
 
 ## Responsibilities
 
