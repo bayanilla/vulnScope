@@ -298,6 +298,9 @@ def main(argv=None) -> int:
     fb.add_argument("-o", "--out", default="zeek_from_filebeat",
                     help="folder for conn.log, dns.log, ... (Zeek JSON; default zeek_from_filebeat)")
 
+    from .incident.cli import add_parser as incident_parser
+    incident_parser(sub)
+
     sub.add_parser("branding-password",
                    help="print a hash for a new Branding page password (set it as VULNSCOPE_BRANDING_PASSWORD_HASH)")
 
@@ -316,6 +319,9 @@ def main(argv=None) -> int:
             return 1
         print(f"{PASSWORD_ENV}='{hash_password(first)}'")
         return 0
+    if args.cmd == "incident":
+        from .incident.cli import main as incident_main
+        return incident_main(args)
     if args.cmd == "filebeat-to-zeek":
         from .parsers.filebeat import export
         counts = export(args.files, args.out, log=lambda m: print(m, file=sys.stderr))

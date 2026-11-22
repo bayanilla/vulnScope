@@ -6,6 +6,11 @@ again to get a release's changes. Upgrading from vulnScope PRO: see [UPGRADE.md]
 
 ## Unreleased
 
+- **Incident cases (first step, command line):** `vulnflow incident new/add/run` keeps the
+  original evidence read-only with its SHA-256, logs every action in a hash-chained audit log, and
+  writes a baseline report from Zeek logs with no scan and no AI model. Every statement cites the
+  original record it comes from. See [docs/INCIDENTS.md](docs/INCIDENTS.md). The vulnerability
+  reports are unchanged.
 - **ULTRA engine changes** (reports unchanged, checked against MAX on every sample): Zeek conn logs
   and Palo Alto exports are parsed by DuckDB; IOC matching, `flows.csv` and alert matching run as
   SQL; the correlation queries live in `vulnflow/model.sql`; results.json has a published format
