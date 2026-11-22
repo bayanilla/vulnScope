@@ -19,7 +19,6 @@ CSRF token: a `csrf` form field, a `csrf` JSON field, or an `X-CSRF-Token` heade
 | `POST /locate-folder` | Finds a folder picked in the browser among the shared folders, from its `name` and sample file names, sizes and times. |
 | `GET /settings`, `POST /settings` | Security Assistant provider, model, endpoint, key and redaction. |
 | `GET /branding`, `POST /branding` | Branding page and its changes (name prefix, logo, logo size). |
-| `POST /branding/unlock`, `POST /branding/lock` | Unlocks the Branding page with its password, or locks it again. |
 | `GET /runs/<id>/` | Results page for a run; other paths under it serve that run's reports. |
 | `GET /runs/<id>/ai-status` | Whether a Security Assistant provider is ready, and where data goes. |
 | `POST /runs/<id>/brief` | Writes the Security Assistant brief for the run. |

@@ -1,4 +1,4 @@
-# Múcaro VulnScope
+# VulnScope
 
 **Network telemetry and vulnerability scans, correlated into reports for system owners.**
 
@@ -10,8 +10,8 @@ technical report and an interactive Explorer. It never scans, probes or contacts
 data.
 
 This repository is **VulnScope ULTRA**: VulnScope MAX with a faster engine and the same reports.
-What changed and what did not is in [docs/ULTRA.md](docs/ULTRA.md). Incident cases, a first
-step towards Incident Analysis, are described in [docs/INCIDENTS.md](docs/INCIDENTS.md).
+What changed and what did not is in [docs/ULTRA.md](docs/ULTRA.md). Incident triage cases live in
+their own tool: [vulnscope_incident](https://github.com/bayanilla/vulnscope_incident).
 
 > **Proof of concept, for local use.** The upload page has no login and can read any folder your
 > account (or the container) can. It listens on `127.0.0.1` only. Read
@@ -166,7 +166,7 @@ is drawn from.
   every network on one map. [Guide](docs/COMPARE.md)
 - **Security Assistant:** ask about hosts, CVEs and IOCs. Offline by default with no AI and nothing
   sent; optionally Claude, OpenAI or a local model. [Guide](docs/SECURITY_ASSISTANT.md)
-- **Branding and themes:** your name and logo on every report, behind a password, and seven
+- **Branding and themes:** your name and logo on every report, and seven
   themes. [Guide](docs/BRANDING.md)
 
 ## Privacy
@@ -199,7 +199,7 @@ made with. Settings, runs and branding are kept. Coming from vulnScope PRO? See
 | [Explorer](docs/EXPLORER.md) | Views, controls, deep links, supported browsers |
 | [Compare reports](docs/COMPARE.md) | Comparisons, several sites, the all-networks map |
 | [Security Assistant](docs/SECURITY_ASSISTANT.md) | Providers, redaction, article briefs, command-line use |
-| [Branding](docs/BRANDING.md) | Name, logo, password, themes |
+| [Branding](docs/BRANDING.md) | Name, logo, themes |
 | [Development](DEVELOPMENT.md) | Tests, benchmarks, builds and releases |
 | [Local API](API.md) | The upload page's HTTP routes |
 | [Configured limits](docs/LIMITS.md) | Every numeric bound in one table |

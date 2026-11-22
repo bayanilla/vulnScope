@@ -40,7 +40,7 @@ def detect(path: str) -> str:
         return "zeek"                 # Zui/Brim JSON export: one array of records tagged by _path
     if first.lstrip().startswith("{") and '"event_type"' in first and '"_path"' not in first:
         return "suricata"
-    if first.lstrip().startswith("{") and ('"id.orig_h"' in first or '"note"' in first):
+    if first.lstrip().startswith("{") and ('"id.orig_h"' in first or '"id_orig_h"' in first or '"note"' in first):
         return "zeek"
     if first.lstrip().startswith("{") and (
         ('"ts"' in first and '"uid"' in first)

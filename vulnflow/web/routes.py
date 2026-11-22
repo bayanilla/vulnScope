@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 
 from ..runname import RUN_ID
-from . import branding_page, compare_page, folders, investigate, runs, settings, upload
+from . import branding_page, compare_page, folders, runs, settings, upload
 
 
 def _table(rows):
@@ -19,15 +19,12 @@ GET = _table([
     (r"/branding", branding_page.view),
     (rf"/runs/({RUN_ID})/(.*)", runs.get),
     (r"/compare/?", compare_page.view),
-    (r"/investigate/?", investigate.view),
-    (rf"/cases/({RUN_ID})/(.*)", investigate.case_get),
     (rf"/compare/({compare_page.COMPARISON_ID})/([a-z_]*\.?[a-z]*)", compare_page.file),
 ])
 
 POST = _table([
     (r"/analyze", upload.analyze_upload),
     (r"/analyze-folder", upload.analyze_folder),
-    (r"/investigate", investigate.start),
     (r"/folder-kind", upload.folder_kind),
     (r"/browse", folders.browse),
     (r"/locate-folder", folders.locate),
@@ -36,7 +33,5 @@ POST = _table([
     (rf"/runs/({RUN_ID})/(brief|article-briefs|ask)", runs.ai),
     (r"/settings", settings.save),
     (r"/branding", branding_page.save),
-    (r"/branding/unlock", branding_page.unlock),
-    (r"/branding/lock", branding_page.lock),
     (r"/compare", compare_page.run),
 ])

@@ -125,7 +125,7 @@ class WebSecurityTests(unittest.TestCase):
         form = urllib.parse.urlencode({"csrf": token, "action": "save", "provider": "openai", "model": "m",
                                        "base_url": "https://attacker.example/v1", "api_key": "sk-attacker-0000"})
         hdr = {"Content-Type": "application/x-www-form-urlencoded", "Origin": f"http://{evil}"}
-        for path in ("/settings", "/branding", "/branding/unlock", "/analyze-folder", "/compare"):
+        for path in ("/settings", "/branding", "/analyze-folder", "/compare"):
             self.assertEqual(s.request("POST", path, form, hdr, host=evil)[0], 421, path)
         for path in ("/settings", "/branding", "/compare/", "/runs/0123456789abcdef/results.json"):
             self.assertEqual(s.request("GET", path, host=evil)[0], 421, path)

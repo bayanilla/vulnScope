@@ -53,19 +53,6 @@ def busy_overlay() -> str:
     return BUSY.format(icon=icon_data_uri())
 
 
-MODES = [("analyze", "/", "Analyze network and vulnerabilities"),
-         ("investigate", "/investigate", "Investigate an incident")]
-
-
-def modes(current: str) -> str:
-    """The switch at the top of the upload page between the two ways in: the regular analysis and
-    an incident investigation."""
-    here = ' aria-current="page"'
-    links = "".join(f'<a href="{href}"{here if key == current else ""}>{html.escape(label)}</a>'
-                    for key, href, label in MODES)
-    return f'<nav class="modes" aria-label="What to do">{links}</nav>'
-
-
 PICKER = """<div class="pathrow"><input id="path" type="text" name="path" value="{value}" placeholder="{example}" autocomplete="off" spellcheck="false"{optional}>
 <button type="button" id="browse" class="secondary">Browse&hellip;</button></div>
 <input type="file" id="pick-dir" webkitdirectory directory multiple hidden>

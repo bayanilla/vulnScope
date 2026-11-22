@@ -19,14 +19,13 @@ from ..parsers import FORMATS
 from ..pipeline import input_files, run
 from ..report import CSS, HTML_OPEN, THEME_INIT, theme_control
 from . import folders
-from .pages import asset, busy_overlay, error_html, modes, page_config, picker
+from .pages import asset, busy_overlay, error_html, page_config, picker
 
 ANALYZE_HINT = "Large folders can take several minutes. Keep this tab open; the report opens here when it's ready."
 
 FORM = """{html_open}<head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{product_name}</title><link rel="icon" href="{icon}">
 {theme_init}<style>{css}{forms_css}</style></head><body>{theme_ui}
-{modes}
 <h1>Analyze files with {product_name}</h1>
 <p>Point the workflow at network telemetry, with optional Nessus results. It cleans and
 normalizes the data and produces an executive summary and a technical report. Without scan data,
@@ -82,7 +81,7 @@ Uploads are copied to this server and limited to {upload_mb} MB in all.</p>
 <button type="submit">Analyze uploaded files</button>
 </form></details>
 <p class="hint">Formats are detected automatically: {formats}. Folder selection is supported by Chrome and other compatible browsers. Files stay on this machine.
-<a href="/compare">Compare reports</a> · <a href="/investigate">Investigate an incident</a> · <a href="/settings">Security Assistant settings</a> · <a href="/branding">Branding</a></p>
+<a href="/compare">Compare reports</a> · <a href="/settings">Security Assistant settings</a> · <a href="/branding">Branding</a></p>
 {busy}{config}
 <script>{busy_js}</script>
 <script>{picker_js}</script>
@@ -111,7 +110,7 @@ def page(req, error: str = "", upload_open: bool = False):
                      "then &ldquo;Upload files to this site?&rdquo;): click Upload both times. "
                      "Nothing is sent; VulnScope only uses it to find the folder. ") if container else "",
         skip_copies=" checked" if not req.app.base_cfg.normalized_copies else "",
-        modes=modes("analyze"), upload_mb=app.max_upload // 1048576,
+        upload_mb=app.max_upload // 1048576,
         upload_open=" open" if upload_open else "",
         busy=busy_overlay(),
         config=page_config({"csrf": app.csrf, "native": folders.NATIVE_PICKER, "dialog": bool(folders.BROWSE_ROOTS)}),
