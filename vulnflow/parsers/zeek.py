@@ -195,22 +195,32 @@ def _json_array(fh, chunk: int = 1 << 20):
             buf, pos = buf[pos:], 0
 
 
-def parse(path: str, stats: ParseStats):
-    """Yield Flow, ThreatEvent, ZeekEvent and OTEvent records one at a time."""
+def records(path: str, stats: ParseStats, on_drop=None):
+    """Yield (locator, stream, record) for every data record in a Zeek log, in file order.
+
+    ``locator`` says where the record is in the (decompressed) file: ``line:N`` (1-based) for
+    TSV and JSON-lines logs, ``item:N`` (1-based) for a Zui/Brim JSON array export. Records that
+    cannot be read are counted in ``stats`` and, when ``on_drop`` is given, reported to it as
+    ``on_drop(locator, reason)``. Header lines and blank lines are skipped."""
     sep, fields, types, stream = "\t", None, None, stream_from_name(path)
     set_sep, empty, unset = ",", "(empty)", "-"
-    generic_streams: set[str] = set()
+
+    def drop(loc, reason):
+        stats.drop(reason)
+        if on_drop is not None:
+            on_drop(loc, reason)
     with open_text(path) as fh:
         is_array = fh.read(64).lstrip().startswith("[")
     with open_text(path) as fh:
-        for line in (_json_array(fh) if is_array else fh):
+        for n, line in enumerate(_json_array(fh) if is_array else fh, 1):
+            loc = f"item:{n}" if is_array else f"line:{n}"
             if isinstance(line, dict):       # one record of a Zui/Brim JSON export
                 stats.read += 1
                 rec = _flatten(line)
                 row_stream = str(rec.get("_path") or stream)
             elif not isinstance(line, str):
                 stats.read += 1
-                stats.drop("malformed JSON")
+                drop(loc, "malformed JSON")
                 continue
             else:
                 line = line.rstrip("\r\n")
@@ -241,35 +251,42 @@ def parse(path: str, stats: ParseStats):
                         if not isinstance(rec, dict):
                             raise ValueError
                     except (json.JSONDecodeError, ValueError):
-                        stats.drop("malformed JSON")
+                        drop(loc, "malformed JSON")
                         continue
                     rec = _flatten(rec)
                     row_stream = str(rec.get("_path") or stream)
                 else:
                     if fields is None:
-                        stats.drop("no #fields header")
+                        drop(loc, "no #fields header")
                         continue
                     vals = line.split(sep)
                     if len(vals) != len(fields):
-                        stats.drop("column count mismatch")
+                        drop(loc, "column count mismatch")
                         continue
                     row_types = types if types and len(types) == len(fields) else ["string"] * len(fields)
                     rec = {k: _typed_value(v, kind, set_sep, empty, unset)
                            for k, v, kind in zip(fields, vals, row_types)}
                     row_stream = stream
-            if row_stream in BOOKKEEPING_STREAMS:
-                stats.drop("Zeek bookkeeping log, not network activity")
-                continue
-            if row_stream == "conn":
-                item = _to_flow(rec, stats)
-            elif row_stream == "notice":
-                item = _notice(rec, stats)
-            elif row_stream == "alert" and rec.get("event_type") == "alert":
-                item = _brimcap_alert(rec, stats)    # Suricata alert inside a Zui/Brim export
-            else:
-                item = _event(rec, row_stream)
-                generic_streams.add(row_stream)
-            if item is not None:
-                yield item
+            yield loc, row_stream, rec
+
+
+def parse(path: str, stats: ParseStats):
+    """Yield Flow, ThreatEvent, ZeekEvent and OTEvent records one at a time."""
+    generic_streams: set[str] = set()
+    for _, row_stream, rec in records(path, stats):
+        if row_stream in BOOKKEEPING_STREAMS:
+            stats.drop("Zeek bookkeeping log, not network activity")
+            continue
+        if row_stream == "conn":
+            item = _to_flow(rec, stats)
+        elif row_stream == "notice":
+            item = _notice(rec, stats)
+        elif row_stream == "alert" and rec.get("event_type") == "alert":
+            item = _brimcap_alert(rec, stats)    # Suricata alert inside a Zui/Brim export
+        else:
+            item = _event(rec, row_stream)
+            generic_streams.add(row_stream)
+        if item is not None:
+            yield item
     if generic_streams:
         stats.note("Zeek stream records preserved as events; only conn sessions and notice alerts affect scoring")
