@@ -9,7 +9,7 @@ from multiprocessing import get_context
 
 from . import resources
 from .errors import UserError
-from .parsers import FORMATS, detect
+from .parsers import FORMATS, detect, native
 from .schema import Finding, Flow, OTEvent, ParseStats, ThreatEvent, ZeekEvent
 from .store import (DEFAULT_BATCH, DEFAULT_SKEW_SECONDS, SENSOR_RANK, EventSpool, FlowView,
                     PartWriter, Store)
@@ -195,6 +195,17 @@ def _parse_all(jobs: list, budget):
         pool.shutdown(wait=True, cancel_futures=True)
 
 
+def _native(fmt: str, path: str, name: str, stats: ParseStats, writer: PartWriter):
+    """(records kept, alerts) when a native reader handled the file, else None."""
+    if fmt == "zeek":
+        kept = native.zeek_conn(path, name, writer.fid, writer.base, writer.dir, writer._con(), stats)
+        return None if kept is None else (kept, [])
+    if fmt == "paloalto":
+        got = native.paloalto(path, name, writer.fid, writer.base, writer.dir, writer._con(), stats)
+        return None if got is None else (got[0] + len(got[1]), got[1])
+    return None
+
+
 def parse_file(job):
     """Parse one input file (in a worker process or the main one). Flows and Zeek/OT events are
     written to Parquet in the run's working directory; findings and IPS/IDS alerts, which are
@@ -209,7 +220,13 @@ def parse_file(job):
     kept = 0
     try:
         try:
-            for r in parser(path, stats):
+            # The two formats that make up most of a large run are read by DuckDB itself when
+            # the file is an ordinary one (parsers/native.py); anything else, and every other
+            # format, goes through the Python parser below.
+            done = _native(fmt, path, name, stats, writer)
+            if done is not None:
+                kept, alerts = done
+            for r in (parser(path, stats) if done is None else ()):
                 r.source = name
                 kept += 1
                 if kind == "findings":

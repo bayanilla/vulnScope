@@ -9,6 +9,9 @@ actually reached, from where, and what happened next. Each run writes an executi
 technical report and an interactive Explorer. It never scans, probes or contacts the hosts in your
 data.
 
+This repository is **VulnScope ULTRA**: VulnScope MAX with a faster engine and the same reports.
+What changed and what did not is in [docs/ULTRA.md](docs/ULTRA.md).
+
 > **Proof of concept, for local use.** The upload page has no login and can read any folder your
 > account (or the container) can. It listens on `127.0.0.1` only. Read
 > [Upload page security](ARCHITECTURE.md#upload-page-security) before running it anywhere shared.

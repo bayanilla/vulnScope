@@ -6,6 +6,12 @@ again to get a release's changes. Upgrading from vulnScope PRO: see [UPGRADE.md]
 
 ## Unreleased
 
+- **ULTRA engine changes** (reports unchanged, checked against MAX on every sample): Zeek conn logs
+  and Palo Alto exports are parsed by DuckDB; IOC matching, `flows.csv` and alert matching run as
+  SQL; the correlation queries live in `vulnflow/model.sql`; results.json has a published format
+  (`docs/results.schema.json`) that saved reports are checked against; DuckDB 1.3.0 and anything
+  older than 1.2 are refused, and DuckDB no longer downloads extensions on demand. See
+  [docs/ULTRA.md](docs/ULTRA.md).
 - **AWS VPC Flow Logs** have their own reader. It also reads records with no header line,
   CloudWatch exports and local Parquet files. It joins each session's request and reply, which AWS
   logs separately, so replies no longer show up as sessions to the client's port and received bytes

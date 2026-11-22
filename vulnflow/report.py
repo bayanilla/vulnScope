@@ -744,6 +744,12 @@ def write_all(res: dict, ds, outdir: str, copies: bool = True) -> dict[str, str]
     """Write every output. ``copies`` False skips the full normalized copies of the input
     (flows.csv, zeek_events.jsonl, ot_events.jsonl), which are about as large as the input."""
     os.makedirs(os.path.join(outdir, "normalized"), mode=0o700, exist_ok=True)
+    from .results_schema import problems
+    wrong = problems(res, limit=5)
+    if wrong:                                   # a bug in this program, not in the input: say so, keep the run
+        import sys
+        print("warning: results.json does not fit its declared format (docs/results.schema.json): "
+              + "; ".join(wrong), file=sys.stderr)
     paths = write_reports(res, outdir)
     from . import explore
     p = os.path.join(outdir, "explorer.html")
@@ -763,13 +769,7 @@ def write_all(res: dict, ds, outdir: str, copies: bool = True) -> dict[str, str]
         ds.flow_store().export_flows_parquet(p)
         paths["normalized/flows.parquet"] = p
         p = os.path.join(outdir, "normalized", "flows.csv")
-        with open(p, "w", newline="", encoding="utf-8") as fh:
-            cw = csv.writer(fh)
-            cols = ["ts", "src_ip", "src_port", "dst_ip", "dst_port", "proto", "action", "established",
-                    "bytes_out", "bytes_in", "app", "src_zone", "dst_zone", "source"]
-            cw.writerow(cols)
-            for f in ds.flows:
-                cw.writerow(csv_row((f.ts.isoformat() if f.ts else "") if c == "ts" else getattr(f, c) for c in cols))
+        ds.flow_store().export_flows_csv(p)
         paths["normalized/flows.csv"] = p
 
     # every internal address that was probed and never answered: not a host, but nothing is dropped

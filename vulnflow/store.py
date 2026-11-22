@@ -17,9 +17,7 @@ import weakref
 from datetime import datetime, timedelta, timezone
 from itertools import islice
 
-import duckdb
-
-from . import resources
+from . import db, resources
 from .schema import Flow, OTEvent, ZeekEvent
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -84,7 +82,7 @@ class Store:
             os.makedirs(base, exist_ok=True)
         self.dir = tempfile.mkdtemp(prefix="vulnscope-work-", dir=base)
         self.budget = budget or resources.plan(memory_limit, self.dir)
-        self.con = duckdb.connect(os.path.join(self.dir, "work.duckdb"))
+        self.con = db.connect(os.path.join(self.dir, "work.duckdb"))
         tmp = os.path.join(self.dir, "duckdb_tmp")
         os.makedirs(tmp, exist_ok=True)
         self.con.execute(f"SET temp_directory = '{_q(tmp)}'")
@@ -104,7 +102,7 @@ class Store:
     def _write_csv(self, rows, name: str) -> str:
         path = os.path.join(self.dir, name)
         with open(path, "w", newline="", encoding="utf-8") as fh:
-            csv.writer(fh).writerows(rows)
+            write_csv_rows(fh, rows)
         return path
 
     def _read_csv_sql(self, path: str, columns: dict[str, str]) -> str:
@@ -200,6 +198,25 @@ class Store:
             SELECT src_ip FROM flows
             UNION SELECT dst_ip FROM flows
                   WHERE established OR action = 'reject' OR bytes_in > 0""").fetchall()}
+
+    def flow_ips(self) -> list[str]:
+        """Every distinct address in the clean flows, as source or destination."""
+        return [r[0] for r in self.con.execute(
+            "SELECT src_ip FROM flows UNION SELECT dst_ip FROM flows").fetchall()]
+
+    def pair_counts(self, ips) -> list[tuple[str, str, int]]:
+        """(source, destination, sessions) for every address pair with one of ``ips`` on either side."""
+        ips = sorted(set(ips))
+        if not ips:
+            return []
+        self.insert_rows("pair_ips", {"ip": "VARCHAR"}, ((ip,) for ip in ips))
+        try:
+            return self.con.execute("""
+                SELECT src_ip, dst_ip, count(*) FROM flows
+                WHERE src_ip IN (SELECT ip FROM pair_ips) OR dst_ip IN (SELECT ip FROM pair_ips)
+                GROUP BY src_ip, dst_ip""").fetchall()
+        finally:
+            self.con.execute("DROP TABLE pair_ips")
 
     def broadcast_ips(self) -> set[str]:
         """IPv4 broadcast-like destinations: 255.255.255.255, or an address ending in .255 that only
@@ -398,29 +415,32 @@ class Store:
         random sample of everything else. Returns (rows iterator, sampled)."""
         cols = "ts, src_ip, dst_ip, dst_port, action, established, proto"
         base = "FROM flows WHERE ts IS NOT NULL AND src_ip <> dst_ip"
-        hot = "(list_contains(?, src_ip) OR list_contains(?, dst_ip))"
-        con, fl = self.con, sorted(flagged)
+        con = self.con
         total = self.flow_span()[0]
         cur = con.cursor()
         sampled = total > cap
         if not sampled:
             cur.execute(f"SELECT {cols} {base} ORDER BY seq")
         else:
+            # Flagged addresses are a table and each flow is tested by a join. (Searching a list of
+            # addresses for every flow, per tier, was most of the Timeline's build time.) The tiers
+            # read flows directly, in its own row order, so each sample is the one a list search gave.
+            self.insert_rows("timeline_flagged", {"ip": "VARCHAR"}, ((ip,) for ip in sorted(set(flagged))))
+            hot = "(src_ip IN (SELECT ip FROM timeline_flagged) OR dst_ip IN (SELECT ip FROM timeline_flagged))"
             half = cap // 2
-            tiers = [(f"{hot}", [fl, fl]), (f"action <> 'allow' AND NOT {hot}", [fl, fl]),
-                     (f"action = 'allow' AND NOT {hot}", [fl, fl])]
-            counts = [int(con.execute(f"SELECT count(*) {base} AND {w}", a).fetchone()[0]) for w, a in tiers]
+            tiers = [hot, f"action <> 'allow' AND NOT {hot}", f"action = 'allow' AND NOT {hot}"]
+            counts = [int(n or 0) for n in con.execute(
+                "SELECT " + ", ".join(f"count(*) FILTER ({w})" for w in tiers) + f" {base}").fetchone()]
             take = [min(counts[0], half)]
             take.append(min(counts[1], half - take[0]))
             take.append(min(counts[2], cap - take[0] - take[1]))
-            parts, args = [], []
-            for (w, a), n, k in zip(tiers, counts, take):
+            parts = []
+            for w, n, k in zip(tiers, counts, take):
                 if not k:
                     continue
                 sample = "" if k >= n else f" USING SAMPLE reservoir({k} ROWS) REPEATABLE (7)"
                 parts.append(f"SELECT * FROM (SELECT {cols}, seq {base} AND {w}){sample}")
-                args += a
-            cur.execute(" UNION ALL ".join(parts) + " ORDER BY seq", args)
+            cur.execute(" UNION ALL ".join(parts) + " ORDER BY seq")
 
         def rows():
             try:
@@ -445,11 +465,32 @@ class Store:
                          bytes_out, bytes_in, app, src_zone, dst_zone, source FROM flows ORDER BY seq)
             TO '{_q(path)}' (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 122880)""")
 
+    def export_flows_csv(self, path: str) -> None:
+        """The cleaned flows as normalized/flows.csv, written by DuckDB instead of a Python loop
+        over every session. The file is the same as the csv module wrote: ISO times in UTC,
+        True/False, CRLF line ends, and text cells that a spreadsheet would run as a formula
+        prefixed with an apostrophe (see report._cell)."""
+        def safe(c):
+            return (f"CASE WHEN length({c}) > 1 AND {c}[1] IN ('=', '+', '-', '@', chr(9), chr(13)) "
+                    f"THEN chr(39) || {c} ELSE nullif({c}, '') END AS {c}")
+        self.con.execute(f"""
+            COPY (SELECT strftime(ts, '%Y-%m-%dT%H:%M:%S')
+                         || CASE WHEN epoch_us(ts) % 1000000 = 0 THEN ''
+                                 ELSE '.' || lpad(CAST(epoch_us(ts) % 1000000 AS VARCHAR), 6, '0') END
+                         || '+00:00' AS ts,
+                         src_ip, src_port, dst_ip, dst_port, {safe('proto')}, {safe('action')},
+                         CASE WHEN established THEN 'True' ELSE 'False' END AS established,
+                         bytes_out, bytes_in, {safe('app')}, {safe('src_zone')}, {safe('dst_zone')},
+                         {safe('source')}
+                  FROM flows ORDER BY seq)
+            TO '{_q(path)}' (FORMAT csv, HEADER true, DELIMITER ',', QUOTE '"', ESCAPE '"',
+                             NEW_LINE '\\r\\n')""")
+
 
 def contact_rows(path: str, host: str) -> list[tuple]:
     """One host's rows from an Explorer contacts file (Store.write_contacts): (side, row JSON,
     connection examples), outside addresses ('a') then internal peers ('p'), each in rank order."""
-    con = duckdb.connect()
+    con = db.connect()
     try:
         con.execute("SET threads = 2")
         return con.execute("SELECT side, row, ex FROM read_parquet(?) WHERE host = ? ORDER BY side, rank",
@@ -526,6 +567,27 @@ class FlowView:
                 yield row_to_flow(r)
         cur.close()
 
+    def counts(self, column: str = "stream") -> dict[str, int]:
+        """Events per ``column`` value ("stream", or "protocol" for OT events), counted by DuckDB
+        from the Parquet files instead of reading every event back into Python."""
+        if not self._len or not _has_parquet(self.path):
+            return {}
+        assert column in ("stream", "protocol")
+        return {k: int(n) for k, n in self.store.con.execute(
+            f"SELECT {column}, count(*) FROM read_parquet('{_q(os.path.join(self.path, '*.parquet'))}') "
+            f"GROUP BY {column}").fetchall()}
+
+    def of_stream(self, stream: str):
+        """Only the events of one stream, in input order (a filter DuckDB applies on the files)."""
+        if not self._len or not _has_parquet(self.path):
+            return
+        for r in self.store.con.execute(
+                f"SELECT ts, uid, src_ip, dst_ip, source, fields FROM read_parquet("
+                f"'{_q(os.path.join(self.path, '*.parquet'))}') WHERE stream = ? ORDER BY ord", [stream]).fetchall():
+            yield ZeekEvent(ts=EPOCH + timedelta(microseconds=r[0]) if r[0] is not None else None,
+                            stream=stream, uid=r[1], src_ip=r[2], dst_ip=r[3],
+                            fields=json.loads(r[5]) if r[5] is not None else {}, source=r[4])
+
     def __getitem__(self, i):
         if isinstance(i, slice):
             return list(self)[i]
@@ -564,7 +626,7 @@ class PartWriter:
 
     def _con(self):
         if self.con is None:
-            self.con = duckdb.connect()
+            self.con = db.connect()
             # one batch at a time: little memory, no threads competing with the other workers
             self.con.execute("SET threads = 1")
             self.con.execute("SET memory_limit = '512MiB'")
@@ -694,6 +756,35 @@ def flow_row(ord_: int, f: Flow, sensor: str, fid: int, days: dict) -> tuple:
             f.dst_zone, f.source, sensor, fid, day)
 
 
+def _csv_cell(value) -> str:
+    if value is None:
+        return ""
+    text = value if isinstance(value, str) else str(value)
+    if any(c in text for c in ',"\r\n'):
+        return '"' + text.replace('"', '""') + '"'
+    return text
+
+
+def csv_lines(rows):
+    """Rows as csv.writer writes them (default dialect), built by hand."""
+    for row in rows:
+        line = ",".join(_csv_cell(v) for v in row)
+        yield (line or ('""' if len(row) == 1 else "")) + "\r\n"     # a lone empty cell is written quoted
+
+
+def write_csv_rows(fh, rows) -> None:
+    """csv.writer(fh).writerows(rows), also where the csv module cannot write a value: before
+    Python 3.11 it refuses text holding a NUL character, which a damaged log can contain."""
+    rows = rows if isinstance(rows, list) else list(rows)
+    start = fh.tell()
+    try:
+        csv.writer(fh).writerows(rows)
+    except csv.Error:
+        fh.seek(start)
+        fh.truncate()
+        fh.writelines(csv_lines(rows))
+
+
 def write_flow_parquet(con, workdir: str, rows: list[tuple], name: str) -> None:
     """Write flow rows (FLOW_COLUMNS order) to ``flows_parquet/<name>.parquet`` through a CSV file
     (fast, needs no numpy/arrow)."""
@@ -701,7 +792,7 @@ def write_flow_parquet(con, workdir: str, rows: list[tuple], name: str) -> None:
     os.makedirs(out, exist_ok=True)
     path = os.path.join(workdir, f"{name}.csv")
     with open(path, "w", newline="", encoding="utf-8") as fh:
-        csv.writer(fh).writerows(rows)
+        write_csv_rows(fh, rows)
     try:
         cols = ", ".join(f"'{k}': '{v}'" for k, v in _CSV_TYPES.items())
         source = (f"read_csv('{_q(path)}', columns={{{cols}}}, header=false, delim=',', quote='\"', "
