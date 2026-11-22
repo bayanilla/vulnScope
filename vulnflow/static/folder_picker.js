@@ -82,7 +82,7 @@
   };
   $("pk-up").onclick = () => parent && show(parent);
   path.form.addEventListener("submit", e => {
-    if (!path.value.trim()) { e.preventDefault(); msg("Choose a folder first: click Browse… and pick one, or type its full path.", true); path.focus(); }
+    if (!path.value.trim() && !path.dataset.optional) { e.preventDefault(); msg("Choose a folder first: click Browse… and pick one, or type its full path.", true); path.focus(); }
   });
   $("pk-use").onclick = () => { if (cur) set(cur); else box.hidden = true; path.focus(); };
   $("pk-cancel").onclick = () => { box.hidden = true; };

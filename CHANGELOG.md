@@ -6,6 +6,11 @@ again to get a release's changes. Upgrading from vulnScope PRO: see [UPGRADE.md]
 
 ## Unreleased
 
+- **Investigate an incident from the upload page:** a switch at the top of the upload page opens a
+  case form (name, networks in scope, time window, notes) that takes evidence from a folder, uploads
+  or both, builds the baseline report and opens the case page. Internal networks, the IOC CSV and
+  Skip full copies now sit in one Options section used by either way of analyzing, so a folder run
+  can take an IOC CSV too; the upload form is folded under "Upload files instead".
 - **Incident cases (first step, command line):** `vulnflow incident new/add/run` keeps the
   original evidence read-only with its SHA-256, logs every action in a hash-chained audit log, and
   writes a baseline report from Zeek logs with no scan and no AI model. Every statement cites the

@@ -1,4 +1,5 @@
-// Upload page: send the report details with whichever form is submitted, and relabel the folder
+// Upload page: send the report details and the Options (internal networks, IOC CSV, skip copies)
+// with whichever form is submitted, and relabel the folder
 // form's button "Open report" when the folder is a completed report's output folder, or "Analyze N
 // sites and compare" when it has a sites list (sites.csv).
 (function () {
@@ -11,6 +12,17 @@
       if (!h) { h = document.createElement("input"); h.type = "hidden"; h.name = n; f.prepend(h); }
       h.value = $(n).value;
     });
+    // the Options section too; a form's own field of the same name is left alone
+    const hidden = (name, value) => {
+      let h = f.querySelector('input[type=hidden][name="' + name + '"]');
+      if (!h) { h = document.createElement("input"); h.type = "hidden"; h.name = name; f.prepend(h); }
+      h.value = value;
+    };
+    hidden("internal_nets", $("nets").value);
+    hidden("skip_copies", $("skip_copies").checked ? "1" : "");
+    let ioc = f.querySelector('input[type=file][name="ioc_archive"]');
+    if (!ioc) { ioc = document.createElement("input"); ioc.type = "file"; ioc.name = "ioc_archive"; ioc.hidden = true; f.append(ioc); }
+    try { ioc.files = $("ioc_archive").files; } catch (e) {}
   }));
   const path = $("path"), btn = $("analyze-folder"), form = path.form, msg = $("sites-msg");
   const analyzing = {busy: form.dataset.busy, hint: form.dataset.busyHint};

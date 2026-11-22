@@ -159,19 +159,21 @@ def sha256_file(path: str, chunk: int = 1 << 20) -> tuple[str, int]:
     return h.hexdigest(), size
 
 
-def add_evidence(case: Case, src: str, actor: str, max_bytes: int | None = None) -> tuple[dict, bool]:
+def add_evidence(case: Case, src: str, actor: str, max_bytes: int | None = None,
+                 original_name: str | None = None) -> tuple[dict, bool]:
     """Store one file in the case. Returns (its evidence record, True if newly stored).
 
     The copy is checked against the hash of the source before it counts as stored, so an
     interrupted copy is never registered. The same content already in the case is recorded as a
-    duplicate upload and not stored again."""
+    duplicate upload and not stored again. ``original_name`` is the name to record when ``src`` is
+    a temporary copy (an upload)."""
     if not os.path.isfile(src):
         raise UserError(f"{src}: not a file.")
     size = os.path.getsize(src)
     if max_bytes is not None and size > max_bytes:
         raise UserError(f"{os.path.basename(src)}: {size} bytes is over the case's limit of {max_bytes} bytes.")
     digest, _ = sha256_file(src)
-    original = os.path.basename(src)
+    original = original_name or os.path.basename(src)
     records = case.evidence()
     for rec in records:
         if rec["sha256"] == digest:

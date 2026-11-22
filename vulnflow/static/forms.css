@@ -26,3 +26,11 @@ button:disabled{opacity:.5;cursor:not-allowed;filter:none}
 @media (prefers-reduced-motion:reduce){.busy-logo{animation:busy-pulse 2s ease-in-out infinite}
 @keyframes busy-pulse{50%{opacity:.55}}}
 label.check{display:flex;gap:8px;align-items:center;font-weight:400}
+.modes{display:inline-flex;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin:4px 0 6px}
+.modes a{padding:8px 16px;color:var(--muted);text-decoration:none;border-right:1px solid var(--line)} .modes a:last-child{border-right:0}
+.modes a[aria-current=page]{color:var(--fg);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)} .modes a:hover{color:var(--fg)}
+#shared-options{margin:16px 0} #shared-options h2 .hint{font-weight:400}
+details#upload-instead{margin:16px 0} details#upload-instead>summary{cursor:pointer;font-weight:600;font-size:1.05rem;padding:6px 0}
+#case-details textarea{width:100%;max-width:640px;padding:6px;font:inherit;resize:vertical}
+.cases{border-collapse:collapse;margin:8px 0;font-size:.95rem} .cases td,.cases th{padding:5px 12px 5px 0;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+.cases code{font-size:.85rem}
