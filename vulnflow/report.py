@@ -488,6 +488,14 @@ CALM_THEMES = ("graphite", "amphibious", "olive-drab", "matrix", "high-contrast"
 HTML_OPEN = (f'<!doctype html><html lang="en" data-theme="{DEFAULT_THEME}"'
              + (" data-calm" if DEFAULT_THEME in CALM_THEMES else "") + ">")
 
+# Every page VulnScope writes to disk carries this policy, so a report or Explorer that is shared and
+# opened from a file can't load anything from the network: no images, styles, fonts or scripts from
+# other hosts, and no fetch/XHR beyond the VulnScope server that served it (the Security Assistant).
+# Everything the pages need is inline or a data: URI. Defence in depth: text from logs is escaped too.
+FILE_CSP = ('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
+            "script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; "
+            "connect-src 'self'; base-uri 'none'\">")
+
 THEME_INIT = """<script>
 const supportedThemes = new Set(__THEMES__);
 let savedTheme = __DEFAULT__;
@@ -663,7 +671,7 @@ def md_to_html(md: str, title: str, inserts: dict | None = None,
     script = ""
     if inserts is not None:
         body, script = visual.decorate(body), visual.SCRIPT
-    return (f"{HTML_OPEN}<head><meta charset=\"utf-8\">"
+    return (f"{HTML_OPEN}<head><meta charset=\"utf-8\">{FILE_CSP}"
             f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             f"<title>{html.escape(title)} · {html.escape(product_name())}</title><link rel=\"icon\" href=\"{icon_data_uri()}\">{THEME_INIT}<style>{CSS}{visual.VISUAL_CSS}"
             f"{ioc_archive.CSS if ioc_matches else ''}</style></head><body>"

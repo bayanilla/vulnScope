@@ -918,7 +918,7 @@ def write_html(fh, data: dict, ioc_drawer: list | None = None) -> None:
     from . import ioc_archive
     from html import escape
     from .branding import EXPLORER_NAME, icon_data_uri, load as load_branding
-    from .report import HTML_OPEN
+    from .report import FILE_CSP, HTML_OPEN
     from .theme_backgrounds import explorer_background_css
     brand = load_branding()
     logo = brand.logo_data_uri()
@@ -928,7 +928,7 @@ def write_html(fh, data: dict, ioc_drawer: list | None = None) -> None:
     name = report.get("name") or ""
     report_markup = (f'<span id="report-name" title="{escape(report.get("description") or name)}">{escape(name)}</span>'
                      if name else "")
-    fh.write(HTML_OPEN + "<head><meta charset=\"utf-8\">"
+    fh.write(HTML_OPEN + "<head><meta charset=\"utf-8\">" + FILE_CSP +
              "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
              f"<title>{escape(name) + ' · ' if name else ''}{EXPLORER_NAME} · {escape(brand.name)}</title><meta name=\"application-name\" content=\"{escape(brand.name)}\"><link rel=\"icon\" href=\"{icon_data_uri()}\"><style>" + _read("analyst_chat.css") + _read("explorer.css") + _read("attackpaths.css") + _read("timeline3d.css") + explorer_background_css() + ioc_archive.CSS + "</style></head><body>"
              + _read("explorer.html").replace("<!--BRAND-->", brand_markup, 1).replace("<!--REPORT-->", report_markup, 1))
