@@ -1,0 +1,42 @@
+# Settings for the code checks CI runs on every pull request (.github/workflows/ci.yml).
+# VulnScope is not installed as a package; this file only configures the tools.
+# Run them locally with:  pip install -r requirements-dev.txt
+#                         ruff check .  &&  mypy  &&  coverage run -m unittest discover -s tests && coverage report
+
+[tool.ruff]
+target-version = "py310"
+extend-exclude = ["vulnflow/static", "samples", "example_output"]
+
+[tool.ruff.lint]
+# ruff's defaults: undefined names, unused imports and variables, syntax-level problems.
+select = ["E4", "E7", "E9", "F"]
+# Used on purpose in this code base: short lambdas assigned to names, and `l` for a line of text.
+ignore = ["E731", "E741"]
+
+[tool.mypy]
+# Lenient start. Checked against Python 3.10, the oldest version VulnScope supports, so a call
+# to something newer (datetime.UTC, a 3.11+ fromisoformat format, ...) fails here before it
+# ships. Still checked: undefined names and attributes, wrong argument counts and names,
+# missing imports inside vulnflow, calls on None that cannot work.
+# Off for now (mostly noise in un-annotated code; switch on one at a time later):
+python_version = "3.10"
+files = ["vulnflow"]
+ignore_missing_imports = true
+disable_error_code = [
+  "var-annotated", "assignment", "arg-type", "operator", "union-attr", "index",
+  "return-value", "type-var", "misc", "call-overload", "annotation-unchecked",
+]
+
+[tool.coverage.run]
+source = ["vulnflow"]
+branch = true
+# The web tests start the server in a thread and the parsers run in worker processes.
+concurrency = ["thread", "multiprocessing"]
+parallel = true
+patch = ["subprocess"]       # also count `python -m vulnflow ...` started by tests
+
+[tool.coverage.report]
+show_missing = false
+skip_covered = false
+precision = 1
+sort = "Cover"

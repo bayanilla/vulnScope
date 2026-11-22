@@ -1,0 +1,11 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	notice
+#open	2026-10-26-00-00-00
+#fields	ts	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	note	msg	src	dst	p	actions
+#types	time	string	addr	port	addr	port	string	string	addr	addr	port	set[enum]
+1793112315.540238	D00000080c	31.40.205.155	-	10.21.1.5	10443	Agentic::Think_Then_Act	31.40.205.155 opened 262 TLS sessions to 10.21.1.5:10443 in 46 bursts of 1-14, about 1 s apart, with 25-31 s pauses	31.40.205.155	10.21.1.5	10443	Notice::ACTION_LOG
+1793112589.714119	D000000835	152.233.51.12	-	10.21.1.5	8443	Agentic::Think_Then_Act	152.233.51.12 opened 40 TLS sessions to 10.21.1.5:8443 in 5 bursts of 1-14, about 1 s apart, with 25-31 s pauses	152.233.51.12	10.21.1.5	8443	Notice::ACTION_LOG
+#close	2026-10-28-00-00-00

@@ -1,4 +1,4 @@
-"""Command line entry point: python -m vulnflow {analyze,serve,samples}."""
+"""Command line entry point: python -m vulnflow {analyze,serve,compare,samples,filebeat-to-zeek,...}."""
 from __future__ import annotations
 
 import argparse
@@ -11,19 +11,32 @@ from .parsers import FORMATS
 
 def _cfg(a) -> Config:
     return Config(internal_nets=a.internal_net or list(DEFAULT_INTERNAL_NETS), hops=a.hops,
-                  min_severity=a.min_severity)
+                  min_severity=a.min_severity,
+                  scan_window_days=a.scan_window_days or None,
+                  dedup_skew_seconds=None if a.dedup_skew < 0 else a.dedup_skew,
+                  network_map=getattr(a, "network_map", None),
+                  known_scanners=getattr(a, "known_scanners", None),
+                  normalized_copies=getattr(a, "normalized_copies", True))
+
+
+def _copies_default() -> bool:
+    """VULNSCOPE_NORMALIZED_COPIES=0 turns the full normalized copies off by default (Docker .env)."""
+    return os.environ.get("VULNSCOPE_NORMALIZED_COPIES", "").strip().lower() not in ("0", "false", "no", "off")
 
 
 def _llm_cfg(a, required=True):
-    """Resolve the AI provider from flags/env. No vendor is assumed: one must be chosen.
+    """Resolve the AI provider from flags/env. No AI vendor is assumed: without a choice the
+    built-in offline assistant is used (``required`` False leaves the config unset instead).
     When the chosen provider needs a key and none is set, ask for it without echoing."""
-    from .llm import KEY_ENV, PROVIDER_NAMES, LLMConfig, LLMError
+    from .llm import KEY_ENV, PROVIDER_NAMES, LLMConfig
     cfg = LLMConfig.from_env(provider=a.llm_provider, model=a.llm_model, base_url=a.llm_base_url,
                              redact=True if a.redact else None)
     if not cfg.ready:
         if required:
-            raise LLMError("Choose an AI provider with --llm-provider "
-                           f"({', '.join(p for p in PROVIDER_NAMES if p != 'mock')}) or VULNFLOW_LLM_PROVIDER.")
+            print("Using the built-in offline assistant (no AI). For an AI model, pass --llm-provider "
+                  f"({', '.join(p for p in PROVIDER_NAMES if p != 'offline')}) or set VULNFLOW_LLM_PROVIDER.",
+                  file=sys.stderr)
+            return LLMConfig.offline()
         return cfg
     if cfg.needs_key() and sys.stdin.isatty():
         import getpass
@@ -33,8 +46,9 @@ def _llm_cfg(a, required=True):
 
 
 def _llm_flags(p):
-    p.add_argument("--llm-provider", choices=["anthropic", "openai", "local", "mock"],
-                   help="AI provider; no default, nothing is sent until you choose (env: VULNFLOW_LLM_PROVIDER)")
+    p.add_argument("--llm-provider", choices=["offline", "anthropic", "openai", "local", "mock"],
+                   help="assistant provider; default 'offline' (built-in, no AI, nothing sent). "
+                        "Nothing goes to an AI model until you choose one (env: VULNFLOW_LLM_PROVIDER)")
     p.add_argument("--llm-model", help="model name (required for openai; suggested defaults: "
                                        "anthropic claude-opus-5-5, local llama3.1)")
     p.add_argument("--llm-base-url", help="endpoint for openai/local, e.g. http://localhost:11434/v1")
@@ -66,77 +80,280 @@ def _chat(outdir, analyst, cfg, first=None) -> int:
         history += [{"role": "user", "content": q}, {"role": "assistant", "content": a}]
 
 
-def _input_files(paths, outdir):
-    """Expand input directories recursively, ignoring hidden files and the output folder."""
-    files = []
-    output = os.path.abspath(outdir)
-    for path in paths:
-        if not os.path.isdir(path):
-            files.append(path)
-            continue
-        for root, dirs, names in os.walk(path):
-            dirs[:] = sorted(d for d in dirs if not d.startswith(".") and
-                             os.path.abspath(os.path.join(root, d)) != output)
-            files.extend(os.path.join(root, name) for name in sorted(names)
-                         if not name.startswith(".") and os.path.isfile(os.path.join(root, name)))
-    return files
+def _compare(args) -> int:
+    from . import compare
+    from .errors import UserError
+    out = os.path.abspath(args.out)
+    names = {}
+    for item in args.network:
+        folder, sep, name = item.partition("=")
+        if not sep or not name.strip():
+            print(f"error: --network takes FOLDER=NAME, not {item!r}", file=sys.stderr)
+            return 2
+        names[os.path.realpath(folder)] = name.strip()
+    try:
+        folders = compare.find_reports(args.reports)
+        if not folders:
+            print("No report folders found (a report folder has results.json next to its reports).", file=sys.stderr)
+            return 1
+        reports = []
+        for folder in folders:
+            rep = compare.reopened(compare.describe(folder))
+            rep.network = names.get(os.path.realpath(folder), rep.network)
+            page = next((p for p in ("explorer.html", "technical_report.html", "executive_summary.html")
+                         if os.path.isfile(os.path.join(folder, p))), "")
+            if page:
+                target = os.path.join(os.path.abspath(folder), page)
+                try:
+                    rep.href = os.path.relpath(target, out).replace(os.sep, "/")
+                except ValueError:                  # another drive (Windows)
+                    from pathlib import Path
+                    rep.href = Path(target).as_uri()
+            reports.append(rep)
+        result = compare.compare(reports, args.ioc_csv, crosscheck=not args.no_crosscheck, workdir=args.workdir,
+                                 log=lambda m: print(m, file=sys.stderr))
+        paths = compare.write(result, out, log=lambda m: print(m, file=sys.stderr))
+    except UserError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    s = result["summary"]
+    print(f"\nCompared {s['reports']} report(s) from {s['networks']} network(s).")
+    print(f"IOCs in more than one report: {s['iocs_shared']} of {s['iocs']}")
+    print(f"Vulnerabilities in more than one report: {s['vulns_shared']} of {s['vulns']}")
+    if result["rehunt"]["indicators"]:
+        print(f"Re-hunt: {result['rehunt']['indicators']} indicator(s) looked for again; "
+              f"{s['found_by_hunt']} sighting(s) the analyses didn't have")
+    for row in [r for r in result["iocs"] if r["reports"] > 1][:10]:
+        print(f"  {row['type']:<7} {row['value'][:60]:<60} {row['reports']} reports, {row['networks']} networks")
+    explorer = result.get("explorer") or {}
+    if explorer.get("file"):
+        print(f"All networks on one map: {explorer['drawn']:,} of {explorer['hosts']:,} hosts from "
+              f"{explorer['reports']} report(s) in explorer.html")
+    for note in result["notes"] + explorer.get("notes", []):
+        print(f"note: {note}", file=sys.stderr)
+    print(f"\nWritten to {out}:")
+    for name in paths:
+        print(f"  {name}")
+    return 0
+
+
+def _analyze_sites(args) -> int:
+    """One report per site of a folder's sites list, then a comparison of them (sites.py)."""
+    from . import sites
+    if not os.path.isdir(args.folder):
+        print(f"error: folder not found: {args.folder}", file=sys.stderr)
+        return 2
+    try:
+        runs, cid = sites.analyze(args.data_dir, args.folder, _cfg(args), workdir=args.workdir,
+                                  log=lambda m: print(m, file=sys.stderr))
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    where = os.path.abspath(args.data_dir)
+    print(f"Analyzed {len(runs)} site(s) into {where}:")
+    for run_id in runs:
+        print(f"  /runs/{run_id}/")
+    print(f"and compared them: /compare/{cid}/")
+    print(f"Start the upload page on that folder (vulnflow serve --data-dir {args.data_dir}) and open "
+          "Compare reports to see them.")
+    return 0
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="vulnflow", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
+    def report_flags(p):
+        p.add_argument("--name", default="", help="report name shown at the top of the reports and in the Explorer")
+        p.add_argument("--description", default="", help="report description shown under the name")
+        p.add_argument("--network-name", default="", metavar="NAME",
+                       help="the network or site the data comes from; `compare` counts reports with the "
+                            "same network name as one network")
+
     def common(p):
         p.add_argument("--internal-net", action="append", metavar="CIDR",
                        help="internal address range (repeatable; default RFC1918 etc.)")
         p.add_argument("--hops", type=int, default=2, help="blast-radius depth (default 2)")
+        p.add_argument("--network-map", metavar="CSV",
+                       help="CSV naming address ranges (cidr,name,type), e.g. AWS VPCs; a network_map.csv "
+                            "inside an input folder is used automatically")
+        p.add_argument("--known-scanners", metavar="CSV",
+                       help="list of scanners you expect (address,name per line), labelled 'expected' instead "
+                            "of flagged; a known_scanners.csv inside an input folder is used automatically")
         p.add_argument("--min-severity", type=int, default=1, choices=range(5),
                        help="lowest Nessus severity to score, 0=Info..4=Critical (default 1)")
+        p.add_argument("--scan-window-days", type=float, default=7, metavar="DAYS",
+                       help="use telemetry within DAYS of each host's scan time (0 = all; default 7)")
+        p.add_argument("--dedup-skew", type=float, default=2.0, metavar="SECONDS",
+                       help="clock skew allowed when matching one session seen by two sensors "
+                            "(default 2; negative disables cross-sensor matching)")
+        p.add_argument("--workdir", metavar="DIR",
+                       help="where to write temporary Parquet/DuckDB files (default: system temp "
+                            "or $VULNSCOPE_WORKDIR); use a disk with room for large inputs")
+        p.add_argument("--no-normalized-copies", dest="normalized_copies", action="store_false",
+                       default=_copies_default(),
+                       help="don't write normalized/flows.csv, zeek_events.jsonl and ot_events.jsonl "
+                            "(full copies of the input, about as large as it; saves that much disk). "
+                            "Default from $VULNSCOPE_NORMALIZED_COPIES")
 
     a = sub.add_parser("analyze", help="run the workflow on local files")
     a.add_argument("files", nargs="+")
     a.add_argument("-o", "--out", default="vulnflow_out")
     a.add_argument("--format", action="append", default=[], metavar="FILE=FORMAT",
-                   help=f"force a file's format ({', '.join(FORMATS)})")
-    a.add_argument("--llm", action="store_true", help="also write an AI analyst brief")
+                   help=f"force a file's format ({', '.join(FORMATS)}, pcap)")
+    a.add_argument("--ioc-csv", dest="ioc_archive", action="append", default=[], metavar="CSV",
+                   help="typed IOC CSV (repeatable; also detected inside input folders)")
+    a.add_argument("--ioc-archive", dest="ioc_archive", action="append", help=argparse.SUPPRESS)
+    a.add_argument("--no-article-preview", action="store_true",
+                   help="skip fetching short source previews for matched archive articles")
+    a.add_argument("--article-preview-cache", metavar="JSON",
+                   help="saved short source overviews keyed by article URL (useful offline)")
+    a.add_argument("--llm", action="store_true", help="also write a Security Assistant brief")
     common(a)
+    report_flags(a)
     _llm_flags(a)
 
-    b = sub.add_parser("brief", help="write an AI analyst brief for an existing output folder")
+    b = sub.add_parser("brief", help="write a Security Assistant brief for an existing output folder")
     b.add_argument("outdir")
     _llm_flags(b)
 
-    q = sub.add_parser("ask", help="ask the AI analyst about an output folder (interactive without a question)")
+    ab = sub.add_parser("article-briefs", help="generate AI briefs for matched source articles")
+    ab.add_argument("outdir")
+    _llm_flags(ab)
+
+    q = sub.add_parser("ask", help="ask the Security Assistant about an output folder (interactive without a question)")
     q.add_argument("outdir")
     q.add_argument("question", nargs="*")
     q.add_argument("--once", action="store_true", help="answer the question and exit")
     _llm_flags(q)
 
     s = sub.add_parser("serve", help="start the local upload page")
-    s.add_argument("--host", default="127.0.0.1")
+    s.add_argument("--host", default="127.0.0.1",
+                   help="address to listen on (default 127.0.0.1; any other address needs --allow-remote)")
+    s.add_argument("--allow-remote", action="store_true",
+                   help="allow a non-loopback --host; every visitor then needs the printed access-token link")
     s.add_argument("--port", type=int, default=8080)
+    s.add_argument("--container", action="store_true", default=bool(os.environ.get("VULNSCOPE_CONTAINER")),
+                   help="Docker image mode: listen on --host inside the container without a token; publish "
+                        "the port on the host's 127.0.0.1 only (env: VULNSCOPE_CONTAINER)")
+    s.add_argument("--public-port", type=int, default=int(os.environ.get("VULNSCOPE_PUBLIC_PORT") or 0) or None,
+                   help="with --container: the host port the browser uses, if not --port (env: VULNSCOPE_PUBLIC_PORT)")
     s.add_argument("--data-dir", default="vulnflow_runs")
     s.add_argument("--max-upload-mb", type=int, default=1024, help="largest accepted upload (default 1024)")
     common(s)
     _llm_flags(s)
-    s.add_argument("--no-llm", action="store_true", help="hide the AI analyst on the results page")
+    s.add_argument("--no-llm", action="store_true", help="hide the Security Assistant on the results page")
     # serve: provider/key can also be chosen later on the page's AI settings screen
 
     x = sub.add_parser("explore", help="analyze a folder and open the interactive host explorer")
-    x.add_argument("files", nargs="+", metavar="FOLDER", help="folder (or files) with telemetry and Nessus scans")
+    x.add_argument("files", nargs="+", metavar="FOLDER", help="folder (or files) with telemetry; Nessus scans optional")
     x.add_argument("-o", "--out", default=None, help="output folder (default: vulnflow_out/<folder name>)")
     x.add_argument("--host", dest="focus", metavar="IP", help="open focused on this host")
     x.add_argument("--no-open", action="store_true", help="write the explorer without opening a browser")
     x.add_argument("--format", action="append", default=[], metavar="FILE=FORMAT", help=argparse.SUPPRESS)
+    x.add_argument("--ioc-csv", dest="ioc_archive", action="append", default=[], metavar="CSV",
+                   help="typed IOC CSV")
+    x.add_argument("--ioc-archive", dest="ioc_archive", action="append", help=argparse.SUPPRESS)
+    x.add_argument("--no-article-preview", action="store_true",
+                   help="skip fetching short source previews")
+    x.add_argument("--article-preview-cache", metavar="JSON",
+                   help="saved short source overviews keyed by article URL")
     common(x)
+    report_flags(x)
 
-    g = sub.add_parser("samples", help="write synthetic sample inputs")
+    c = sub.add_parser("compare", help="which IOCs and vulnerabilities show up in more than one saved report")
+    c.add_argument("reports", nargs="+", metavar="FOLDER",
+                   help="report output folders (with results.json), or folders that contain them, such as "
+                        "the upload page's data folder")
+    c.add_argument("-o", "--out", default="vulnflow_compare", help="output folder (default vulnflow_compare)")
+    c.add_argument("--ioc-csv", action="append", default=[], metavar="CSV",
+                   help="IOC CSV to look for again in every report's saved data (repeatable)")
+    c.add_argument("--no-crosscheck", action="store_true",
+                   help="don't look for the IOCs one report matched in the other reports")
+    c.add_argument("--network", action="append", default=[], metavar="FOLDER=NAME",
+                   help="count the report in FOLDER as network NAME (repeatable); default: its network "
+                        "name, else its report name")
+    c.add_argument("--workdir", metavar="DIR", help="where to put DuckDB's temporary files while searching flows")
+
+    g = sub.add_parser("samples", help="write the sample folders (scan-backed, telemetry-only, 4,324-host on-prem + AWS, "
+                                       "Gootloader, the two-company Compare sample, Artex AI and CyberStrike AI)")
     g.add_argument("outdir", nargs="?", default="samples")
 
-    args = ap.parse_args(argv)
+    cs = sub.add_parser("compare-sample", help="load the two-company Compare sample into the upload page: seven site "
+                                               "reports and a comparison of them")
+    cs.add_argument("--data-dir", default="vulnflow_runs",
+                    help="the upload page's data folder (default vulnflow_runs, as for serve)")
+    cs.add_argument("--again", action="store_true", help="add another set even if the seven reports are already there")
+
+    st = sub.add_parser("analyze-sites", help="analyze a folder with a sites list (sites.csv) as one report per site, "
+                                              "then compare them, into the upload page's data folder")
+    st.add_argument("folder", help="folder with sites.csv and one subfolder per site")
+    st.add_argument("--data-dir", default="vulnflow_runs",
+                    help="the upload page's data folder (default vulnflow_runs, as for serve)")
+    common(st)
+
+    fb = sub.add_parser("filebeat-to-zeek",
+                        help="turn a Filebeat/Elastic export (CSV or NDJSON) of Zeek logs back into Zeek logs")
+    fb.add_argument("files", nargs="+", help="exported CSV/NDJSON file(s), plain or .gz")
+    fb.add_argument("-o", "--out", default="zeek_from_filebeat",
+                    help="folder for conn.log, dns.log, ... (Zeek JSON; default zeek_from_filebeat)")
+
+    from .incident.cli import add_parser as incident_parser
+    incident_parser(sub)
+
+    sub.add_parser("branding-password",
+                   help="print a hash for a new Branding page password (set it as VULNSCOPE_BRANDING_PASSWORD_HASH)")
+
+    args, extra = ap.parse_known_args(argv)
+    # Before Python 3.12, `ask OUT --once a question` leaves the words after --once unparsed.
+    if extra and args.cmd == "ask" and not any(e.startswith("-") for e in extra):
+        args.question += extra
+    elif extra:
+        ap.error("unrecognized arguments: " + " ".join(extra))
+    if args.cmd == "branding-password":
+        import getpass
+        from .branding import PASSWORD_ENV, hash_password
+        first = getpass.getpass("New Branding password: ")
+        if len(first.strip()) < 12 or first != getpass.getpass("Repeat it: "):
+            print("Passwords must match and be at least 12 characters.", file=sys.stderr)
+            return 1
+        print(f"{PASSWORD_ENV}='{hash_password(first)}'")
+        return 0
+    if args.cmd == "incident":
+        from .incident.cli import main as incident_main
+        return incident_main(args)
+    if args.cmd == "filebeat-to-zeek":
+        from .parsers.filebeat import export
+        counts = export(args.files, args.out, log=lambda m: print(m, file=sys.stderr))
+        if not counts:
+            print("No Zeek records found (expected event.dataset zeek.* or zeek.* columns).", file=sys.stderr)
+            return 1
+        for stream, n in sorted(counts.items()):
+            print(f"{os.path.join(args.out, stream + '.log')}: {n:,} record(s)")
+        return 0
+    if args.cmd == "compare":
+        return _compare(args)
+    if args.cmd == "compare-sample":
+        os.umask(0o077)          # like the upload page's own runs
+        from .sample_compare import load
+        runs, cid = load(args.data_dir, again=args.again, log=lambda m: print(m, file=sys.stderr))
+        where = os.path.abspath(args.data_dir)
+        if cid is None:
+            print(f"The seven sample reports are already in {where} (--again adds another set).")
+        else:
+            print(f"Loaded seven reports into {where}:")
+            for run_id in runs:
+                print(f"  /runs/{run_id}/")
+            print(f"and compared them: /compare/{cid}/")
+        print("On the upload page, open Compare reports to see them.")
+        return 0
+    if args.cmd in ("analyze", "explore", "serve", "analyze-sites"):
+        os.umask(0o077)          # reports, normalized logs and spooled data are private to this account
+    if args.cmd == "analyze-sites":
+        return _analyze_sites(args)
     if args.cmd == "samples":
-        from .samples import generate
-        for p in generate(args.outdir):
+        from .samples import generate_bundles
+        for p in generate_bundles(args.outdir):
             print(p)
         return 0
     if args.cmd == "serve":
@@ -147,16 +364,29 @@ def main(argv=None) -> int:
             try:
                 llm_cfg = _llm_cfg(args, required=False)
             except LLMError as exc:
-                print(f"warning: {exc} Choose a provider on the AI settings page instead.", file=sys.stderr)
-                llm_cfg = LLMConfig()
+                print(f"warning: {exc} Using the built-in offline assistant; choose a provider on the "
+                      "AI settings page instead.", file=sys.stderr)
+                llm_cfg = LLMConfig.offline()
         serve(args.host, args.port, args.data_dir, _cfg(args), llm_cfg=llm_cfg,
-              max_upload=args.max_upload_mb * 1024 * 1024)
+              max_upload=args.max_upload_mb * 1024 * 1024, allow_remote=args.allow_remote,
+              container=args.container, public_port=args.public_port)
         return 0
-    if args.cmd in ("brief", "ask"):
+    if args.cmd in ("brief", "article-briefs", "ask"):
         from .llm import Analyst, LLMError, load_results, write_brief
         try:
             cfg = _llm_cfg(args)
             res = load_results(args.outdir)
+            if args.cmd == "article-briefs":
+                from .article_brief import generate_article_briefs
+                from .report import save_article_briefs
+                summary = generate_article_briefs(res, cfg)
+                if summary["generated"]:
+                    save_article_briefs(res, args.outdir)
+                print(f"Generated {summary['generated']} article brief(s); "
+                      f"{summary['saved']} saved, {summary['unavailable']} source(s) unavailable.")
+                for error in summary["errors"]:
+                    print(f"warning: {error}", file=sys.stderr)
+                return 0 if summary["saved"] else 2
             if args.cmd == "brief":
                 print(write_brief(res, args.outdir, cfg))
                 return 0
@@ -173,23 +403,41 @@ def main(argv=None) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 2
 
-    from .pipeline import run
+    from .pipeline import input_files, run
+    from .sites import find as find_sites
+    for folder in args.files:
+        listed = find_sites(folder) if os.path.isdir(folder) else None
+        if listed:
+            print(f"note: {folder} has a sites list ({os.path.basename(listed)}); this makes one report of "
+                  f"everything in it. `vulnflow analyze-sites {folder}` makes one report per site and compares "
+                  "them, so each network's sites stay apart.", file=sys.stderr)
     if args.cmd == "explore" and not args.out:
         args.out = os.path.join("vulnflow_out", os.path.basename(os.path.abspath(args.files[0])) or "explore")
     overrides = dict(x.split("=", 1) for x in args.format)
-    files = _input_files(args.files, args.out)
+    files = input_files(args.files, args.out) + args.ioc_archive
     try:
-        res, paths = run(files, args.out, _cfg(args), overrides)
+        res, paths = run(files, args.out, _cfg(args), overrides,
+                         article_previews=not args.no_article_preview,
+                         article_preview_cache=args.article_preview_cache,
+                         workdir=args.workdir,
+                         report={"name": args.name, "description": args.description,
+                                 "network": args.network_name})
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     s, pc = res["summary"], res["summary"]["priority_counts"]
     for i in res["inputs"]:
         print(f"  {i['file']:<32} {i['format']:<11} read {i['read']:>6}  kept {i['kept']:>6}")
-    print(f"\n{s['flows']} sessions, {s['findings_scored']} findings scored on {s['hosts_with_findings']} hosts")
-    print(f"P1 {pc['P1']}  P2 {pc['P2']}  P3 {pc['P3']}  P4 {pc['P4']}")
-    print(f"corroborated exploitation evidence: {', '.join(s['hosts_corroborated']) or 'none'}; "
-          f"leads to investigate: {', '.join(s['hosts_to_investigate'] + s['hosts_possible_spread']) or 'none'}")
+    if s["vulnerability_data_available"]:
+        print(f"\n{s['flows']} sessions, {s['findings_scored']} findings scored on {s['hosts_with_findings']} hosts")
+        print(f"P1 {pc['P1']}  P2 {pc['P2']}  P3 {pc['P3']}  P4 {pc['P4']}")
+        print(f"corroborated exploitation evidence: {', '.join(s['hosts_corroborated']) or 'none'}; "
+              f"leads to investigate: {', '.join(s['hosts_to_investigate'] + s['hosts_possible_spread']) or 'none'}")
+    else:
+        print(f"\n{s['flows']} sessions. No vulnerability data available; vulnerability status unknown.")
+        print(f"{s['threat_alerts']} IPS/IDS alerts; {len(res['network_leads'])} return-connection leads for review.")
+    if "ioc_matches" in res:
+        print(f"IOC CSV matches for review: {len(res['ioc_matches'])}")
     if args.cmd == "explore":
         url = "file://" + os.path.abspath(paths["explorer.html"]) + (f"#host={args.focus}" if args.focus else "")
         print(f"\nExplorer: {url}")
@@ -201,7 +449,7 @@ def main(argv=None) -> int:
         from .llm import LLMError, write_brief
         try:
             cfg = _llm_cfg(args)
-            print(f"\nWriting AI analyst brief with {cfg.label()} ...")
+            print(f"\nWriting Security Assistant brief with {cfg.label()} ...")
             write_brief(res, args.out, cfg)
             paths["ai_analyst_brief.md"] = os.path.join(args.out, "ai_analyst_brief.md")
             paths["ai_analyst_brief.html"] = os.path.join(args.out, "ai_analyst_brief.html")

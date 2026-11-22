@@ -1,219 +1,211 @@
-# Vulnerability Exposure Workflow (`vulnflow`)
+# Múcaro VulnScope
 
-Upload network telemetry and Nessus results. The workflow cleans and normalizes them,
-works out which vulnerable services are actually reachable and from where, how far a
-compromise could spread, and whether traffic already looks like exploitation. It then
-writes an **executive summary** and a **technical report** for system owners.
+**Network telemetry and vulnerability scans, correlated into reports for system owners.**
 
-Pure Python 3.10+ standard library. Nothing to install for the core workflow; the optional
-AI analyst needs `pip install anthropic` only if you choose Anthropic.
+![VulnScope Explorer in 3D: each subnet is a platform and each host a pillar sized by risk, with outside addresses on the arc overhead (ARTEX sample)](screenshots/explorer_3d_artex.jpg)
 
-## Quick start
+VulnScope reads the logs and scans you already have and shows which vulnerable services were
+actually reached, from where, and what happened next. Each run writes an executive summary, a
+technical report and an interactive Explorer. It never scans, probes or contacts the hosts in your
+data.
 
-```bash
-# 1. Try it on the synthetic sample environment (250 hosts, about 9,800 sessions)
-python3 -m vulnflow samples samples
-python3 -m vulnflow analyze samples -o example_output
+This repository is **VulnScope ULTRA**: VulnScope MAX with a faster engine and the same reports.
+What changed and what did not is in [docs/ULTRA.md](docs/ULTRA.md). Incident cases, a first
+step towards Incident Analysis, are described in [docs/INCIDENTS.md](docs/INCIDENTS.md).
 
-# 2. Run on real data (files or recursively scanned folders, any mix of formats)
-python3 -m vulnflow analyze /path/to/log-bundle -o out \
-    --internal-net 10.0.0.0/8 --internal-net 172.16.0.0/12
+> **Proof of concept, for local use.** The upload page has no login and can read any folder your
+> account (or the container) can. It listens on `127.0.0.1` only. Read
+> [Upload page security](ARCHITECTURE.md#upload-page-security) before running it anywhere shared.
 
-# 3. Point it at a folder and open the interactive host explorer in your browser
-python3 -m vulnflow explore ~/Documents/case-logs            # add --host 10.0.1.10 to open on one host
+The command-line package is `vulnflow`.
 
-# 4. Or start the upload page for system owners
-python3 -m vulnflow serve --port 8080          # http://127.0.0.1:8080/
+## Quickstart
+
+**Docker** (Linux, macOS, Windows, air-gapped networks). Download `compose.yaml` and `env.example`
+from the [latest release](https://github.com/bayanilla/vulnscope_max/releases/latest) into an empty
+folder, then:
+
+```sh
+cp env.example .env      # optional: data folder, runs folder, port, memory
+docker compose pull
+docker compose up -d
 ```
 
-Run tests with `python3 -m unittest discover -s tests` (no model or network needed).
+Open **http://127.0.0.1:8765/**, enter or browse to a folder of logs and scans, and click
+**Analyze folder**. Stop it with `docker compose down`. The image includes
+[Zeek](https://zeek.org), so packet captures work out of the box. Compose shares your home folder
+read-only; set `VULNSCOPE_BROWSE` in `.env` to share an evidence drive instead (see
+[Docker container](ARCHITECTURE.md#docker-container)). To build from source, clone this repository,
+`cp .env.example .env` and run `docker compose up -d`. With no internet, load the image from the
+release file instead; see [Air-gapped networks](ARCHITECTURE.md#air-gapped-networks-and-enclaves).
 
-## Supported inputs (auto-detected)
+**Python 3.10 or later:**
 
-| Kind | Format | Notes |
-|---|---|---|
-| Telemetry | Zeek `conn.log` (TSV or JSON) | `conn_state` decides completed vs. rejected sessions. |
-| Alerts | Zeek `notice.log` (TSV or JSON) | Notices become IPS/IDS alerts used as exploitation evidence. |
-| Context | Other Zeek streams (TSV or JSON, including `.log.gz`) | `#path` identifies TSV streams; JSON uses `_path` or the filename. DNS, HTTP, SMTP, files, custom streams and others are preserved in `normalized/zeek_events.jsonl` with typed TSV fields and per-stream counts. They do not create extra connection sessions. |
-| Industrial telemetry | Zeek Modbus, DNP3, BACnet, S7, EtherNet/IP, CIP, OPC UA logs | Core Zeek logs and installed Zeek package streams are preserved in `normalized/ot_events.jsonl` with protocol, operation, source/destination and direction when available. Observed operations do not become threat alerts automatically. |
-| Telemetry + alerts | Palo Alto TRAFFIC and THREAT logs | Web UI / Panorama CSV export (header row) or raw syslog CSV in PAN-OS field order. THREAT rows become alerts; blocked/reset ones count as mitigation, not evidence. Zones `untrust/outside/internet/external/wan` count as external. Timestamps are assumed UTC. |
-| Telemetry + alerts | Suricata EVE JSON | `flow` events become sessions, `alert` events become alerts. |
-| Telemetry | Generic flow CSV / TSV / space-delimited | nfdump CSV, AWS VPC flow logs, SIEM exports. Columns are matched by common names (`src_ip`, `sa`, `srcaddr`, ...). |
-| Scan | Nessus `.nessus` (v2 XML) | Preferred: carries exploit availability and Metasploit flags. |
-| Scan | Nessus CSV export | One row per CVE is merged per host/port/plugin. |
-
-Force a format with `--format file.csv=paloalto` if detection guesses wrong.
-
-## Pipeline
-
-1. **Normalize** (`vulnflow/parsers`, `normalize.py`): supported sources become `Flow`, `ThreatEvent`,
-   `Finding`, or a stream-specific Zeek/industrial event (`schema.py`). IPs are validated and canonicalized, protocol numbers mapped,
-   timestamps converted to UTC, malformed rows dropped and counted, exact duplicate sessions removed,
-   and overlapping scan findings merged.
-2. **Correlate** (`correlate.py`), for each vulnerability:
-   - **Exposure**: completed sessions to the vulnerable port, split by internet vs. internal sources,
-     plus blocked and attempted connections. Host-level (port 0) findings use overall host activity.
-   - **Blast radius**: graph walk (default 2 hops) over completed internal sessions from the host,
-     flagging reachable hosts that themselves have High/Critical findings and use of SMB/RDP/SSH/WinRM/DB ports.
-   - **Indicators**, graded in two levels so the reports never overstate them:
-     - *Lead* (worth investigating, not proof): a return connection from the host to an outside address
-       that reached the vulnerable service, new lateral connections or >20 MB uploads after that contact,
-       an unblocked IPS/IDS alert on the vulnerable service, or a flagged host newly connecting to another
-       host's vulnerable service (possible spread).
-     - *Corroborated*: an unblocked alert on the vulnerable service **and** post-contact behaviour from the
-       host itself. Reports call this "likely exploitation" and ask for incident response and host
-       forensics; they never state a compromise as confirmed, because network logs cannot prove one.
-       Without THREAT/notice/EVE alerts, nothing gets past "lead".
-   - **Score** = `CVSS x 10 x Exploit x Exposure x BlastRadius` (x1.25 corroborated, x1.1 leads), capped at 100,
-     mapped to P1 (act now) through P4 (routine). Every score carries a plain-English rationale.
-   - **Coverage**: scanned hosts never seen on the wire, and active servers that were never scanned.
-3. **Report** (`report.py`): writes to the output folder:
-   - `executive_summary.md/.html` for leadership
-   - `technical_report.md/.html` for system owners and admins (data quality, method, per-host evidence, remediation)
-   - `correlated_findings.csv` for ticketing, `results.json` for automation
-   - `hostile_activity.svg`, the hostile activity diagram as a standalone image
-
-   The HTML reports add a visual layer on top of the Markdown: priority badges and evidence tags
-   ("Likely exploitation" vs "Lead, not confirmed"), number tiles and a priority bar, the hostile activity
-   diagram (ported from vulnPath: outside sources, the vulnerable services they hit, return connections and
-   new lateral paths), a sortable and filterable findings table linked to the diagram (click a host or a row
-   to focus), a written-out score breakdown per finding, and a blast-radius map per host. Everything is
-   inline SVG, CSS and a little JavaScript, follows the selected theme, and prints cleanly.
-   - `normalized/flows.csv`, `normalized/findings.csv`, `normalized/zeek_events.jsonl`,
-     `normalized/ot_events.jsonl` for cleaned inputs and preserved Zeek stream records
-   - `ai_analyst_brief.md/.html` and `ai_chat_log.md` when the AI analyst is used
-
-## Host explorer
-
-`explorer.html` is written with every run (and opened for you by `vulnflow explore`). It is a single
-offline file: no network, no libraries. The overview groups every Nessus-scanned host by /24, coloured by
-worst severity. Click a host, or pick it from the list on the left, and the camera flies to it:
-
-- **Left: north/south.** Every outside address in the firewall or Zeek logs that exchanged traffic with
-  the host, in either direction, colour-coded as an unblocked IPS alert, a session that reached a
-  vulnerable port, a session that reached the host, the host connecting out (violet), or a blocked or
-  failed attempt.
-- **Right: east/west.** Every internal host it has traffic to or from, including failed attempts (dashed
-  grey, "no session"). Hosts with completed sessions carry an estimated likelihood that a compromise of
-  the selected host could spread there, plus the next hop beyond them.
-- The first 24 on each side are drawn large and labelled; the rest are packed in a block further out
-  (hover for details) and all of them are listed in the panel.
-- **Panel:** the same lists with session counts, ports and the reasons behind each estimate, plus the
-  host's Nessus findings. Click any internal peer to pivot to it; Esc goes back.
-
-Fly-Through flies to the next P1/P2 host on each click (Shift+click goes back); it never moves on its own. L toggles labels, M toggles motion, `/` searches.
-Deep links work: `explorer.html#host=10.0.1.10`.
-
-**How the blast-radius likelihood is estimated.** It is a heuristic for triage, not a measurement:
-`p = reach x weakness`. Reach is 1.0 when the selected host opened completed sessions to the peer, 0.35
-when only the peer connects in, and 0 otherwise. Weakness is the strongest of: a vulnerability on a port
-the selected host already uses (CVSS/10, x1.0 with a public exploit, x0.55 without), any other High or
-Critical finding (CVSS/10 x0.45 with exploit, x0.25 without), an admin or lateral-movement protocol in
-use (0.5), or a 0.1 baseline. Unscanned peers get at least 0.3 because their exposure is unknown. Bands:
-High at 0.6 or more, Medium at 0.35 or more, otherwise Low. Two hops out multiplies the two steps. Treat
-every line as a lead to check, not as confirmed compromise.
-
-## Upload page
-
-**Analyze a folder in place.** The top of the page takes a folder path on the computer running the server
-(for example `~/Documents/case-logs`). Every file in it and its subfolders is read where it sits, with
-nothing copied or uploaded; hidden files are skipped. From the command line the same thing is
-`python3 -m vulnflow analyze ~/Documents/case-logs -o report`. **Browse...** next to the path opens the Mac's own Choose Folder
-dialog (on other systems, a folder list in the page), so nobody has to type the path.
-
-`python3 -m vulnflow serve` serves a page with a folder picker, optional separate telemetry and scan files, and an
-optional internal-networks box. Each run gets a random ID under `vulnflow_runs/<id>/` with its inputs
-and reports. It binds to 127.0.0.1 by default and has no authentication, so put it behind your SSO
-proxy before exposing it to other users.
-
-The upload page, AI settings, results page, and newly generated HTML reports share a theme picker.
-It offers Mucaro's SOC Dark, Nord Calm, High Contrast, Light, Classic Windows, Matrix,
-Mac OS X Aqua, and Windows 2000 styles. The browser remembers the choice locally.
-
-Uploads are streamed to disk in 64 KB chunks, so memory use stays flat whatever the file size. The default
-limit is 1 GB per upload; change it with `serve --max-upload-mb N`.
-
-## AI analyst (optional, vendor-neutral)
-
-An LLM can read the correlated results, write an **analyst brief** (what matters, what to do first,
-likely attack paths, how to validate each top finding with example Zeek / Palo Alto filters, where the
-scoring may be wrong, questions for system owners), and answer **follow-up questions**. The core
-pipeline never depends on it, and **no vendor is preselected**: nothing is sent to any model until the
-analyst picks a provider.
-
-| Provider | What it is | Key |
-|---|---|---|
-| `anthropic` | Claude via the official Anthropic SDK (`pip install anthropic`) | `ANTHROPIC_API_KEY` |
-| `openai` | OpenAI's API, or an OpenAI-hosted gateway via `--llm-base-url` | `OPENAI_API_KEY` |
-| `local` | Any OpenAI-compatible server you run: Ollama, vLLM, LM Studio, llama.cpp | usually none |
-
-**On the upload page**, open **AI analyst settings** (linked on the upload page and every results page),
-pick a provider, enter the model and API key, and save. The key is held in the server's memory only:
-it is never written to disk, logged, or shown again (only its last four characters), and it is forgotten
-when the server stops. "Turn off AI and forget key" clears it. Each results page then offers
-**Generate AI analyst brief** and a chat box for questions.
-
-**From the command line**, choose the provider explicitly. If it needs a key and none is set in the
-environment, you are prompted for it without echo (keys are not accepted as command-line arguments, so they
-stay out of shell history):
-
-```bash
-python3 -m vulnflow analyze samples -o out --llm --llm-provider openai --llm-model <model>
-python3 -m vulnflow brief out --llm-provider anthropic                  # model defaults to claude-opus-5-5
-python3 -m vulnflow ask out --llm-provider local --llm-model llama3.1  # interactive Q&A, Ollama default URL
-python3 -m vulnflow ask out --once "How do I confirm the web01 return connection in Zeek?" --llm-provider openai --llm-model <model>
-python3 -m vulnflow serve --redact      # choose provider and key in the browser
+```sh
+python3 -m pip install -r requirements.txt   # DuckDB, the one dependency
+python3 -m vulnflow serve                    # http://127.0.0.1:8080/
 ```
 
-| Setting | Flag | Environment variable |
-|---|---|---|
-| Provider (no default) | `--llm-provider anthropic\|openai\|local` | `VULNFLOW_LLM_PROVIDER` |
-| Model | `--llm-model` (required for `openai`) | `VULNFLOW_LLM_MODEL` |
-| Endpoint | `--llm-base-url` | `VULNFLOW_LLM_BASE_URL` |
-| API key | prompted, or the settings page | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, or `VULNFLOW_LLM_API_KEY` |
-| Redact IPs and hostnames | `--redact` or the settings checkbox | `VULNFLOW_LLM_REDACT=1` |
+`python3 start_upload_page.py` does the same, picks a free port and opens the browser. Packet
+captures also need Zeek on the PATH (or `VULNSCOPE_ZEEK=/path/to/zeek`). If the page doesn't load,
+see [Troubleshooting](docs/TROUBLESHOOTING.md).
 
-How it is kept honest and safe:
+## See the output first
 
-- **Grounded.** The model gets the correlated results (scores, exposure evidence, blast radius,
-  indicators, coverage), never raw logs, and must cite host and plugin/CVE for each claim and say when
-  the data does not answer a question. A question naming a host, CVE or plugin pulls that finding's full
-  record into the prompt. The same prompt is used for every provider.
-- **Untrusted data.** Hostnames, application names and plugin output can be attacker-influenced. They are
-  wrapped as data, the model is told never to follow instructions inside them, it has no tools, and its
-  output is HTML-escaped on the page.
-- **Data handling.** With a hosted provider, results leave your network for that vendor. `--redact` swaps
-  every IP and hostname for a token everywhere in the text, including free-text fields such as Nessus
-  synopsis and plugin output (IPv4, IPv6, internal FQDNs and scanned short names; public reference sites
-  such as vendor advisories stay readable). Before anything is sent, the outgoing text is checked again and
-  the request is refused if any address or known hostname survived. Answers are mapped back locally; `local` keeps everything on your
-  hardware. The results page states where data goes.
-- **Browser safety.** Settings and brief forms carry a per-server token and cross-origin posts are refused,
-  so another website open in the same browser cannot change the provider or read results through it.
-- **Audit trail.** Every question and answer is appended to `ai_chat_log.md` in the run folder.
-- **Provider details.** Anthropic: results sit in a cached system prompt so follow-ups are cheap, and
-  `fallbacks: "default"` retries a request a safety classifier declines on Anthropic's recommended fallback
-  model. OpenAI: uses `max_completion_tokens` and default temperature so reasoning models work. Refusals or
-  content filtering from any provider come back as a clear error.
-- `--llm-provider mock` is an offline stand-in used by the tests and for demos without a model.
+`example_output/` holds a finished run on a synthetic 250-host network. Open `explorer.html`,
+`executive_summary.html` or `technical_report.html` in your browser, no install needed. To analyze
+a bundled sample:
 
-## Tuning
+```sh
+python3 -m vulnflow analyze samples/gootloader_seo_poisoning -o gootloader_output
+python3 -m vulnflow compare-sample    # seven site reports from two companies, plus their comparison
+```
 
-- `--internal-net CIDR` (repeatable): what counts as "inside". Default is RFC1918, CGNAT, loopback, link-local, ULA.
-- `--hops N`: blast-radius depth.
-- `--min-severity 0-4`: lowest Nessus severity to score (default 1, Low).
-- Weights live at the top of `correlate.py` (`LATERAL_PORTS`, `EXTERNAL_ZONES`, `EXFIL_BYTES`, `BROAD_REACH`).
+Samples include a Gootloader intrusion, a two-company comparison, and ARTEX and CyberStrikeAI
+agentic intrusions replayed from public reporting. All sample data is fabricated. See
+[the sample guide](samples/README.md) and the [screenshot gallery](screenshots/README.md).
 
-## Known limits
+## How it works
 
-- Hosts are joined by IP. Scans run by hostname only, or DHCP churn during the telemetry window, reduce matches; NAT'd
-  firewall logs should be exported with pre-NAT addresses.
-- Industrial protocol support reads exported Zeek logs, including logs produced by installed ICS analyzers.
-  Raw packet captures and vendor-specific historian/PLC exports need an upstream decoder or a source-specific parser.
-  Zeek events outside `conn` and `notice`, including OT operations, are preserved as context and counted but do not
-  affect vulnerability scores yet.
-- Absence of traffic means "not observed by these sensors", which is why unseen hosts are scored as unknown rather than safe.
-- "Likely exploitation" still needs confirmation on the host (EDR, memory, logs). Treat the output as a
-  way to prioritise investigation, not as a final verdict.
-- Natural next steps: use Zeek `dns.log` for hostname-to-IP mapping, file evidence from `files.log`,
-  and a Splunk/Elastic export target.
+1. **Read:** every file in the folder is detected by content and streamed into Parquet, so
+   multi-GB log sets fit in bounded memory.
+2. **Correlate:** DuckDB de-duplicates sessions seen by more than one sensor and, when scans are
+   present, matches vulnerable services to the traffic that reached them.
+3. **Report:** executive summary, technical report, Explorer, and CSV and JSON for ticketing and
+   automation.
+
+With telemetry alone, VulnScope reports observed connections, IPS/IDS alerts and exact IOC matches,
+and marks vulnerability status as **unknown**. Details: [Architecture](ARCHITECTURE.md) and
+[Methods](METHODS.md).
+
+## What it reads
+
+| Input | Formats | What it adds |
+| --- | --- | --- |
+| Zeek | TSV or JSON, Zui/Brim exports, Filebeat via Kibana CSV or NDJSON | Connections and protocol logs |
+| Palo Alto | TRAFFIC and THREAT | Sessions and IPS alerts |
+| Suricata | EVE JSON | IDS alerts |
+| AWS VPC Flow Logs | Text with or without a header, CloudWatch and Athena exports, local Parquet; plain or `.gz` | Connections, with both directions of a session joined |
+| Flow records | nfdump, SIEM CSV exports | Connections |
+| Packet captures | `.pcap`, `.pcapng`, plain or `.gz` | Run through Zeek offline |
+| Nessus | `.nessus` or CSV | Vulnerability findings |
+| IOC list | CSV: `type,indicator[,source_url]` | Exact matches on IPs, domains, URLs, hashes, CVEs, packages |
+| Network map | `network_map.csv` (`cidr,name,type`) | Names cloud networks such as AWS VPCs |
+| Known scanners | `known_scanners.csv` (`address,name`) | Labels your own scanners "expected" instead of "review" |
+
+If detection guesses a format wrong, force it with `--format file.csv=paloalto`.
+[Methods](METHODS.md#inputs-and-normalization) lists what each source can and cannot contribute.
+
+## Analyze your data
+
+On the upload page:
+
+1. Enter a folder path or click **Browse…**, then **Analyze folder**. Files are read where they
+   sit; nothing is copied. You can also upload files (up to 1 GB each by default).
+2. Optionally list your internal networks. The default is RFC 1918, CGNAT, loopback, link-local and
+   ULA ranges.
+3. Optionally open **Report details** to name the run and its network. These label the reports and
+   group runs in Compare reports.
+
+From the command line:
+
+```sh
+python3 -m vulnflow analyze /path/to/case -o out --internal-net 10.0.0.0/8
+python3 -m vulnflow explore /path/to/case        # analyze and open the Explorer
+```
+
+**Several sites or companies.** One analysis treats a folder as one network. To keep sites apart,
+give each its own folder and add a `sites.csv`; see [Compare reports](docs/COMPARE.md#several-sites-in-one-folder).
+
+**Large inputs.** DuckDB sizes itself to the machine and spills to disk; plan for free disk about
+the size of the uncompressed logs. `--workdir` (or `VULNSCOPE_WORKDIR`) moves the temporary files.
+See [Large inputs](ARCHITECTURE.md#large-inputs-and-resource-sizing).
+
+## Read the results
+
+Every scored finding has a priority from **P1** (act now) to **P4** (routine) and a plain-English
+rationale built from CVSS, exploit availability, observed exposure and blast radius. Indicators are
+graded so reports never overstate them:
+
+- **Lead, not confirmed:** worth investigating, for example a return connection to an outside
+  address that reached the vulnerable service, or an unblocked IPS/IDS alert.
+- **Likely exploitation:** an unblocked alert on the vulnerable service **and** follow-on behaviour
+  from the host. Reports ask for incident response and host forensics; they never state a
+  compromise as confirmed.
+
+No traffic means "not observed by these sensors", not "safe". Scanned hosts never seen on the wire,
+and active servers never scanned, are listed as coverage gaps. The reports also warn when the
+sensor looks unreliable (packet loss, or one-direction capture).
+
+**The Explorer** (`explorer.html`, one offline file) shows the same run as a 3D or flat map, an
+Attack paths view of the likeliest ways in, and a Timeline of every flow. Click a host to see who
+it talked to inside and out. Press **?** in any view for help; the
+[Explorer guide](docs/EXPLORER.md) covers the controls.
+
+![Explorer overview of the synthetic 250-host example run, with the host list ranked by priority](screenshots/explorer_current_overview.jpg)
+
+For a guided walk-through, analyze the Gootloader sample and follow `hr-ws-07` in the Timeline.
+[Methods](METHODS.md) explains every score and estimate.
+
+## What each run writes
+
+- Executive summary and technical report, as Markdown and standalone HTML (print or save as PDF
+  from your browser)
+- `explorer.html`, the offline Explorer
+- `correlated_findings.csv` for ticketing and `results.json` for automation
+- Normalized inputs under `normalized/` (skip the large copies with `--no-normalized-copies`)
+- `hostile_activity.svg`, and the Security Assistant brief and audit log when used
+
+To reopen a saved run with the current version, choose its output folder on the upload page and
+click **Open report**. Keep `explorer.html` with `results.json`: it holds the traffic the Explorer
+is drawn from.
+
+## More features
+
+- **Compare reports:** find IOCs and vulnerabilities shared across runs and networks, and draw
+  every network on one map. [Guide](docs/COMPARE.md)
+- **Security Assistant:** ask about hosts, CVEs and IOCs. Offline by default with no AI and nothing
+  sent; optionally Claude, OpenAI or a local model. [Guide](docs/SECURITY_ASSISTANT.md)
+- **Branding and themes:** your name and logo on every report, behind a password, and seven
+  themes. [Guide](docs/BRANDING.md)
+
+## Privacy
+
+| Topic | What to expect |
+| --- | --- |
+| Target contact | Never scans, probes or resolves anything in your data. Zeek reads captures offline. |
+| Outbound connections | Only four, each tied to a feature: IOC article previews, Cloudflare Radar, a hosted Security Assistant model, and article briefs. See [Methods](METHODS.md#privacy-and-outbound-network-use). |
+| Offline mode | `VULNSCOPE_OFFLINE=1` turns off article previews only. On air-gapped systems, also leave Radar and AI providers unconfigured. |
+| API keys | Held in memory only, never written to disk, logs or reports. |
+| Retention | Runs stay on disk, readable by your account only, until you delete them. Reports are not encrypted. |
+| Deployment | Local use. A shared server needs `--allow-remote` behind your SSO proxy and its own security review. |
+
+Every numeric bound is listed in [Configured limits](docs/LIMITS.md).
+
+## Updating
+
+Run `docker compose pull && docker compose up -d` (from source: `git pull`, then
+`docker compose up -d --build`), then analyze your data again. Each run keeps the version it was
+made with. Settings, runs and branding are kept. Coming from vulnScope PRO? See
+[UPGRADE.md](UPGRADE.md).
+
+## Documentation
+
+| Doc | Covers |
+| --- | --- |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Port in use, proxies, updates that don't show, Docker on macOS |
+| [Methods](METHODS.md) | Formats, correlation and scoring, Explorer estimates, what VulnScope cannot establish |
+| [Architecture](ARCHITECTURE.md) | Pipeline, large inputs, Docker, air-gapped bundle, upload page security |
+| [Explorer](docs/EXPLORER.md) | Views, controls, deep links, supported browsers |
+| [Compare reports](docs/COMPARE.md) | Comparisons, several sites, the all-networks map |
+| [Security Assistant](docs/SECURITY_ASSISTANT.md) | Providers, redaction, article briefs, command-line use |
+| [Branding](docs/BRANDING.md) | Name, logo, password, themes |
+| [Development](DEVELOPMENT.md) | Tests, benchmarks, builds and releases |
+| [Local API](API.md) | The upload page's HTTP routes |
+| [Configured limits](docs/LIMITS.md) | Every numeric bound in one table |
+| [Changelog](CHANGELOG.md) | Notable changes per release |
+
+## License
+
+MIT. See [LICENSE](LICENSE). The Múcaro browser tab icon keeps its original MIT attribution in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -1,67 +1,315 @@
-(function () {
+vfWhenReady(function (D) {   // starts once vf_data.js has unpacked the data
 'use strict';
-const D = JSON.parse(document.getElementById('vf-data').textContent);
+const telemetryOnly = D.vulnerability_data_available === false;
+// subnet -> addresses that were probed and never answered (not hosts, so not drawn)
+const PROBED = D.probed_subnets || {};
+// All networks on one map (combine.py): each compared report is an island, and its hosts and subnets
+// carry "@<island>" on their ids so that equal addresses in two networks stay apart; shown() drops it.
+const COMBINED = D.combined || null;
+const shown = id => COMBINED && id != null ? String(id).replace(/@\d+$/, '') : id;
+if (telemetryOnly) document.getElementById('hint').textContent =
+  'Click a host to inspect recorded endpoints, ports, protocols, and direction.';
 const cv = document.getElementById('stage'), ctx = cv.getContext('2d');
+// cinematic 3D view (explorer3d.js, Three.js); the 2D canvas stays as the fallback and draws labels on top
+const cv3 = document.getElementById('stage3d');
+// 3D is the default where WebGL works; choosing Flat is remembered, ?3d / ?2d force one
+const KEY3D = 'vulnscope-explorer-3d-v3';
+const can3d = !!(cv3 && window.VF3D && window.VF3D.supported());
+let R3 = null, R3inst = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const iocIds = new Set((D.ioc_matches || []).map(item => item.id));
+const iocCounts = D.ioc_counts || {};
+const iocButton = (type, value, label = value) => {
+  const key = type + ':' + (type === 'cve' ? String(value).toUpperCase() : value);
+  return iocIds.has(key) ? `<button type="button" class="ioc-link" data-ioc-key="${esc(key)}">${esc(label)}</button>` : esc(label);
+};
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // backdrop follows the report theme picked on the vulnflow pages (same browser storage when served);
-// light themes get a dark slate, since the glowing graph needs a dark canvas
-const BACKDROP = {dark: ['#16223a', '#0f172a'], nord: ['#434c5e', '#3b4252'], 'high-contrast': ['#0a0a0a', '#000000'],
-  matrix: ['#05200c', '#020b04']};
+// Light draws the graph on a white canvas with darker line and label colours (LIGHT below)
+const BACKDROP = {dark: ['#16223a', '#020617'], light: ['#ffffff', '#fafafa'],
+  graphite: ['#1b1c20', '#111214'], 'olive-drab': ['#1f2218', '#14160f'], matrix: ['#131c15', '#0a0f0b'], 'high-contrast': ['#0d0d0d', '#000000'], amphibious: ['#1f3052', '#0f1729']};
 const SLATE = ['#3a4a60', '#283548'];
-let themeName = 'dark';
-try { themeName = localStorage.getItem('vulnflow-theme') || 'dark'; } catch (_) {}
+// Graphite is the default theme (DEFAULT_THEME in report.py), also where the browser's choice can't be read
+const DEFAULT_THEME = 'graphite';
+let themeName = DEFAULT_THEME;
+try { themeName = localStorage.getItem('vulnflow-theme') || DEFAULT_THEME; } catch (_) {}
+if (!BACKDROP[themeName]) themeName = DEFAULT_THEME;
+document.documentElement.dataset.theme = themeName;
 const [BG_IN, BG_OUT] = BACKDROP[themeName] || SLATE;
+// restrained themes: accent colour of each; they share the flat chrome (html[data-calm]) and the muted graph palette
+const CALM_ACCENT = {graphite: '#45b0c2', light: '#0f6f80', 'olive-drab': '#c2b56e', matrix: '#4ccf7a', 'high-contrast': '#fde047', amphibious: '#ffc72c'};
+const CALM = themeName in CALM_ACCENT;   // no stars, haze or glow text
+document.documentElement.toggleAttribute('data-calm', CALM);
+const LIGHT = themeName === 'light';   // white canvas: dark labels, darker lines, no additive glow
+// Restrained themes keep colour for what needs attention (alerts, vulnerable paths, severity, IOCs); ordinary
+// traffic, guides and labels go neutral. C() maps a default colour to its restrained counterpart.
+const CALM_MAP = {'#ff3b5c': '#e5534b', '#ff8a3d': '#d98845', '#ffd23f': '#c9a544', '#4dabf7': '#7c9fd4', '#8da2b5': '#8e8f8b',
+  '#ffc857': '#8a8d91', '#b98cff': '#9088b0', '#8892a6': '#6f7276', '#5b6b82': '#55585c',
+  '#ff2e88': '#c4627c', '#ffb020': '#c9963f', '#2ee6d6': '#45b0c2', '#6ea8ff': '#6c7076', '#78aaff': '#777a80',
+  '#e4ecfa': '#d8d9d6', '#d6e4f5': '#dcdcd8', '#7f95b3': '#8e8f8b', '#a9bcd6': '#b4b5b1', '#e6f1ff': '#f0f0ee',
+  '#6f86a6': '#85868a', '#8fa3c0': '#9a9b97', '#9fb3cc': '#a0a19d', '#ff8095': '#e8837c', '#ffb27a': '#e0a273'};
+if (CALM) CALM_MAP['#2ee6d6'] = CALM_ACCENT[themeName];
+// Light: clean mid-bright colours for what needs attention (they hold 3:1 on white without going muddy),
+// steel blue for hosts connecting out, neutral grays for everything else, near-black labels.
+if (LIGHT) Object.assign(CALM_MAP, {'#ff3b5c': '#da3737', '#ff8a3d': '#f0782f', '#ffd23f': '#e0a100', '#4dabf7': '#3d85f0', '#8da2b5': '#8e9196',
+  '#ffc857': '#8e9196', '#b98cff': '#5b7ba8', '#8892a6': '#a6a8ab', '#5b6b82': '#a6a8ab',
+  '#ff2e88': '#bc1e70', '#ffb020': '#c98a00', '#6ea8ff': '#8e9196', '#78aaff': '#a6a8ab',
+  '#e4ecfa': '#4a4c50', '#d6e4f5': '#1b1c1e', '#7f95b3': '#5c5e62', '#a9bcd6': '#3a3c40', '#e6f1ff': '#000000',
+  '#6f86a6': '#5c5e62', '#8fa3c0': '#5c5e62', '#9fb3cc': '#5c5e62', '#ff8095': '#a71627', '#ffb27a': '#9e3a16'});
+// outline behind canvas labels, and the fill of hollow markers: the page colour
+const LABEL_HALO = LIGHT ? BG_IN + 'e6' : 'rgba(3,6,12,.85)', HOLLOW = LIGHT ? '#ffffff' : null;
+const C = h => (CALM && CALM_MAP[h.toLowerCase()]) || h;
 document.documentElement.style.setProperty('--bg', BG_OUT);
-const SEV = {Critical: '#ff3b5c', High: '#ff8a3d', Medium: '#ffd23f', Low: '#4dabf7', Info: '#8da2b5', '': '#8da2b5'};
-const RETURN = '#b98cff';
-const KIND = {alert: '#ff3b5c', vuln: '#ff8a3d', reached: '#ffc857', outbound: RETURN, attempt: '#8892a6', blocked: '#5b6b82'};
+const SEV = {Critical: C('#ff3b5c'), High: C('#ff8a3d'), Medium: C('#ffd23f'), Low: C('#4dabf7'), Info: C('#8da2b5'), '': C('#8da2b5')};
+const RETURN = C('#b98cff');
+// optional network map (network_map.csv): named ranges such as AWS VPCs; empty without a map
+const NETS = D.networks || [], CLOUD_COL = C('#e4ecfa');
+const netOf = d => (d && d.net != null && NETS[d.net]) || null;
+const SUBNET_NET = new Map((D.subnets || []).filter(x => x.net != null).map(x => [x.id, NETS[x.net]]));
+const subnetNet = id => SUBNET_NET.get(id) || null;
+const netTag = n => n ? (n.cloud && !CALM ? '☁ ' : '') + n.name : '';
+const KIND = {alert: C('#ff3b5c'), vuln: C('#ff8a3d'), reached: C('#ffc857'), outbound: RETURN, attempt: C('#8892a6'), blocked: C('#5b6b82')};
+const KIND_RANK = {alert: 0, vuln: 1, reached: 2, outbound: 3, attempt: 4, blocked: 5};
 const KIND_TXT = {alert: 'IPS alert, not blocked', vuln: 'Reached a vulnerable service', reached: 'Reached the host',
-  outbound: 'Host connected out to it', attempt: 'Tried, no completed session', blocked: 'Blocked by firewall or IPS'};
-const BAND = {High: '#ff2e88', Medium: '#ffb020', Low: '#2ee6d6', None: '#5b6b82'};
+  outbound: 'Host connected out to it', attempt: 'Tried, no completed session', blocked: 'Blocked by firewall/IPS or refused by the host'};
+const BAND = {High: C('#ff2e88'), Medium: C('#ffb020'), Low: C('#2ee6d6'), None: C('#5b6b82'), Unknown: C('#8da2b5')};
 
 let W = 0, H = 0, DPR = 1;
-const cam = {x: 0, y: 0, z: 0.25, tx: 0, ty: 0, tz: 1};
+// (uy, tuy): the user's own up/down shift of the 3D picture in screen px (middle-drag), cleared when the view is refit
+const cam = {x: 0, y: 0, z: 0.25, tx: 0, ty: 0, tz: 1, sx: 0, sy: 0, tsx: 0, tsy: 0, uy: 0, tuy: 0};
 const still = /[?&#]still\b/.test(location.search + location.hash);
 const state = {mode: 'overview', focus: null, hover: null, labels: true, motion: !reduced && !still, history: []};
 const nodes = new Map();          // id -> render node
 let edges = [];                   // focus-mode edges
 let t0 = performance.now();
+// 3D camera. Overview: the user's own orbit (oyaw around the plane, opitch from straight above);
+// host focus: small offsets (fyaw, fpitch) from a front-on view, reset on each new host.
+// The overview opens on the low view, slowly turning to the left (view.spin). The turn stops as soon as
+// the user moves the camera, picks a view or opens a host; switching to 3D, "← All hosts", Reset or the
+// Spin button go back to the low view and restart it.
+const VIEWS = {top: 0, tilted: 0.82, low: 1.25};
+const DEFAULT_VIEW = 'low', SPIN = Math.PI * 2 / 150;   // one full turn every 150 s
+const view = {yaw: 0, pitch: VIEWS[DEFAULT_VIEW], dist: 1.6, oyaw: 0, opitch: VIEWS[DEFAULT_VIEW], fyaw: 0, fpitch: 0, idle: 0, cmix: 1, spin: true};
+const hash01 = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return ((h >>> 0) % 10007) / 10007; };
 
 // ---------------------------------------------------------------- layout: overview
-function overviewLayout() {
+// pack subnets by their real size: largest first, each at the first spot on an outward spiral that
+// clears every placed subnet by GAP plus a share of both radii, so small subnets no longer pile up
+// in the middle and big neighbours get proportionally more room
+// big subnets pack their hosts a little tighter so one large subnet cannot crowd out the rest
+const SP = 48, GAP = 180, GAP_K = 0.3, spacing = n => SP / Math.pow(Math.max(1, n / 30), 0.25);
+const golden = Math.PI * (3 - Math.sqrt(5));
+// the first spot on an outward spiral (`step` world units per radian) clearing every placed circle by
+// `gap` plus `k` times both radii
+function spiralSpot(placed, r, gap, step = 6, k = GAP_K) {
+  for (let t = 0; t < 20000; t++) {
+    const a = t * 0.12, rr = step * a;
+    const x = rr * Math.cos(a), y = rr * Math.sin(a) * 0.8;
+    if (placed.every(p => Math.hypot(p.x - x, p.y - y) >= (p.r + r) * (1 + k) + gap)) return [x, y];
+  }
+  return [0, 0];
+}
+// the subnets of `list` packed round (0, 0): [{s, members, cr, x, y}]
+function packSubnets(list) {
   const groups = new Map();
-  D.nodes.forEach(n => { if (!groups.has(n.subnet)) groups.set(n.subnet, []); groups.get(n.subnet).push(n); });
-  const subnets = [...groups.keys()].sort();
-  const golden = Math.PI * (3 - Math.sqrt(5));
+  list.forEach(n => { if (!groups.has(n.subnet)) groups.set(n.subnet, []); groups.get(n.subnet).push(n); });
+  const sized = [...groups.keys()].sort().map(s => {
+    const members = groups.get(s).sort((a, b) => (b.observed - a.observed) || (b.score - a.score) || a.id.localeCompare(b.id));
+    return {s, members, cr: 40 + spacing(members.length) * Math.sqrt(members.length)};
+  }).sort((a, b) => {
+    const ca = subnetNet(a.s), cb = subnetNet(b.s);
+    return (!!(ca && ca.cloud) - !!(cb && cb.cloud)) || (ca ? ca.name : '').localeCompare(cb ? cb.name : '') ||
+      b.members.length - a.members.length || a.s.localeCompare(b.s);
+  });
+  const placed = [];
+  sized.forEach((g, i) => {
+    [g.x, g.y] = i ? spiralSpot(placed, g.cr, GAP) : [0, 0];
+    placed.push({x: g.x, y: g.y, r: g.cr});
+  });
+  return sized;
+}
+// a packed subnet's cluster and hosts, offset to (ox, oy)
+function placeSubnet(g, ox, oy, clusters, island) {
+  const cx = ox + g.x, cy = oy + g.y, members = g.members;
+  clusters.push({subnet: g.s, x: cx, y: cy, z: 0, r: g.cr + 18, island});
+  members.forEach((n, k) => {
+    const rr = k === 0 && members.length === 1 ? 0 : spacing(members.length) * Math.sqrt(k + 0.5);
+    const a = k * golden;
+    const rn = node(n);
+    rn.ox = cx + rr * Math.cos(a); rn.oy = cy + rr * Math.sin(a);
+    rn.oz = pillarH(n);
+  });
+}
+// room the host list takes on the left (none on narrow screens, where it is hidden)
+function railWidth() { if (W <= 900) return 0; const r = $('rail').getBoundingClientRect(); return r.width ? Math.max(280, r.right + 2) : 280; }
+const islands = [];   // all-networks map: one per report, {k, x, y, r, info, grouped}
+// all-networks map: one per network that has more than one compared report (a company's sites), drawn
+// as a solid ring round its reports' islands with the network's name under it: {name, x, y, r, ks, ...}
+const nets = [];
+// one network's islands sit ISLAND_GAP plus ISLAND_K of both radii apart; its ring is NET_PAD times the
+// smallest circle round them (room for their labels); networks sit at least NET_GAP_MIN apart, more for big ones
+const ISLAND_GAP = 260, ISLAND_K = 0.06, NET_PAD = 1.12, NET_GAP_MIN = 900;
+const ZOOM_MIN = COMBINED ? 0.01 : 0.12;   // how far out the wheel and the overview fit may zoom
+function overviewLayout() {
   const clusters = [];
-  subnets.forEach((s, i) => {
-    const members = groups.get(s).sort((a, b) => (b.scanned - a.scanned) || (b.score - a.score) || a.id.localeCompare(b.id));
-    const cr = 40 + 40 * Math.sqrt(members.length);
-    const r = i === 0 ? 0 : 230 * Math.sqrt(i) + cr;
-    const cx = r * Math.cos(i * golden), cy = r * Math.sin(i * golden);
-    clusters.push({subnet: s, x: cx, y: cy, r: cr + 18});
-    members.forEach((n, k) => {
-      const rr = k === 0 && members.length === 1 ? 0 : 40 * Math.sqrt(k + 0.5);
-      const a = k * golden;
-      const rn = node(n);
-      rn.ox = cx + rr * Math.cos(a); rn.oy = cy + rr * Math.sin(a);
+  if (!COMBINED) { packSubnets(D.nodes).forEach(g => placeSubnet(g, 0, 0, clusters)); return clusters; }
+  // Each report's subnets are packed as in its own Explorer into an island. One network's islands are
+  // then packed together, the largest first, so each company's sites form one group, and the groups sit
+  // side by side, the network with the most hosts first (a spiral of them when there are more than
+  // three), with a gap between networks well over the gap between one network's sites.
+  const by = new Map();
+  D.nodes.forEach(n => { const k = n.net || 0; if (!by.has(k)) by.set(k, []); by.get(k).push(n); });
+  const R = COMBINED.reports, groups = new Map();
+  const packs = [...by.entries()].map(([k, list]) => {
+    const subs = packSubnets(list);
+    return {k, n: list.length, subs, x: 0, y: 0, r: subs.reduce((m, g) => Math.max(m, Math.hypot(g.x, g.y) + g.cr + 18), 0) + 60};
+  });
+  const step = Math.max(6, Math.max(...packs.map(p => p.r)) / 45);
+  packs.forEach(p => {
+    const key = netKey(R[p.k].network);
+    if (!groups.has(key)) groups.set(key, {name: R[p.k].network, packs: [], n: 0, x: 0, y: 0, r: 0});
+    const g = groups.get(key); g.packs.push(p); g.n += p.n;
+  });
+  const G = [...groups.entries()].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0])).map(e => e[1]);
+  G.forEach(g => {
+    g.packs.sort((a, b) => b.n - a.n || R[a.k].generated.localeCompare(R[b.k].generated) || a.k - b.k);
+    const placed = [];
+    g.packs.forEach((p, i) => { [p.x, p.y] = i ? spiralSpot(placed, p.r, ISLAND_GAP, step, ISLAND_K) : [0, 0]; placed.push(p); });
+    const e = enclosing(placed);
+    placed.forEach(p => { p.x -= e.x; p.y -= e.y; });
+    g.r = e.r * (placed.length > 1 ? NET_PAD : 1);
+  });
+  const gap = Math.max(NET_GAP_MIN, 0.6 * Math.max(...G.map(g => g.r)));
+  if (G.length <= 3) {
+    G.forEach((g, i) => { g.x = i ? G[i - 1].x + G[i - 1].r + gap + g.r : 0; });
+    const mid = (G[G.length - 1].x + G[G.length - 1].r - G[0].r) / 2;
+    G.forEach(g => { g.x -= mid; });
+  } else {
+    const placed = [];
+    G.forEach((g, i) => { [g.x, g.y] = i ? spiralSpot(placed, g.r, gap, Math.max(6, G[0].r / 45)) : [0, 0]; placed.push(g); });
+  }
+  G.forEach(g => {
+    const grouped = g.packs.length > 1;
+    if (grouped) nets.push({name: g.name, x: g.x, y: g.y, r: g.r, ks: g.packs.map(p => p.k), hosts: g.n,
+      total: g.packs.reduce((t, p) => t + (R[p.k].nodes || p.n), 0)});
+    g.packs.forEach(p => {
+      const x = g.x + p.x, y = g.y + p.y;
+      islands[p.k] = {k: p.k, x, y, r: p.r, info: R[p.k], grouped};
+      p.subs.forEach(s => placeSubnet(s, x, y, clusters, p.k));
     });
   });
   return clusters;
 }
+// the smallest circle round a set of circles, near enough (Badoiu-Clarkson: keep stepping towards the
+// farthest point, by less each time)
+function enclosing(cs) {
+  let x = cs.reduce((t, c) => t + c.x, 0) / cs.length, y = cs.reduce((t, c) => t + c.y, 0) / cs.length;
+  const far = () => cs.reduce((m, c) => { const d = Math.hypot(c.x - x, c.y - y) + c.r; return d > m[0] ? [d, c] : m; }, [-1, null]);
+  for (let i = 1; i <= 300 && cs.length > 1; i++) {
+    const c = far()[1], d = Math.hypot(c.x - x, c.y - y) || 1;
+    x += (c.x + (c.x - x) / d * c.r - x) / (i + 1); y += (c.y + (c.y - y) / d * c.r - y) / (i + 1);
+  }
+  return {x, y, r: far()[0]};
+}
+function netKey(name) { return String(name || '').split(/\s+/).filter(Boolean).join(' ').toLowerCase(); }
+// pillar height in the 3D overview: risk score with a scan, outside exposure without one
+function pillarH(d) {
+  if (!d.observed) return 4;
+  return telemetryOnly ? 14 + 26 * Math.log2(1 + (d.ext || 0)) : 12 + Math.min(100, d.score || 0) * 2.6;
+}
 function node(d) {
   if (nodes.has(d.id)) return nodes.get(d.id);
-  const r = d.scanned ? 7 + Math.min(9, (d.score || 0) / 12) : 4.5;
-  const n = {d, id: d.id, x: 0, y: 0, tx: 0, ty: 0, ox: 0, oy: 0, a: 0, ta: 1, r, tr: r, color: SEV[d.sev] || SEV[''],
+  const r = d.observed ? 7 + Math.min(9, (d.score || 0) / 12) : 4.5;
+  const n = {d, id: d.id, x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0, ox: 0, oy: 0, oz: 0, a: 0, ta: 1, r, tr: r, color: SEV[d.sev] || SEV[''],
     ext: false, born: performance.now() + Math.random() * 900};
   nodes.set(d.id, n);
   return n;
 }
 const clusters = overviewLayout();
 const links = D.links.map(([a, b, w]) => ({a: nodes.get(a), b: nodes.get(b), w})).filter(l => l.a && l.b);
-nodes.forEach(n => { n.x = n.ox * 1.8; n.y = n.oy * 1.8; n.tx = n.ox; n.ty = n.oy; });
+nodes.forEach(n => { n.x = n.ox * 1.8; n.y = n.oy * 1.8; n.tx = n.ox; n.ty = n.oy;
+  n.z = -40 - hash01(n.id + '~') * 260; n.tz = n.oz; });
+// All-networks highlights: hosts with an IOC match or a vulnerability are drawn as usual and the rest
+// dimmed. What a host or an outside address shares with other reports is in its hover and host cards.
+const ITEMS = COMBINED ? COMBINED.items : [], REPS = COMBINED ? COMBINED.reports : [];
+// overview opacity of an internal host (an item it shares with other reports is an IOC or vulnerability too)
+const restAlpha = n => !COMBINED || n.d.sev || iocCounts[n.d.id] || (n.d.sh || []).length ? 1 : 0.3;
+if (COMBINED) nodes.forEach(n => { if (!n.ext && !n.domain) n.ta = restAlpha(n); });
+// the network and report a host on the all-networks map comes from
+const repOf = d => COMBINED && d ? REPS[d.net || 0] : null;
+function netLabel(d) { const r = repOf(d); return r ? (netKey(r.network) === netKey(r.name) ? r.network : r.network + ' · ' + r.name) : ''; }
+// 3D overview summaries (explore.py _overview_summary): complete per-subnet totals, bundled traffic
+// between subnets, the risky host-to-host paths, and the most significant outside addresses
+const fewP1 = D.nodes.filter(n => n.pri === 'P1').length <= 40;   // 3D overview labels every P1 only when there are few
+const subnetInfo = new Map((D.subnets || []).map(x => [x.id, x]));
+const clusterOf = new Map(clusters.map(c => [c.subnet, c]));
+// with many subnets, label only the ones that matter most (the rest on hover)
+[...clusters].sort((a, b) => {
+  const A = subnetInfo.get(a.subnet) || {}, B = subnetInfo.get(b.subnet) || {};
+  return (B.likely || 0) - (A.likely || 0) || (B.p1 || 0) - (A.p1 || 0) || (B.hosts || 0) - (A.hosts || 0);
+}).forEach((c, i) => { c.labelled = i < 14; });
+const subLinks = (D.subnet_links || []).map(([a, b, w, lw]) => ({a: clusterOf.get(a), b: clusterOf.get(b), w, lw})).filter(l => l.a && l.b);
+const riskyLinks = (D.risky_links || []).map(([a, b, w, why, lvl]) => ({a: nodes.get(a), b: nodes.get(b), w, why, lvl})).filter(l => l.a && l.b);
+const ring = (() => {
+  let minX = 0, maxX = 0, minY = 0, maxY = 0;
+  clusters.forEach(c => { minX = Math.min(minX, c.x - c.r); maxX = Math.max(maxX, c.x + c.r); minY = Math.min(minY, c.y - c.r); maxY = Math.max(maxY, c.y + c.r); });
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, R = Math.max(260, Math.hypot(maxX - minX, maxY - minY) / 2 * 1.05);
+  return {cx, cy, R, z: 200 + R * 0.4, lift: 0};
+})();
+const inetNodes = [];
+// the internet arc always sits overhead on the far side of the network from the camera, so it never
+// blocks the view; when the view is rotated the arc glides round to stay behind
+const ARC = Math.PI - 0.6;
+const arcCenter = yaw => 1.5 * Math.PI - yaw;
+// Each address sits above the hosts it reached, so the order along the arc depends on the view. On the
+// all-networks map its beams reach islands far apart, and re-sorting on every frame of the slow turn
+// kept swapping neighbours, which made the beams shake; there the order is kept while the camera turns
+// (resort false) and worked out again only when the view is set (Reset, the view buttons, after a drag).
+let inetOrder = null;
+function placeInet(yaw, resort = true) {
+  const rx = Math.cos(yaw), ry = -Math.sin(yaw);   // screen-right direction on the plane
+  const order = !resort && inetOrder ? inetOrder : inetOrder = inetNodes.map(n => {
+    let sx = 0, k = 0;
+    n.info.targets.forEach(t => { const h = nodes.get(t[0]); if (h) { sx += (h.ox - ring.cx) * rx + (h.oy - ring.cy) * ry; k++; } });
+    return {n, x: k ? sx / k : (n.hash - 0.5) * ring.R};
+  }).sort((a, b) => a.x - b.x || (a.n.id < b.n.id ? -1 : 1));
+  order.forEach(({n}, i) => {
+    const f = order.length > 1 ? i / (order.length - 1) : 0.5;
+    const ang = arcCenter(yaw) - (f - 0.5) * ARC;
+    n.ox = ring.cx + ring.R * 1.08 * Math.cos(ang); n.oy = ring.cy + ring.R * 1.08 * Math.sin(ang);
+    if (n.ta > 0) { n.tx = n.ox; n.ty = n.oy; }
+  });
+}
+(D.internet || []).slice(0, 48).forEach((e, i) => {
+  const id = 'inet:' + e.ip;
+  const n = {d: {id: e.ip, name: '', scanned: false, sev: ''}, id, x: ring.cx, y: ring.cy, z: ring.z + 400, tx: 0, ty: 0, tz: 0,
+    ox: ring.cx, oy: ring.cy, oz: ring.z + (i % 3) * 26, hash: hash01(e.ip),
+    a: 0, ta: 0, r: 5 + Math.min(6, Math.log2(1 + e.hosts_total) * 2), tr: 0, color: KIND[e.kind], ext: true, inet: true,
+    born: 0, info: e, labelled: false};
+  n.tr = n.r; n.tz = n.oz;
+  nodes.set(id, n); inetNodes.push(n);
+});
+placeInet(0);
+inetNodes.forEach(n => { n.tx = n.ox; n.ty = n.oy; });
+const inetRanked = [...inetNodes].sort((a, b) => KIND_RANK[a.info.kind] - KIND_RANK[b.info.kind] || b.info.hosts_total - a.info.hosts_total);
+inetRanked.slice(0, 6).forEach(n => { n.labelled = true; });
+function showInet(on) { inetNodes.forEach(n => { n.ta = on ? 1 : 0; n.tx = n.ox; n.ty = n.oy; n.tz = n.oz; }); }
+function clusterAt(sx, sy) {
+  if (!R3 || state.mode !== 'overview') return null;
+  let best = null, bd = 1e9;
+  clusters.forEach(c => {
+    const [x, y, sc] = Pw(c.x, c.y, 0), d = Math.hypot(x - sx, (y - sy) / Math.max(0.35, Math.cos(view.pitch)));
+    if (d < c.r * sc && d < bd) { bd = d; best = c; }
+  });
+  return best;
+}
+function zoomCluster(c) {
+  const railW = railWidth();
+  cam.tz = Math.min(1.6, Math.max(0.3, Math.min((W - railW - 80) / (c.r * 2 + 260), (H - 200) / (c.r * 2 + 360)) * 1.3));
+  cam.tx = c.x; cam.ty = c.y; cam.tsx = railW / 2; cam.tsy = 0;
+  view.idle = performance.now();
+}
 
 // ---------------------------------------------------------------- stars
 const stars = Array.from({length: 260}, () => ({x: Math.random(), y: Math.random(), z: Math.random() * 0.8 + 0.2,
@@ -72,15 +320,26 @@ function extNode(a) {
   const id = 'ext:' + a.ip;
   let n = nodes.get(id);
   if (!n) {
-    n = {d: {id: a.ip, name: '', scanned: false, sev: ''}, id, x: 0, y: 0, tx: 0, ty: 0, ox: 0, oy: 0, a: 0, ta: 0,
+    n = {d: {id: a.ip, name: '', scanned: false, sev: ''}, id, x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0, ox: 0, oy: 0, oz: 0, a: 0, ta: 0,
       r: 6, tr: 6, color: KIND[a.kind], ext: true, born: 0, info: a};
     nodes.set(id, n);
   }
   n.info = a; n.color = KIND[a.kind];
   return n;
 }
+function domainNode(match) {
+  const id = match.id;
+  let n = nodes.get(id);
+  if (!n) {
+    n = {d: {id: match.value, name: '', scanned: false, sev: ''}, id, x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0, ox: 0, oy: 0, oz: 0, a: 0, ta: 0,
+      r: 7, tr: 7, color: C('#2ee6d6'), ext: false, domain: true, born: 0, info: match};
+    nodes.set(id, n);
+  }
+  n.info = match;
+  return n;
+}
 const LABELED = 24;                // nodes per side drawn large and labelled; the rest are packed beyond them
-const SIDE_MAX = 400;              // nodes drawn per side; the panel lists every one
+const SIDE_MAX = 400;              // graph drawing limit; the panel can reach every IP
 function arc(list, dir) {
   // two labelled columns of up to 12, curved so both ends bend towards the selected host,
   // then a dense block of small unlabelled nodes further out (hover them for details)
@@ -91,9 +350,11 @@ function arc(list, dir) {
       const gap = Math.max(36, Math.min(95, 420 / cnt));
       const y = (k - (cnt - 1) / 2) * gap;
       item.tx = dir * (400 + col * 270 - (y * y) / 1600); item.ty = y; item.gap = gap; item.small = false;
+      item.tz = 40 - (y * y) / 2600 - col * 25;
     } else {
       const j = i - LABELED, col = Math.floor(j / rows), k = j % rows, cnt = Math.min(rows, list.length - LABELED - col * rows);
       item.tx = dir * (900 + col * 24); item.ty = (k - (cnt - 1) / 2) * 17; item.gap = 17; item.small = true;
+      item.tz = -50 - col * 3;
     }
   });
 }
@@ -103,22 +364,37 @@ function peerNode(ip) {
 function focus(id, push = true) {
   const F = D.focus[id];
   if (!F) return;
+  loadFullLists(id);
   if (push && state.focus && state.focus !== id) state.history.push(state.focus);
-  state.mode = 'focus'; state.focus = id;
-  document.body.classList.add('focused');
+  stopSpin();
+  state.mode = 'focus'; state.focus = id; cam.tuy = 0;
+  document.body.classList.add('focused'); placeViewctl();   // the legend is shorter while focused
   $('hint').classList.add('gone');
+  updateAbout();
   history.replaceState(null, '', '#host=' + encodeURIComponent(id));
   const center = nodes.get(id);
   const keep = new Set([id]);
   // background nodes drift outward and fade
-  nodes.forEach(n => { n.gap = 0; n.small = false; if (n.ext) { n.ta = 0; } else { n.ta = 0.05; n.tx = n.ox * 2.4; n.ty = n.oy * 2.4; n.tr = n.r; } });
-  center.tx = 0; center.ty = 0; center.ta = 1; center.tr = 22;
+  nodes.forEach(n => { n.gap = 0; n.small = false; if (n.ext || n.domain) { n.ta = 0; } else { n.ta = 0.05; n.tx = n.ox * 2.4; n.ty = n.oy * 2.4; n.tz = n.oz - 900; n.tr = n.r; } });
+  center.tx = 0; center.ty = 0; center.tz = 40; center.ta = 1; center.tr = 22;
+  if (push !== 'resize') { view.fyaw = 0; view.fpitch = 0; }
   const atk = F.attackers.slice(0, SIDE_MAX).map(extNode);
   arc(atk, -1);
   atk.forEach(n => { n.ta = 1; n.tr = n.small ? 3.5 : 5 + Math.min(7, Math.log2(1 + n.info.sessions + n.info.out_sessions + 3 * n.info.alerts)); keep.add(n.id); });
+  // DNS matches are source-linked IOCs without a corresponding outside IP node.
+  // Show them separately above the host; the dashed edge means an observed query, not an IP session.
+  const domains = (D.ioc_matches || []).filter(item => item.type === 'domain' && item.hosts.includes(id)).slice(0, 8).map(domainNode);
+  const domainCols = domains.length <= 4 ? 2 : 3;
+  const domainRows = Math.ceil(domains.length / domainCols);
+  domains.forEach((n, i) => {
+    const row = Math.floor(i / domainCols), inRow = Math.min(domainCols, domains.length - row * domainCols), col = i % domainCols;
+    n.tx = (col - (inRow - 1) / 2) * 300;
+    n.ty = -190 - (domainRows - 1) * 45 + row * 90;
+    n.tz = 50; n.ta = 1; n.tr = 7; n.gap = 90; keep.add(n.id);
+  });
   const peers = F.peers.slice(0, SIDE_MAX).map(p => { const n = peerNode(p.ip); n.info = p; return n; });
   arc(peers, 1);
-  peers.forEach(n => { n.ta = n.info.band === 'None' ? 0.75 : 1; n.tr = n.small ? 3.5 : (n.d.scanned ? 8 : 6) + n.info.p * 6; keep.add(n.id); });
+  peers.forEach(n => { n.ta = n.info.band === 'None' ? 0.75 : 1; n.tr = n.small ? 3.5 : (n.d.observed ? 8 : 6) + n.info.p * 6; keep.add(n.id); });
   // two-hop nodes sit beyond the labelled columns; with a packed overflow block they stay in the panel only
   const shownPeers = new Set(peers.length > LABELED ? [] : peers.map(n => n.id));
   const h2 = F.hop2.filter(p => shownPeers.has(p.via) && p.p >= 0.1).slice(0, 10).map(p => { const n = peerNode(p.ip); n.info = p; return n; });
@@ -126,7 +402,7 @@ function focus(id, push = true) {
     const via = nodes.get(n.info.via);
     const sib = h2.slice(0, i).filter(m => m.info.via === n.info.via).length;
     n.tx = via.tx + 260 + Math.floor(sib / 4) * 190; n.ty = via.ty + ((sib % 4) - 1.5) * 52;
-    n.ta = 0.85; n.tr = 5; keep.add(n.id);
+    n.tz = via.tz - 25; n.ta = 0.85; n.tr = 5; keep.add(n.id);
   });
   edges = [];
   F.attackers.slice(0, SIDE_MAX).forEach(a => {
@@ -138,6 +414,7 @@ function focus(id, push = true) {
     edges.push(mkEdge(n, center, KIND[a.kind], Math.max(a.sessions, a.alerts + a.alerts_blocked), a.kind === 'blocked' || a.kind === 'attempt', 'atk', a, false, sm));
     if (a.out_sessions) edges.push(mkEdge(center, n, RETURN, a.out_sessions, !a.out_established, 'ret', a, true, sm));
   });
+  domains.forEach(n => edges.push(mkEdge(center, n, C('#2ee6d6'), 1, true, 'dns', n.info, false, false)));
   F.peers.slice(0, SIDE_MAX).forEach(p => {
     const n = nodes.get(p.ip), sm = n.small, c = BAND[p.band], none = p.band === 'None';
     if (p.out_tries) edges.push(mkEdge(center, n, c, none ? p.out_tries : p.out, none || !p.out, 'out', p, false, sm));
@@ -148,11 +425,18 @@ function focus(id, push = true) {
   let minX = -60, maxX = 60, minY = -60, maxY = 60;
   keep.forEach(k => { const n = nodes.get(k); minX = Math.min(minX, n.tx); maxX = Math.max(maxX, n.tx); minY = Math.min(minY, n.ty); maxY = Math.max(maxY, n.ty); });
   minX -= 130; maxX += 110;           // room for the labels beside the outer nodes
-  const panelW = W > 900 ? 420 : 0, railW = W > 900 ? 280 : 0, mobileH = W > 900 ? 0 : H * 0.52;
-  const availW = W - panelW - railW - 60, availH = H - 170 - mobileH;
-  cam.tz = Math.min(1.6, Math.max(0.25, Math.min(availW / (maxX - minX + 160), availH / (maxY - minY + 120))));
+  const drawerW = document.body.classList.contains('ai-chat-open') && W > 1100 ? $('analyst-chat').getBoundingClientRect().width : 0;
+  const phoneLayout = W <= 520;
+  const panelW = drawerW ? drawerW + Math.min(100, W * 0.06) :
+    phoneLayout ? 0 : (parseFloat(getComputedStyle($('panel')).width) || 400) + 20;
+  const railW = railWidth();
+  const phonePanelH = phoneLayout ? H * 0.52 : 0;
+  const availW = Math.max(80, W - panelW - railW - 40), availH = H - 170 - phonePanelH;
+  cam.tz = Math.min(1.6, Math.max(drawerW ? 0.12 : W > 900 ? 0.25 : 0.08,
+    Math.min(availW / (maxX - minX + 160), availH / (maxY - minY + 120))));
+  if (R3) cam.tz *= 1.12;
   cam.tx = (minX + maxX) / 2 - (railW - panelW) / 2 / cam.tz;
-  cam.ty = (minY + maxY) / 2 + mobileH / 2 / cam.tz;
+  cam.ty = (minY + maxY) / 2 + phonePanelH / 2 / cam.tz;
   if (!state.motion) snap();
   renderPanel(id); renderList();
 }
@@ -164,29 +448,49 @@ function mkEdge(a, b, color, weight, dashed, kind, info, bend, small) {
 }
 function overview() {
   state.mode = 'overview'; state.focus = null; state.history = [];
-  document.body.classList.remove('focused');
+  document.body.classList.remove('focused'); placeViewctl();
   history.replaceState(null, '', '#');
-  nodes.forEach(n => { if (n.ext) n.ta = 0; else { n.ta = 1; n.tx = n.ox; n.ty = n.oy; n.tr = n.r; } });
+  homeView();
+  nodes.forEach(n => { if (n.ext || n.domain) n.ta = 0; else { n.ta = restAlpha(n); n.tx = n.ox; n.ty = n.oy; n.tz = n.oz; n.tr = n.r; } });
+  showInet(!!R3);
   edges = [];
   fitOverview();
   $('panel').hidden = true;
-  renderList();
+  renderList(); updateAbout();
 }
 function fitOverview() {
+  cam.tuy = 0;
   let minX = 0, maxX = 0, minY = 0, maxY = 0;
-  nodes.forEach(n => { if (!n.ext) { minX = Math.min(minX, n.ox); maxX = Math.max(maxX, n.ox); minY = Math.min(minY, n.oy); maxY = Math.max(maxY, n.oy); } });
-  const railW = W > 900 ? 280 : 0;
-  cam.tz = Math.min(1.5, Math.max(0.2, Math.min((W - railW - 80) / (maxX - minX + 200), (H - 200) / (maxY - minY + 200))));
-  cam.tx = (minX + maxX) / 2 - railW / 2 / cam.tz; cam.ty = (minY + maxY) / 2;
+  nodes.forEach(n => { if (!n.ext && !n.domain) { minX = Math.min(minX, n.ox); maxX = Math.max(maxX, n.ox); minY = Math.min(minY, n.oy); maxY = Math.max(maxY, n.oy); } });
+  // all-networks map: the rings round the reports and networks too, not only their hosts
+  for (const o of [...islands, ...nets]) if (o) { minX = Math.min(minX, o.x - o.r); maxX = Math.max(maxX, o.x + o.r); minY = Math.min(minY, o.y - o.r); maxY = Math.max(maxY, o.y + o.r); }
+  const railW = railWidth();
+  const drawerW = document.body.classList.contains('ai-chat-open') && W > 1100 ? $('analyst-chat').getBoundingClientRect().width : 0;
+  const rightInset = drawerW ? drawerW + Math.min(100, W * 0.06) : 0;
+  cam.tz = Math.min(1.5, Math.max(COMBINED ? ZOOM_MIN : drawerW ? 0.12 : 0.2,
+    Math.min((W - railW - rightInset - 80) / (maxX - minX + 200), (H - 200) / (maxY - minY + 200))));
+  if (R3) {
+    minX = ring.cx - ring.R * 1.1; maxX = ring.cx + ring.R * 1.1; minY = ring.cy - ring.R; maxY = ring.cy + ring.R;
+    cam.tz = Math.min(1.5, Math.max(COMBINED ? ZOOM_MIN : drawerW ? 0.1 : 0.15,
+      Math.min((W - railW - rightInset - 60) / (maxX - minX + 120), (H - 170) / ((maxY - minY) * 0.75 + 120)))) * 0.85;
+    // orbit pivot = the network's centre; the screen shift keeps it clear of the host list and drawer
+    cam.tx = ring.cx; cam.ty = ring.cy; cam.tsx = (railW - rightInset) / 2; cam.tsy = ring.R * 0.3 * cam.tz;
+    return;
+  }
+  cam.tx = (minX + maxX) / 2 - (railW - rightInset) / 2 / cam.tz; cam.ty = (minY + maxY) / 2;
 }
-function snap() { nodes.forEach(n => { n.x = n.tx; n.y = n.ty; n.a = n.ta; n.r = n.tr; }); cam.x = cam.tx; cam.y = cam.ty; cam.z = cam.tz; }
+function snap() { nodes.forEach(n => { n.x = n.tx; n.y = n.ty; n.z = n.tz; n.a = n.ta; n.r = n.tr; }); cam.x = cam.tx; cam.y = cam.ty; cam.z = cam.tz; cam.sx = cam.tsx; cam.sy = cam.tsy; view.dist = 1; }
 
 // ---------------------------------------------------------------- drawing
 const toS = (x, y) => [(x - cam.x) * cam.z + W / 2, (y - cam.y) * cam.z + H / 2];
 const toW = (sx, sy) => [(sx - W / 2) / cam.z + cam.x, (sy - H / 2) / cam.z + cam.y];
+// screen position and CSS px per world unit, through the 3D camera when it is on
+const Pw = (x, y, z) => R3 ? R3.project(x, y, z || 0) : [(x - cam.x) * cam.z + W / 2, (y - cam.y) * cam.z + H / 2, cam.z];
+const P = n => Pw(n.x, n.y, n.z);
 function resize() {
   DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
   cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (R3inst) R3inst.setSize(W, H, DPR);
 }
 function bezier(a, b, bend) {
   const [x1, y1] = toS(a.x, a.y), [x2, y2] = toS(b.x, b.y);
@@ -199,33 +503,54 @@ function frame(now) {
   const dt = Math.min(0.05, (now - t0) / 1000); t0 = now;
   const k = state.motion ? 1 - Math.pow(0.0015, dt) : 1;
   cam.x += (cam.tx - cam.x) * k; cam.y += (cam.ty - cam.y) * k; cam.z += (cam.tz - cam.z) * k;
+  if (state.mode === 'focus' || !R3) { cam.tsx = 0; cam.tsy = 0; }
+  cam.sx += (cam.tsx - cam.sx) * k; cam.sy += (cam.tsy - cam.sy) * k; cam.uy += (cam.tuy - cam.uy) * k;
   nodes.forEach(n => {
     const ready = now > n.born;
     n.x += (n.tx - n.x) * k; n.y += (n.ty - n.y) * k; n.r += (n.tr - n.r) * k;
+    n.z += (n.tz - n.z) * (ready ? k * 0.8 : 0);
     n.a += ((ready ? n.ta : 0) - n.a) * Math.min(1, k * 1.4);
   });
   ctx.clearRect(0, 0, W, H);
+  if (R3) { draw3d(now, dt, k); requestAnimationFrame(frame); return; }
   // backdrop: deep gradient + parallax stars
   const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.75);
   g.addColorStop(0, BG_IN); g.addColorStop(1, BG_OUT);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   const T = now / 1000;
-  stars.forEach(s => {
+  if (!CALM) stars.forEach(s => {
     const x = ((s.x * W - cam.x * cam.z * s.z * 0.15) % W + W) % W, y = ((s.y * H - cam.y * cam.z * s.z * 0.15) % H + H) % H;
     ctx.globalAlpha = 0.25 + 0.35 * s.z * (0.6 + 0.4 * Math.sin(T * 1.3 + s.p));
-    ctx.fillStyle = '#9fc6ff'; ctx.fillRect(x, y, s.z * 1.6, s.z * 1.6);
+    ctx.fillStyle = C('#9fc6ff'); ctx.fillRect(x, y, s.z * 1.6, s.z * 1.6);
   });
   ctx.globalAlpha = 1;
   drawGrid();
   const focusing = state.mode === 'focus';
+  // all-networks map: a solid ring round each network's reports, with its name under it ...
+  nets.forEach(nt => {
+    const [x, y] = toS(nt.x * (focusing ? 2.4 : 1), nt.y * (focusing ? 2.4 : 1));
+    ctx.globalAlpha = focusing ? 0.04 : 0.45; ctx.strokeStyle = C('#e4ecfa'); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(x, y, nt.r * cam.z, 0, Math.PI * 2); ctx.stroke();
+  });
+  // ... and one dashed ring per report's island
+  islands.forEach(isl => {
+    if (!isl) return;
+    const [x, y] = toS(isl.x * (focusing ? 2.4 : 1), isl.y * (focusing ? 2.4 : 1));
+    ctx.globalAlpha = focusing ? 0.04 : 0.7;
+    ctx.strokeStyle = 'rgba(120,170,255,.35)'; ctx.lineWidth = 1.4; ctx.setLineDash([10, 6]);
+    ctx.beginPath(); ctx.arc(x, y, isl.r * cam.z, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  });
+  ctx.globalAlpha = 1;
   // subnet halos
   clusters.forEach(c => {
     const [x, y] = toS(c.x * (focusing ? 2.4 : 1), c.y * (focusing ? 2.4 : 1));
     ctx.globalAlpha = focusing ? 0.05 : 0.5;
-    ctx.strokeStyle = 'rgba(120,170,255,.22)'; ctx.setLineDash([3, 6]); ctx.lineWidth = 1;
+    const cn = subnetNet(c.subnet), cloud = cn && cn.cloud;
+    ctx.strokeStyle = cloud ? 'rgba(228,236,250,.55)' : CALM ? 'rgba(150,152,156,.28)' : 'rgba(120,170,255,.22)'; ctx.setLineDash(cloud ? [8, 4] : [3, 6]); ctx.lineWidth = cloud ? 1.6 : 1;
     ctx.beginPath(); ctx.arc(x, y, c.r * cam.z, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    if (!focusing && cam.z > 0.35) { ctx.fillStyle = '#6f86a6'; ctx.font = '11px ui-monospace,Menlo,monospace'; ctx.textAlign = 'center';
-      ctx.fillText(c.subnet, x, y - c.r * cam.z - 6); }
+    if (!focusing && cam.z > 0.35) { ctx.fillStyle = C('#6f86a6'); ctx.font = '11px ui-monospace,Menlo,monospace'; ctx.textAlign = 'center';
+      ctx.fillText(shown(c.subnet), x, y - c.r * cam.z - 6);
+      if (cloud) { ctx.fillStyle = cloud ? CLOUD_COL : C('#8fa3c0'); ctx.font = '600 11px ui-monospace,Menlo,monospace'; ctx.fillText(netTag(cn), x, y - c.r * cam.z - 20); } }
   });
   ctx.globalAlpha = 1;
   // overview links
@@ -233,7 +558,7 @@ function frame(now) {
     const al = Math.min(l.a.a, l.b.a) * (focusing ? 0.15 : 1);
     if (al < 0.02) return;
     const [x1, y1] = toS(l.a.x, l.a.y), [x2, y2] = toS(l.b.x, l.b.y);
-    ctx.globalAlpha = al * 0.22; ctx.strokeStyle = '#6ea8ff'; ctx.lineWidth = 0.6 + Math.min(2.5, Math.log10(1 + l.w));
+    ctx.globalAlpha = al * 0.22; ctx.strokeStyle = C('#6ea8ff'); ctx.lineWidth = 0.6 + Math.min(2.5, Math.log10(1 + l.w));
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
   });
   ctx.globalAlpha = 1;
@@ -249,7 +574,7 @@ function frame(now) {
     ctx.shadowColor = e.color; ctx.shadowBlur = e.dashed || e.small ? 0 : 8;
     ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.quadraticCurveTo(p[2], p[3], p[4], p[5]); ctx.stroke();
     ctx.setLineDash([]); ctx.shadowBlur = 0;
-    if (!e.small || (hl && lit)) arrow(p, e.color, al * (lit ? 1 : 0.2), e.b.r * cam.z);
+    if (e.kind !== 'dns' && (!e.small || (hl && lit))) arrow(p, e.color, al * (lit ? 1 : 0.2), e.b.r * cam.z);
     if (e.parts.length) {
       ctx.globalCompositeOperation = 'lighter';
       e.parts.forEach((t, i) => {
@@ -257,7 +582,7 @@ function frame(now) {
         const [x, y] = qpt(p, t);
         const r = 1.6 + e.w * 0.5;
         const gr = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
-        gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.3, e.color); gr.addColorStop(1, 'rgba(0,0,0,0)');
+        gr.addColorStop(0, C('#ffffff')); gr.addColorStop(0.3, e.color); gr.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.globalAlpha = al * (lit ? 0.95 : 0.15); ctx.fillStyle = gr;
         ctx.beginPath(); ctx.arc(x, y, r * 3, 0, Math.PI * 2); ctx.fill();
       });
@@ -275,13 +600,156 @@ function frame(now) {
     const [x, y] = toS(n.x, n.y);
     for (let i = 0; i < cnt; i++) {
       const ang = T * (0.4 + i * 0.03) + i * (Math.PI * 2 / cnt), rr = (n.r + 9 + (i % 3) * 4) * cam.z;
-      ctx.globalAlpha = n.a * 0.8; ctx.fillStyle = n.d.alert && i === 0 ? '#ff3b5c' : '#ffc857';
+      ctx.globalAlpha = n.a * 0.8; ctx.fillStyle = n.d.alert && i === 0 ? C('#ff3b5c') : C('#ffc857');
       ctx.beginPath(); ctx.arc(x + rr * Math.cos(ang), y + rr * Math.sin(ang), Math.max(1.2, 1.6 * cam.z), 0, 7); ctx.fill();
     }
   });
   ctx.globalAlpha = 1;
+  // network and report names last, over hosts and their labels
+  if (!focusing && state.labels && islands.length) mapLabels(toS, 'flat', 24, 20);
   if (focusing) sideTitles();
   requestAnimationFrame(frame);
+}
+// Names of the outside addresses on the 3D arc, busiest address first: left of the address, else right of
+// it, then over or under it, a row further out each time, wherever it covers neither the arc's title, a
+// name already placed, nor another named or IOC-ringed address. An address with no room anywhere shows
+// its name only when hovered.
+let inetTitle = [];
+function arcLabels(on) {
+  inetNodes.forEach(n => { n.lab = null; });
+  if (!on) return;
+  labelSpan = openSpan();
+  const ioc = n => iocIds.has('ip:' + n.d.id);
+  const marks = inetNodes.filter(n => n.a > 0.5 && (n.labelled || ioc(n))).map(n => {
+    const [x, y, sc] = P(n), r = Math.max(2, n.r * sc), g = r + (ioc(n) ? 8 : 2);
+    return {n, x, y, r, gap: r + (ioc(n) ? 6 : 0), box: {x0: x - g, x1: x + g, y0: y - g, y1: y + g}};
+  });
+  const names = [...inetTitle];
+  ctx.font = '12px system-ui,-apple-system,Segoe UI,sans-serif';
+  inetRanked.forEach(n => {
+    const m = n.labelled && marks.find(o => o.n === n);
+    if (!m) return;
+    const {x, y, r, gap} = m, boxes = names.concat(marks.filter(o => o !== m).map(o => o.box));
+    n.lab = place(n, 'arc', [(l, w) => [x - r - 8 - w / 2, y + 4], (l, w) => [x + r + 8 + w / 2, y + 4],
+      ...[0, 1, 2].flatMap(k => [() => [x, y - gap - 9 - 22 * k], () => [x, y + gap + 18 + 22 * k]])],
+      1, ctx.measureText(nodeLabel(n)).width, boxes, []);
+    if (n.lab) names.push(boxes[boxes.length - 1]);
+  });
+}
+// All-networks map labels. Each network's name goes under its ring (over it when under would land on
+// another network), then each report's name beside its island, biggest island first: under it, else over
+// it, right of it or left of it, wherever it covers no other island and no label already placed. A label
+// with no room anywhere loses its second line, or is left out until zooming in makes room. `at` maps a
+// point on the plane to [screen x, y]; `key` names the view, for place().
+function mapLabels(at, key, netGap, islandGap, al = 1) {
+  const boxes = [], netFeet = nets.map(nt => footprint(at, nt));
+  labelSpan = openSpan();
+  const off = f => f.cx + f.rx < labelSpan[0] || f.cx - f.rx > labelSpan[1] || f.cy + f.ry < -40 || f.cy - f.ry > H + 40;
+  nets.forEach((nt, i) => { if (!off(netFeet[i])) netRingLabel(nt, key, spotsAround(netFeet[i], netGap).slice(0, 2), al, boxes, netFeet.filter(f => f !== netFeet[i])); });
+  const all = islands.filter(Boolean), feet = all.map(isl => footprint(at, isl));
+  all.map((isl, i) => [isl, feet[i]]).sort(([a], [b]) => b.r - a.r || a.k - b.k).forEach(([isl, f]) => {
+    if (!off(f)) islandLabel(isl, key, spotsAround(f, islandGap), al, f.rx, boxes, feet.filter(o => o !== f));
+  });
+}
+// where a ring of radius r round (x, y) lies on screen, as an ellipse (a circle in Flat)
+function footprint(at, {x, y, r}) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < 16; i++) {
+    const [sx, sy] = at(x + r * Math.cos(i * Math.PI / 8), y + r * Math.sin(i * Math.PI / 8));
+    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+  }
+  return {cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, rx: Math.max(1, (x1 - x0) / 2), ry: Math.max(1, (y1 - y0) / 2)};
+}
+// the spots round a footprint for a label, as functions of its line count and width that give its first
+// baseline: under the ring, over it, right of it, left of it
+function spotsAround(f, gap) {
+  const mid = n => f.cy + 5 - (n - 1) * 8;
+  return [n => [f.cx, f.cy + f.ry + gap], n => [f.cx, f.cy - f.ry - gap + 10 - (n - 1) * 16],
+    (n, w) => [f.cx + f.rx + 8 + w / 2, mid(n)], (n, w) => [f.cx - f.rx - 8 - w / 2, mid(n)]];
+}
+// the first spot where a label fits. A label leaves the spot it had last frame (kept per view in o.at)
+// for a better one only with room to spare, so it does not flick between two while the 3D view turns.
+function place(o, key, spots, lines, w, boxes, feet) {
+  const last = (o.at || (o.at = {}))[key];
+  for (let i = 0; i < spots.length; i++) {
+    const [x, y] = spots[i](lines, w);
+    if (claim(boxes, x, y, w, lines, feet, last != null && i < last ? 10 : 0)) { o.at[key] = i; return [x, y]; }
+  }
+  return null;
+}
+// the part of the canvas that no side panel covers, [left, right]: map labels stay inside it
+let labelSpan = [0, 0];
+function openSpan() {
+  const box = id => { const el = $(id); if (!el || el.hidden) return null; const b = el.getBoundingClientRect(); return b.width && b.height ? b : null; };
+  let l = 0, r = W;
+  const rail = W > 900 && box('rail'); if (rail) l = rail.right;
+  for (const id of ['panel', 'analyst-chat']) { const b = box(id); if (b && b.left > W / 2) r = Math.min(r, b.left); }
+  return [l, r];
+}
+const labelBox = (x, y, w, lines) => ({x0: x - w / 2 - 6, x1: x + w / 2 + 6, y0: y - 14, y1: y + 4 + (lines - 1) * 16});
+// a label of width w whose first baseline is at y and that has `lines` lines, if it is clear of the side
+// panels and covers no box yet taken and none of the footprints in `feet`, with `pad` pixels to spare
+// (it then takes its own box)
+function claim(boxes, x, y, w, lines, feet = [], pad = 0) {
+  const b = labelBox(x, y, w, lines);
+  const t = {x0: b.x0 - pad, x1: b.x1 + pad, y0: b.y0 - pad, y1: b.y1 + pad};
+  if (x - w / 2 < labelSpan[0] || x + w / 2 > labelSpan[1]) return false;
+  if (boxes.some(o => t.x0 < o.x1 && o.x0 < t.x1 && t.y0 < o.y1 && o.y0 < t.y1)) return false;
+  if (feet.some(f => {     // the box's nearest point to the ellipse's centre, with y scaled to make it a circle
+    const dx = Math.max(t.x0, Math.min(f.cx, t.x1)) - f.cx, dy = (Math.max(t.y0, Math.min(f.cy, t.y1)) - f.cy) * f.rx / f.ry;
+    return dx * dx + dy * dy < f.rx * f.rx;
+  })) return false;
+  boxes.push(b);
+  return true;
+}
+// an island's name beside its ring: the network, then the report, its date and how many hosts it has.
+// Inside a network's ring, which carries the network's name, it is the report's name less the network's
+// ("Corvane Phoenix plant" is "Phoenix plant"), with the rest only when the island is big enough on screen.
+function islandLabel(isl, key, spots, al, px, boxes, feet) {
+  const r = isl.info, same = netKey(r.network) === netKey(r.name);
+  const t1 = isl.grouped ? siteName(r) : r.network.toUpperCase();
+  const f1 = isl.grouped ? '700 12px ui-monospace,Menlo,monospace' : '700 13px ui-monospace,Menlo,monospace', f2 = '10.5px ui-monospace,Menlo,monospace';
+  const bits = [(same || isl.grouped ? '' : r.name + ' · ') + (r.generated || '').slice(0, 10), `${r.drawn.toLocaleString()} host${r.drawn === 1 ? '' : 's'}` +
+    (r.drawn < r.nodes ? ` of ${r.nodes.toLocaleString()}` : '')];
+  const t2 = bits.join(' · ');
+  ctx.font = f1; const w1 = ctx.measureText(t1).width;
+  ctx.font = f2; const w2 = ctx.measureText(t2).width;
+  let two = !isl.grouped || px >= 90, pos = two && place(isl, key, spots, 2, Math.max(w1, w2), boxes, feet);
+  if (!pos) { two = false; pos = place(isl, key, spots, 1, w1, boxes, feet); }
+  if (!pos) return;
+  const [x, y] = pos;
+  ctx.globalAlpha = al; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = LABEL_HALO;
+  ctx.font = f1; ctx.fillStyle = C('#e6f1ff');
+  ctx.strokeText(t1, x, y); ctx.fillText(t1, x, y);
+  if (two) {
+    ctx.font = f2; ctx.fillStyle = C('#9fb3cc');
+    ctx.strokeText(t2, x, y + 15); ctx.fillText(t2, x, y + 15);
+  }
+  ctx.globalAlpha = 1;
+}
+// a report's name without its network's in front ("Corvane Phoenix plant" -> "Phoenix plant")
+function siteName(r) {
+  const name = String(r.name || ''), net = String(r.network || '').trim();
+  const rest = net && name.toLowerCase().startsWith(net.toLowerCase() + ' ') ? name.slice(net.length).trim() : '';
+  return rest || name;
+}
+// a network's name under its ring (over it if under has no room), then how many reports and hosts it
+// has. It is always drawn: islands' labels give way to it.
+function netRingLabel(nt, key, spots, al, boxes, feet) {
+  const t1 = nt.name.toUpperCase();
+  const bits = [`${nt.ks.length} reports`, `${nt.hosts.toLocaleString()} host${nt.hosts === 1 ? '' : 's'}` +
+    (nt.hosts < nt.total ? ` of ${nt.total.toLocaleString()}` : '')];
+  const t2 = bits.join(' · ');
+  ctx.font = '700 16px ui-monospace,Menlo,monospace'; const w1 = ctx.measureText(t1).width;
+  ctx.font = '11px ui-monospace,Menlo,monospace'; const w2 = ctx.measureText(t2).width;
+  const w = Math.max(w1, w2), pos = place(nt, key, spots, 2, w, boxes, feet), [x, y] = pos || spots[0](2, w);
+  if (!pos) boxes.push(labelBox(x, y, w, 2));
+  ctx.globalAlpha = al; ctx.textAlign = 'center'; ctx.lineWidth = 5; ctx.strokeStyle = LABEL_HALO;
+  ctx.font = '700 16px ui-monospace,Menlo,monospace'; ctx.fillStyle = C('#e6f1ff');
+  ctx.strokeText(t1, x, y); ctx.fillText(t1, x, y);
+  ctx.font = '11px ui-monospace,Menlo,monospace'; ctx.fillStyle = C('#9fb3cc'); ctx.lineWidth = 4;
+  ctx.strokeText(t2, x, y + 17); ctx.fillText(t2, x, y + 17);
+  ctx.globalAlpha = 1;
 }
 function drawGrid() {
   const step = 120 * cam.z; if (step < 24) return;
@@ -301,62 +769,91 @@ function arrow(p, color, al, rb) {
   ctx.lineTo(ax - 9 * Math.cos(ang - 0.4), ay - 9 * Math.sin(ang - 0.4));
   ctx.lineTo(ax - 9 * Math.cos(ang + 0.4), ay - 9 * Math.sin(ang + 0.4)); ctx.closePath(); ctx.fill();
 }
+function nodeLabel(n) {
+  if (n.domain) return n.d.id.length > 24 ? n.d.id.slice(0, 23) + '…' : n.d.id;
+  return n.ext ? n.d.id : (n.d.name ? n.d.name.split('.')[0] : shown(n.d.id));
+}
 function drawNode(n, T) {
-  const [x, y] = toS(n.x, n.y), r = Math.max(2, n.r * cam.z);
-  if (x < -80 || y < -80 || x > W + 80 || y > H + 80) return;
-  const sel = state.focus === n.id, hov = state.hover === n;
+  const [x, y, sc] = P(n), r = Math.max(2, n.r * sc);
+  if (!(x > -80 && y > -80 && x < W + 80 && y < H + 80)) return;
+  const sel = state.focus === n.id, hov = state.hover === n, gl = !!R3;
   ctx.globalAlpha = n.a;
-  if (sel) {   // radar rings and sweep on the selected host
-    for (let i = 0; i < 3; i++) {
+  if (sel) {   // radar rings and sweep on the selected host (3D draws its rings in the scene)
+    for (let i = 0; i < 3 && !gl; i++) {
       const ph = ((T * 0.6 + i / 3) % 1);
       ctx.globalAlpha = n.a * (1 - ph) * 0.6; ctx.strokeStyle = n.color; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(x, y, r + ph * 90 * cam.z, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, r + ph * 90 * sc, 0, 7); ctx.stroke();
     }
     if (state.motion) {
       const sw = ctx.createConicGradient ? ctx.createConicGradient(T * 1.4, x, y) : null;
       if (sw) { sw.addColorStop(0, 'rgba(46,230,214,.22)'); sw.addColorStop(0.12, 'rgba(46,230,214,0)'); sw.addColorStop(1, 'rgba(46,230,214,0)');
-        ctx.globalAlpha = n.a; ctx.fillStyle = sw; ctx.beginPath(); ctx.arc(x, y, 160 * cam.z, 0, 7); ctx.fill(); }
+        ctx.globalAlpha = n.a * (gl ? 0.7 : 1); ctx.fillStyle = sw; ctx.beginPath(); ctx.arc(x, y, 160 * sc, 0, 7); ctx.fill(); }
     }
     ctx.globalAlpha = n.a;
   }
   ctx.shadowColor = n.color; ctx.shadowBlur = (sel ? 30 : hov ? 22 : 12);
-  if (n.ext) {   // outside sources are diamonds
-    ctx.fillStyle = n.info.kind === 'blocked' ? 'rgba(20,30,46,.9)' : n.color;
+  if (gl) {
+    ctx.shadowBlur = 0;
+    if (n.domain) { ctx.strokeStyle = C('#2ee6d6'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r + 6, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = C('#2ee6d6'); ctx.font = '700 10px ui-monospace,Menlo,monospace'; ctx.textAlign = 'center'; ctx.fillText('D', x, y + 3); }
+    else if (n.ext) { if (iocIds.has('ip:' + n.d.id)) { ctx.strokeStyle = C('#2ee6d6'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r + 6, 0, Math.PI * 2); ctx.stroke(); } }
+    else if (n.d.observed && n.d.ev) { ctx.strokeStyle = n.d.ev === 'likely' ? C('#ff3b5c') : C('#ffd23f'); ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(x, y, r + 5, T % 7, T % 7 + 6.28); ctx.stroke(); ctx.setLineDash([]); }
+  } else if (n.domain) { // source-linked DNS observations are separate from network traffic nodes
+    ctx.fillStyle = HOLLOW || 'rgba(8,40,48,.95)'; ctx.strokeStyle = C('#2ee6d6'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(x, y, r + 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = C('#2ee6d6'); ctx.font = '700 10px ui-monospace,Menlo,monospace'; ctx.textAlign = 'center';
+    ctx.fillText('D', x, y + 3);
+  } else if (n.ext) {   // outside sources are diamonds
+    ctx.fillStyle = n.info.kind === 'blocked' ? (HOLLOW || 'rgba(20,30,46,.9)') : n.color;
     ctx.strokeStyle = n.color; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(x, y - r * 1.25); ctx.lineTo(x + r * 1.25, y); ctx.lineTo(x, y + r * 1.25); ctx.lineTo(x - r * 1.25, y); ctx.closePath();
     ctx.fill(); ctx.stroke();
-  } else if (!n.d.scanned) {
-    ctx.fillStyle = 'rgba(14,22,36,.9)'; ctx.strokeStyle = '#8da2b5'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 2]);
+    if (iocIds.has('ip:' + n.d.id)) {
+      ctx.strokeStyle = C('#2ee6d6'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, r + 6, 0, Math.PI * 2); ctx.stroke();
+    }
+  } else if (!n.d.observed) {
+    ctx.fillStyle = HOLLOW || 'rgba(14,22,36,.9)'; ctx.strokeStyle = C('#8da2b5'); ctx.lineWidth = 1.5; ctx.setLineDash([2, 2]);
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
   } else {
     const gr = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-    gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.25, n.color); gr.addColorStop(1, shade(n.color));
+    gr.addColorStop(0, C('#ffffff')); gr.addColorStop(0.25, n.color); gr.addColorStop(1, shade(n.color));
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
-    if (n.d.ev) { ctx.shadowBlur = 0; ctx.strokeStyle = n.d.ev === 'likely' ? '#ff3b5c' : '#ffd23f'; ctx.lineWidth = 2;
+    if (n.d.ev) { ctx.shadowBlur = 0; ctx.strokeStyle = n.d.ev === 'likely' ? C('#ff3b5c') : C('#ffd23f'); ctx.lineWidth = 2;
       ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(x, y, r + 5, T % 7, T % 7 + 6.28); ctx.stroke(); ctx.setLineDash([]); }
   }
   ctx.shadowBlur = 0;
-  if (hov && !sel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 4, 0, 7); ctx.stroke(); }
+  if (COMBINED && !n.ext && !n.domain && iocCounts[n.id]) {   // all-networks map: IOC hosts ringed teal
+    const gap = Math.max(1.5, Math.min(1, sc * 2.5) * 4);
+    ctx.strokeStyle = C('#2ee6d6'); ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(x, y, r + gap, 0, 7); ctx.stroke();
+  }
+  if (hov && !sel) { ctx.strokeStyle = LIGHT ? '#1b1c1e' : '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 4, 0, 7); ctx.stroke(); }
   // labels
-  const show = state.labels && (sel || hov || (state.mode === 'focus' ? n.a > 0.5 && !n.small : (n.d.scanned && (cam.z > 0.55 || n.d.pri === 'P1'))));
+  const show = state.labels && (sel || hov || (n.inet ? n.labelled && n.a > 0.5 && (!R3 || !!n.lab) :
+    state.mode === 'focus' ? n.a > 0.5 && !n.small : (n.d.observed && (sc > 0.55 || (n.d.pri === 'P1' && (!R3 || fewP1 || n.d.ev))))));
   if (show) {
-    const name = n.ext ? n.d.id : (n.d.name ? n.d.name.split('.')[0] : n.d.id);
+    const name = nodeLabel(n);
     ctx.font = (sel ? '600 14px' : '12px') + ' system-ui,-apple-system,Segoe UI,sans-serif';
-    const side = n.ext ? 'right' : (state.mode === 'focus' && n.id !== state.focus && n.info) ? 'left' : 'center';
+    const side = n.inet && R3 && n.lab ? 'center' : n.domain ? 'center' : n.ext ? 'right' :
+      (state.mode === 'focus' && n.id !== state.focus && n.info) ? 'left' : 'center';
     ctx.textAlign = side;
-    const lx = side === 'right' ? x - r - 8 : side === 'left' ? x + r + 8 : x, ly = side === 'center' ? y + r + 15 : y + 4;
-    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(3,6,12,.85)'; ctx.strokeText(name, lx, ly);
-    ctx.fillStyle = sel ? '#ffffff' : '#d6e4f5'; ctx.fillText(name, lx, ly);
+    const [lx, ly] = n.inet && R3 && n.lab ? n.lab :
+      [side === 'right' ? x - r - 8 : side === 'left' ? x + r + 8 : x, side === 'center' ? y + r + 15 : y + 4];
+    ctx.lineWidth = 4; ctx.strokeStyle = LABEL_HALO; ctx.strokeText(name, lx, ly);
+    ctx.fillStyle = sel ? (LIGHT ? '#000000' : C('#ffffff')) : C('#d6e4f5'); ctx.fillText(name, lx, ly);
     // tight columns: keep everything on one line so neighbouring rows don't collide
-    const tight = state.mode === 'focus' && !sel && (n.gap || 99) * cam.z < 42;
+    const tight = state.mode === 'focus' && !sel && (n.gap || 99) * sc < 42;
     if (tight && n.info && n.info.band && side === 'left') {
       const nw = ctx.measureText(name).width;
       ctx.font = '600 10.5px ui-monospace,Menlo,monospace'; ctx.fillStyle = BAND[n.info.band];
       const t = n.info.band === 'None' ? 'NO SESSION' : (n.info.p * 100).toFixed(0) + '% ' + n.info.band.toUpperCase();
       ctx.strokeText(t, lx + nw + 8, ly); ctx.fillText(t, lx + nw + 8, ly);
     } else if ((sel || state.mode === 'focus') && !n.ext && n.d.name) {
-      ctx.font = '10.5px ui-monospace,Menlo,monospace'; ctx.fillStyle = '#7f95b3';
-      ctx.strokeText(n.d.id, lx, ly + 13); ctx.fillText(n.d.id, lx, ly + 13);
+      ctx.font = '10.5px ui-monospace,Menlo,monospace'; ctx.fillStyle = C('#7f95b3');
+      ctx.strokeText(shown(n.d.id), lx, ly + 13); ctx.fillText(shown(n.d.id), lx, ly + 13);
     }
     if (state.mode === 'focus' && n.info && n.info.band && !sel && !tight) {
       ctx.font = '600 10.5px ui-monospace,Menlo,monospace'; ctx.fillStyle = BAND[n.info.band];
@@ -369,21 +866,293 @@ function drawNode(n, T) {
 function shade(hex) { const c = parseInt(hex.slice(1), 16); return `rgb(${(c >> 16 & 255) * 0.35 | 0},${(c >> 8 & 255) * 0.35 | 0},${(c & 255) * 0.35 | 0})`; }
 function sideTitles() {
   const F = D.focus[state.focus]; if (!F) return;
-  ctx.font = '600 11px ui-monospace,Menlo,monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#7f95b3';
+  ctx.font = '600 11px ui-monospace,Menlo,monospace'; ctx.textAlign = 'center'; ctx.fillStyle = C('#7f95b3');
   let top = 0;
   nodes.forEach(n => { if (n.ta > 0.5 && n.id !== state.focus) top = Math.min(top, n.ty); });
-  const [cx, ly0] = toS(0, top - 46), ly = Math.max(96, ly0);
+  const [cx, ly0] = Pw(0, top - 46, 0), ly = Math.max(96, ly0);
   const lx = cx - 30, rx = cx + 30;
   ctx.globalAlpha = 0.9;
-  const more = (n, shown) => n > shown ? `  (+${n - shown} in panel)` : '';
+  // the all-networks map keeps only the top of each list: the rest is in the report's own Explorer
+  const more = (n, drawn, listed) => COMBINED ? (n > drawn ? `  (+${n - drawn} in its report's Explorer)` : '') :
+    (listed > drawn ? `  (+${listed - drawn} in panel)` : '') + (n > listed ? `  (+${n - listed} not in this page)` : '');
   ctx.textAlign = 'right';
-  const lt = `◀ NORTH / SOUTH · ${F.attackers_total} OUTSIDE ADDRESS${F.attackers_total === 1 ? '' : 'ES'}${more(F.attackers_total, Math.min(SIDE_MAX, F.attackers.length))}`;
+  const lt = `◀ NORTH / SOUTH · ${F.attackers_total} OUTSIDE ADDRESS${F.attackers_total === 1 ? '' : 'ES'}${more(F.attackers_total, Math.min(SIDE_MAX, F.attackers.length), F.attackers.length)}`;
   const minL = (W > 900 ? 290 : 10) + ctx.measureText(lt).width;
   const lxe = Math.max(lx, minL);
   ctx.fillText(lt, lxe, Math.max(90, ly));
   ctx.textAlign = 'left';
-  ctx.fillText(`EAST / WEST · ${F.peers_total} INTERNAL HOST${F.peers_total === 1 ? '' : 'S'}${more(F.peers_total, Math.min(SIDE_MAX, F.peers.length))} ▶`, Math.max(rx, lxe + 28), Math.max(90, ly));
+  ctx.fillText(`EAST / WEST · ${F.peers_total} INTERNAL HOST${F.peers_total === 1 ? '' : 'S'}${more(F.peers_total, Math.min(SIDE_MAX, F.peers.length), F.peers.length)} ▶`, Math.max(rx, lxe + 28), Math.max(90, ly));
   ctx.globalAlpha = 1;
+}
+
+// ---------------------------------------------------------------- 3D (Three.js) drawing
+function rotateView(dir) { view.spin = false; view.oyaw += dir * Math.PI / 4; placeInet(view.oyaw); markView(); }
+function setView(name, reset) {
+  view.opitch = VIEWS[name];
+  if (reset) { view.oyaw = 0; placeInet(0); fitOverview(); }
+  view.spin = !!reset;
+  markView();
+}
+// back to the opening camera: Low view, facing front, slowly turning left (not under Reduce motion)
+function homeView() { view.opitch = VIEWS[DEFAULT_VIEW]; view.oyaw = 0; placeInet(0); view.spin = true; markView(); }
+function stopSpin() { if (view.spin) { view.spin = false; markView(); } }
+function markView() {
+  for (const name of Object.keys(VIEWS)) {
+    const b = $('vc-' + name); if (b) b.setAttribute('aria-pressed', String(Math.abs(view.opitch - VIEWS[name]) < 0.02));
+  }
+  const sp = $('vc-spin'); if (sp) sp.setAttribute('aria-pressed', String(view.spin && state.motion));
+}
+function set3d(on, remember) {
+  on = !!on && can3d;
+  if (on && !R3inst) {
+    try { R3inst = window.VF3D.create(cv3, {bgIn: BG_IN, bgOut: BG_OUT, calm: CALM, light: LIGHT, onLost: () => set3d(false, false)}); R3inst.setSize(W, H, DPR); }
+    catch (err) { console.warn('3D view unavailable, using 2D', err); R3inst = null; on = false; }
+  }
+  R3 = on ? R3inst : null;
+  if (cv3) cv3.hidden = !on;
+  document.body.classList.toggle('gl3d', on);
+  markSeg();
+  if (remember) { try { localStorage.setItem(KEY3D, on ? '1' : '0'); } catch (_) {} }
+  if (on && remember && state.motion) view.dist = 1.6;
+  if (on && remember) homeView();   // entering 3D always starts on Low, slowly turning left
+  if (state.mode === 'focus') focus(state.focus, 'resize'); else { showInet(on); fitOverview(); }
+  if (!state.motion) snap();
+}
+const RGB = hex => window.VF3D.rgb(hex);
+// the 2D view's curve between two nodes, lifted towards the camera in proportion to its length
+function edgeCurve(e) {
+  const a = e.a, b = e.b, dx = b.x - a.x, dy = b.y - a.y, k = e.bend ? 0.28 : 0.1;
+  return [a.x, a.y, a.z, (a.x + b.x) / 2 - dy * k, (a.y + b.y) / 2 + dx * k, (a.z + b.z) / 2 + Math.hypot(dx, dy) * 0.12, b.x, b.y, b.z];
+}
+const qb = (c, t) => { const u = 1 - t, A = u * u, B = 2 * u * t, C = t * t;
+  return [A * c[0] + B * c[3] + C * c[6], A * c[1] + B * c[4] + C * c[7], A * c[2] + B * c[5] + C * c[8]]; };
+const HALO = RGB(C('#78aaff')), CLOUD_RGB = RGB(CLOUD_COL), NET_RGB = RGB(C('#e4ecfa'));
+const RISK2 = RGB(C('#ff2e88')), RISK1 = RGB(C('#ffb020')), BUNDLE = RGB(C('#6ea8ff')), BUNDLE_LAT = RGB(C('#ff8a3d')),
+  RING = RGB(C('#2ee6d6')), P_CRIT = RGB(C('#ff3b5c')), P_HIGH = RGB(C('#ff8a3d'));
+// On Light's white canvas lines don't add up to light, so faint ones wash out: thin traffic is drawn more
+// opaque there, and rings, pillars and the internet arc get LK times their usual strength.
+const BEAM_ALPHA = LIGHT ? {alert: 0.9, vuln: 0.34, reached: 0.24, outbound: 0.24, attempt: 0.14, blocked: 0.12}
+  : {alert: 0.85, vuln: 0.13, reached: 0.08, outbound: 0.08, attempt: 0.04, blocked: 0.035};
+const OUT_BEAM = RGB(RETURN), OUT_ALPHA = LIGHT ? 0.3 : 0.15, LK = LIGHT ? 1.7 : 1;
+// a paler shade of a beam colour for the dots that run along it (the same colour on Light's white canvas)
+const PALER = new Map();
+const paler = col => LIGHT ? col : PALER.get(col) || PALER.set(col, col.map(v => v + (1 - v) * 0.45)).get(col);
+// which way a host's traffic with an outside address went: in, out or both (older data has no 4th field)
+const beamDir = t => t[3] || (t[1] === 'outbound' ? 'out' : 'in');
+// Overview: subnet platforms on one plane, hosts as pillars whose height is risk, traffic between
+// subnets bundled beneath the plane, only risky host paths drawn bright, and the internet as a ring
+// overhead with beams down to the hosts each outside address reached, and violet beams rising from
+// hosts that connected out to it.
+function overviewScene(L, T, cm, cs, cdz) {
+  const flows = [];
+  if (cm < 0.01) return flows;
+  const hc = state.hoverCluster, hn = state.hover;
+  clusters.forEach(c => {
+    const si = subnetInfo.get(c.subnet), col = si && si.likely ? P_CRIT : si && si.p1 ? P_HIGH : HALO;
+    const on = !hc || hc === c;
+    L.circle(c.x * cs, c.y * cs, cdz, c.r, 80, hc === c ? 2.2 : 1.4, col, Math.min(1, LK * cm * (on ? 0.5 : 0.18)), false);
+    L.circle(c.x * cs, c.y * cs, cdz, c.r * 0.97, 80, 0.8, HALO, LK * cm * 0.12, true);
+    const cn = subnetNet(c.subnet);
+    if (cn && cn.cloud) L.circle(c.x * cs, c.y * cs, cdz, c.r * 1.08, 80, 1.6, CLOUD_RGB, cm * (on ? 0.7 : 0.25), true);
+  });
+  // all-networks map: a dashed ring round each report's island and a solid ring round each network's reports
+  islands.forEach(isl => { if (isl) L.circle(isl.x * cs, isl.y * cs, cdz, isl.r, 160, 1.8, HALO, cm * 0.32, true); });
+  nets.forEach(nt => L.circle(nt.x * cs, nt.y * cs, cdz, nt.r, 240, 2.4, NET_RGB, Math.min(1, LK * cm * 0.6), false));
+  // bundled subnet-to-subnet traffic, sagging under the plane; orange share = admin/lateral protocols
+  const maxW = subLinks.reduce((m, l) => Math.max(m, l.w), 1);
+  subLinks.forEach(l => {
+    const a = l.a, b = l.b, ax = a.x * cs, ay = a.y * cs, bx = b.x * cs, by = b.y * cs, len = Math.hypot(bx - ax, by - ay);
+    const lat = l.lw / Math.max(1, l.w), on = !hc || hc === a || hc === b;
+    const al = Math.min(1, LK * cm * (on ? 0.22 + 0.4 * Math.sqrt(l.w / maxW) : 0.06));
+    const col = lat > 0.25 ? BUNDLE_LAT : BUNDLE, c = [ax, ay, cdz, (ax + bx) / 2, (ay + by) / 2, cdz - 60 - len * 0.32, bx, by, cdz];
+    L.quad(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], 24, 1 + Math.min(7, Math.log2(1 + l.w) * 0.6), col, al, false);
+    if (on) flows.push({c, col, al: al * 1.3, size: 3 + Math.min(3, Math.log10(1 + l.w)), speed: 0.05 + (l.w / maxW) * 0.08});
+  });
+  // risk pillars
+  nodes.forEach(n => {
+    if (n.ext || n.domain || n.a < 0.02) return;
+    const base = n.z - n.oz, w = n.d.pri === 'P1' ? 3.2 : n.d.observed ? 2 : 1;
+    L.strip(2, i => [n.x, n.y, i ? n.z : base], w, RGB(n.color), Math.min(1, LK * n.a * cm * (hn === n ? 0.95 : 0.5)), false);
+  });
+  // risky host-to-host paths, from pillar base to pillar base beneath the plane
+  riskyLinks.forEach((l, i) => {
+    if (i >= 60 && !(hn && (hn === l.a || hn === l.b))) return;
+    const a = l.a, b = l.b, al0 = Math.min(a.a, b.a) * cm; if (al0 < 0.02) return;
+    const za = a.z - a.oz, zb = b.z - b.oz, len = Math.hypot(b.x - a.x, b.y - a.y);
+    const on = !hn || hn === a || hn === b, col = l.lvl > 1 ? RISK2 : RISK1;
+    const c = [a.x, a.y, za, (a.x + b.x) / 2, (a.y + b.y) / 2, (za + zb) / 2 - 25 - len * 0.3, b.x, b.y, zb];
+    const al = al0 * (on ? (l.lvl > 1 ? 0.42 : 0.22) * (hn ? 2 : 1) : 0.04);
+    L.quad(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], 16, 0.9 + Math.min(1.8, Math.log10(1 + l.w) * 0.7), col, al, false);
+    if (on && al > 0.1) flows.push({c, col, al, size: 3.4, speed: 0.12 + (hash01(a.id + b.id) * 0.1)});
+  });
+  // the internet ring and its beams
+  if (inetNodes.length) {
+    const arcAt = (f, dz) => { const ang = arcCenter(view.yaw) - (f - 0.5) * ARC;
+      return [ring.cx + ring.R * 1.08 * Math.cos(ang), ring.cy + ring.R * 1.08 * Math.sin(ang), ring.z + dz]; };
+    L.strip(61, i => arcAt(i / 60, -14), LIGHT ? 1.5 : 1.1, RING, LK * cm * 0.25, true);
+    L.strip(61, i => arcAt(i / 60, 66), 0.7, RING, LK * cm * 0.1, false);
+    // On the all-networks map every solid beam holds its place and carries one slow, faint dot that shows
+    // which way the traffic went (down from the address, up from the host), like the traffic between the
+    // subnets below; a report's own map runs brighter dots on its alert and outbound beams. On a dark
+    // canvas the dot is a paler shade of its beam, so it still shows on a bright alert beam.
+    const calm = (fade, base, col, c, speed) => flows.push({c, col: paler(col), al: fade * Math.min(0.65, Math.max(0.3, base)), size: 3.4, speed});
+    inetNodes.forEach(n => {
+      if (n.a < 0.02) return;
+      n.info.targets.forEach(t => {
+        const h = nodes.get(t[0]); if (!h || h.a < 0.02) return;
+        const on = !hn || hn === n || hn === h, dir = beamDir(t), w = 0.9 + Math.min(2.2, Math.log2(1 + t[2]) * 0.3);
+        const fade = Math.min(n.a, h.a) * cm;
+        if (dir !== 'out') {   // inbound: from the address down to the host
+          const al = fade * BEAM_ALPHA[t[1]] * (on ? (hn ? 1.4 : 1) : 0.12);
+          const c = [n.x, n.y, n.z, (n.x + h.x) / 2, (n.y + h.y) / 2, (n.z + h.z) / 2 + 60, h.x, h.y, h.z];
+          const col = RGB(KIND[t[1]]), dashed = t[1] === 'blocked' || t[1] === 'attempt';
+          L.quad(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], 14, w, col, al, dashed);
+          if (COMBINED) { if (!dashed && on) calm(fade, BEAM_ALPHA[t[1]] * (hn ? 2 : 1.4), col, c, 0.07); }
+          else if (!dashed && on && (t[1] === 'alert' || t[1] === 'vuln' || hn)) flows.push({c, col, al: Math.min(1, al * 1.4), size: 3.2, speed: 0.18});
+        }
+        if (dir !== 'in') {    // outbound: from the host up to the address, on a slightly higher curve
+          const al = fade * (t[1] === 'alert' ? 0.6 : OUT_ALPHA) * (on ? (hn ? 1.6 : 1) : 0.12);
+          const c = [h.x, h.y, h.z, (n.x + h.x) / 2, (n.y + h.y) / 2, (n.z + h.z) / 2 + 130, n.x, n.y, n.z];
+          L.quad(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], 14, w, OUT_BEAM, al, false);
+          if (COMBINED) { if (on) calm(fade, (t[1] === 'alert' ? 0.6 : OUT_ALPHA) * (hn ? 3 : 2), OUT_BEAM, c, 0.06); }
+          else if (on) flows.push({c, col: OUT_BEAM, al: Math.min(1, al * 2.2), size: 3, speed: 0.14});
+        }
+      });
+    });
+  }
+  return flows;
+}
+function draw3d(now, dt, k) {
+  const T = now / 1000, focusing = state.mode === 'focus', motion = state.motion;
+  // camera: cinematic tilt over the overview, near front-on (readable labels) when focused
+  const kv = motion ? 1 - Math.pow(0.02, dt) : 1;
+  // slow turn to the left over the overview, until the user takes the camera
+  if (view.spin && motion && !focusing && view.cmix > 0.99) { view.oyaw += SPIN * Math.min(dt, 0.1); placeInet(view.oyaw, !COMBINED); }
+  const tyaw = focusing ? view.fyaw : view.oyaw, tpitch = focusing ? 0.13 + view.fpitch : view.opitch;
+  view.yaw += (tyaw - view.yaw) * kv;
+  view.pitch += (tpitch - view.pitch) * kv;
+  // the closer the camera is to the Low view, the higher the internet arc rides, so on Low it sits centred
+  // in the space above the network instead of crowding it; from Tilted up to Top it stays where it was
+  const lift = ring.R * 0.3 * Math.max(0, Math.min(1, (view.pitch - VIEWS.tilted) / (VIEWS.low - VIEWS.tilted)));
+  if (lift !== ring.lift) { const dz = lift - ring.lift; ring.lift = lift; ring.z += dz; inetNodes.forEach(n => { n.oz += dz; n.tz += dz; n.z += dz; }); }
+  view.dist += (1 - view.dist) * (motion ? 1 - Math.pow(0.05, dt) : 1);
+  view.cmix += ((focusing ? 0 : 1) - view.cmix) * k;
+  // switching between orbit (overview) and front-on (focus) camera models: snap yaw so neither spins
+  if (focusing !== view.wasFocus) { view.wasFocus = focusing; view.yaw = tyaw; }
+  R3.setCamera(cam.x, cam.y, cam.z, view.yaw, view.pitch, view.dist, !focusing, cam.sx, cam.sy + cam.uy);
+
+  // ribbons: subnet halos, overview links, focus edges, shockwaves on the selected host
+  const L = R3.lines; L.begin();
+  const cm = view.cmix, cs = 2.4 - 1.4 * cm, cdz = -900 * (1 - cm);
+  const flows = overviewScene(L, T, cm, cs, cdz);
+  const hl = state.hoverEdge;
+  edges.forEach(e => {
+    const al = Math.min(e.a.a, e.b.a); e.c = null; if (al < 0.03) return;
+    const c = e.c = edgeCurve(e), lit = !hl || hl === e.info;
+    e.al = al * (lit ? (e.kind === 'hop2' ? 0.55 : e.small ? 0.35 : 0.8) : 0.12) * (e.small && hl && lit ? 2.5 : 1);
+    e.lit = lit;
+    L.quad(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], e.small ? 6 : 20, e.w * (lit && hl ? 1.6 : 1), RGB(e.color), e.al, e.dashed);
+  });
+  const sel = state.focus && nodes.get(state.focus);
+  if (sel && focusing) for (let i = 0; i < 3; i++) {
+    const ph = (T * 0.45 + i / 3) % 1;
+    L.circle(sel.x, sel.y, sel.z, sel.r + 6 + ph * 140, 64, 1.6, RGB(sel.color), sel.a * (1 - ph) * 0.7, false);
+  }
+  L.end();
+
+  // node bodies and halos
+  const N = R3.nodes; N.begin();
+  nodes.forEach(n => {
+    if (n.a < 0.01) return;
+    const isSel = state.focus === n.id, hov = state.hover === n;
+    let shape = 0, hollow = 0;
+    if (n.domain) shape = 3; else if (n.ext) { shape = 1; hollow = n.info.kind === 'blocked' ? 1 : 0; } else if (!n.d.observed) shape = 2;
+    const glow = isSel ? 1.6 : hov ? 1.2 : n.ext ? 0.45 : n.d.observed ? 0.75 : 0.2;
+    N.add(n.x, n.y, n.z, n.r, RGB(n.color), n.a, shape, hollow, glow, 2);
+  });
+  N.end();
+
+  // sparks: traffic along focus edges, flow on the busiest overview links, satellites round exposed hosts
+  const S = R3.sparks; S.begin();
+  edges.forEach(e => {
+    if (!e.parts.length || !e.c) return;
+    const col = RGB(e.color), size = (1.6 + e.w * 0.5) * 2.6;
+    e.parts.forEach((t, i) => {
+      t = (t + dt * e.speed * (e.kind === 'in' ? 0.6 : 1)) % 1; e.parts[i] = t;
+      const p = qb(e.c, t);
+      S.add(p[0], p[1], p[2], 0, col, e.al / 0.8 * (e.lit ? 0.95 : 0.15), 0, 0, 0, size);
+    });
+  });
+  if (motion && cm > 0.05) flows.forEach((f, i) => {
+    const t = (T * f.speed + i * 0.137) % 1, p = qb(f.c, t);
+    S.add(p[0], p[1], p[2], 0, f.col, f.al, 0, 0, 0, f.size);
+  });
+  S.end();
+  R3.render(T);
+
+  // canvas overlay: subnet labels, arrowheads, rings and labels
+  if (cm > 0.3 && state.labels) clusters.forEach(c => {
+    const [x, y, sc] = Pw(c.x, c.y + c.r, 0);
+    if (!(x > -50 && x < W + 50 && y > -50 && y < H + 50)) return;
+    const si = subnetInfo.get(c.subnet);
+    const hov = state.hoverCluster === c;
+    if (!hov && !c.labelled) return;
+    ctx.globalAlpha = cm * (hov ? 1 : 0.8); ctx.textAlign = 'center';
+    ctx.font = (hov ? '600 ' : '') + '11px ui-monospace,Menlo,monospace'; ctx.fillStyle = hov ? C('#e6f1ff') : C('#a9bcd6');
+    ctx.lineWidth = 4; ctx.strokeStyle = LIGHT ? LABEL_HALO : 'rgba(3,6,12,.8)';
+    ctx.strokeText(shown(c.subnet), x, y + 14); ctx.fillText(shown(c.subnet), x, y + 14);
+    const cn = subnetNet(c.subnet);
+    if (cn && cn.cloud) { ctx.font = '600 11px ui-monospace,Menlo,monospace'; ctx.fillStyle = CLOUD_COL;
+      ctx.strokeText(netTag(cn), x, y + 1); ctx.fillText(netTag(cn), x, y + 1); }
+    if (si && (sc > 0.25 || hov)) {
+      const bits = [`${si.hosts} host${si.hosts === 1 ? '' : 's'}`];
+      if (si.p1) bits.push(`${si.p1} P1`);
+      if (si.likely) bits.push(`${si.likely} likely`);
+      if (si.exposed) bits.push(`${si.exposed} exposed`);
+      if (si.drawn < si.hosts) bits.push(`${si.hosts - si.drawn} not drawn`);
+      ctx.font = '10px ui-monospace,Menlo,monospace'; ctx.fillStyle = si.likely ? C('#ff8095') : si.p1 ? C('#ffb27a') : C('#7f95b3');
+      const t = bits.join(' · ');
+      ctx.strokeText(t, x, y + 27); ctx.fillText(t, x, y + 27);
+    }
+  });
+  inetTitle = [];
+  if (cm > 0.3 && inetNodes.length) {
+    const ac = arcCenter(view.yaw), [x, y] = Pw(ring.cx + ring.R * 1.08 * Math.cos(ac), ring.cy + ring.R * 1.08 * Math.sin(ac), ring.z + 70);
+    if (y > 70) {
+      ctx.globalAlpha = 0.75 * cm; ctx.font = '600 11px ui-monospace,Menlo,monospace'; ctx.textAlign = 'center'; ctx.fillStyle = C('#2ee6d6');
+      const tot = D.internet_total || inetNodes.length;
+      const title = `INTERNET · ${tot.toLocaleString()} OUTSIDE ADDRESS${tot === 1 ? '' : 'ES'}` + (tot > inetNodes.length ? ` · TOP ${inetNodes.length} SHOWN` : '');
+      ctx.fillText(title, x, Math.max(84, y - 18));
+      // address names keep off the title and the space above it, so none sits over the title, away from its address
+      inetTitle.push({...labelBox(x, Math.max(84, y - 18), ctx.measureText(title).width, 1), y0: -Infinity});
+      if (D.internet_out_total != null) {
+        ctx.font = '10px ui-monospace,Menlo,monospace'; ctx.fillStyle = C('#7f95b3');
+        const a = `↓ ${D.internet_in_total.toLocaleString()} REACHED IN   `, b = `↑ ${D.internet_out_total.toLocaleString()} CONTACTED BY HOSTS`;
+        const wa = ctx.measureText(a).width, wb = ctx.measureText(b).width, x0 = x - (wa + wb) / 2;
+        ctx.textAlign = 'left'; ctx.fillText(a, x0, Math.max(98, y - 4));
+        ctx.fillStyle = RETURN; ctx.fillText(b, x0 + wa, Math.max(98, y - 4)); ctx.textAlign = 'center';
+        inetTitle.push(labelBox(x, Math.max(98, y - 4), wa + wb, 1));
+      }
+    }
+  }
+  edges.forEach(e => {
+    if (!e.c || e.kind === 'dns' || (e.small && !(hl && e.lit))) return;
+    const [x0, y0] = Pw(...qb(e.c, 0.93)), [x1, y1] = Pw(...qb(e.c, 0.985)), [xe, ye, se] = P(e.b);
+    if (!(xe > -50 && xe < W + 50 && ye > -50 && ye < H + 50)) return;
+    const ang = Math.atan2(y1 - y0, x1 - x0), back = Math.min(e.b.r * se + 3, 40);
+    const ax = xe - Math.cos(ang) * back, ay = ye - Math.sin(ang) * back;
+    ctx.globalAlpha = Math.min(e.a.a, e.b.a) * (e.lit ? 1 : 0.2); ctx.fillStyle = e.color;
+    ctx.beginPath(); ctx.moveTo(ax, ay);
+    ctx.lineTo(ax - 9 * Math.cos(ang - 0.4), ay - 9 * Math.sin(ang - 0.4));
+    ctx.lineTo(ax - 9 * Math.cos(ang + 0.4), ay - 9 * Math.sin(ang + 0.4)); ctx.closePath(); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  arcLabels(cm > 0.3 && state.labels);
+  const order = [...nodes.values()].filter(n => n.a > 0.02).sort((a, b) => a.a - b.a);
+  order.forEach(n => drawNode(n, T));
+  // network and report names last, over hosts and their labels
+  if (cm > 0.3 && state.labels && islands.length) mapLabels((x, y) => Pw(x, y, 0), '3d', 26, 20, cm);
+  if (focusing) sideTitles();
 }
 
 // ---------------------------------------------------------------- interaction
@@ -391,62 +1160,174 @@ function pick(sx, sy) {
   let best = null, bd = 1e9;
   nodes.forEach(n => {
     if (n.a < 0.3) return;
-    const [x, y] = toS(n.x, n.y), d = Math.hypot(x - sx, y - sy), r = Math.max(8, n.r * cam.z + 6);
-    if (d < r && d < bd) { bd = d; best = n; }
+    const [x, y, sc] = P(n), d = Math.hypot(x - sx, y - sy), r = Math.max(8, n.r * sc + 6);
+    if (!(d < 1e9)) return;
+    const labelRight = x - r - 8;
+    const extLabelHit = n.ext && state.mode === 'focus' && state.labels && !n.small && n.a > 0.5
+      && sx >= labelRight - n.d.id.length * 7.5 && sx <= labelRight
+      && Math.abs(sy - (y + 4)) < 12;
+    const domainWidth = nodeLabel(n).length * 7.5;
+    const domainLabelHit = n.domain && state.mode === 'focus' && state.labels && n.a > 0.5
+      && sx >= x - domainWidth / 2 && sx <= x + domainWidth / 2
+      && Math.abs(sy - (y + Math.max(2, n.r * sc) + 15)) < 12;
+    const labelHit = extLabelHit || domainLabelHit;
+    const score = labelHit ? 0 : d;
+    if ((d < r || labelHit) && score < bd) { bd = score; best = n; }
   });
   return best;
 }
 let drag = null;
-cv.addEventListener('pointerdown', e => { drag = {x: e.clientX, y: e.clientY, cx: cam.tx, cy: cam.ty, moved: false}; cv.setPointerCapture(e.pointerId); });
+// drag rotates (3D), right/Shift-drag pans (same as Timeline), middle-drag moves the picture straight up or down
+cv.addEventListener('pointerdown', e => {
+  if (e.button === 1) e.preventDefault();   // no browser autoscroll on the middle button
+  const vert = e.button === 1;
+  drag = {x: e.clientX, y: e.clientY, cx: cam.tx, cy: cam.ty, vert,
+  node: pick(e.clientX, e.clientY), moved: false, lx: e.clientX, ly: e.clientY, orbit: !!R3 && !vert && !(e.button === 2 || e.shiftKey),
+  yaw: state.mode === 'focus' ? view.fyaw : view.oyaw, pitch: state.mode === 'focus' ? view.fpitch : view.opitch}; view.idle = performance.now(); cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('contextmenu', e => { if (R3) e.preventDefault(); });
+cv.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });   // autoscroll starts on mousedown in some browsers
 cv.addEventListener('pointermove', e => {
   if (drag) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 4) { drag.moved = true; cv.classList.add('dragging'); }
-    if (drag.moved) { cam.tx = drag.cx - dx / cam.z; cam.ty = drag.cy - dy / cam.z; cam.x = cam.tx; cam.y = cam.ty; }
+    if (Math.abs(dx) + Math.abs(dy) > 4) { if (!drag.moved) { stopSpin(); drag.yaw = state.mode === 'focus' ? view.fyaw : view.oyaw; } drag.moved = true; cv.classList.add('dragging'); }
+    view.idle = performance.now();
+    if (drag.moved && drag.orbit) {
+      if (state.mode === 'focus') { view.fyaw = Math.max(-0.9, Math.min(0.9, drag.yaw - dx * 0.005)); view.fpitch = Math.max(-0.5, Math.min(0.9, drag.pitch + dy * 0.004)); }
+      else { view.oyaw = drag.yaw - dx * 0.006; view.opitch = Math.max(0, Math.min(1.4, drag.pitch - dy * 0.004)); placeInet(view.oyaw, !COMBINED); markView(); }
+      view.yaw = state.mode === 'focus' ? view.fyaw : view.oyaw; view.pitch = state.mode === 'focus' ? 0.13 + view.fpitch : view.opitch;
+    } else if (drag.moved && drag.vert) {
+      if (R3) { cam.tuy += e.clientY - drag.ly; cam.uy = cam.tuy; }
+      else panBy(drag.lx, drag.ly, drag.lx, e.clientY);
+    } else if (drag.moved) {
+      panBy(drag.lx, drag.ly, e.clientX, e.clientY);
+    }
+    drag.lx = e.clientX; drag.ly = e.clientY;
     return;
   }
   const n = pick(e.clientX, e.clientY);
-  state.hover = n; cv.classList.toggle('hover', !!n);
+  const hc = n ? null : clusterAt(e.clientX, e.clientY);
+  state.hover = n; state.hoverCluster = hc; cv.classList.toggle('hover', !!(n || hc));
+  if (hc) { subnetTip(hc, e.clientX, e.clientY); return; }
   state.hoverEdge = n && n.info && state.mode === 'focus' ? n.info : null;
   tip(n, e.clientX, e.clientY);
 });
 cv.addEventListener('pointerup', e => {
-  const wasDrag = drag && drag.moved; drag = null; cv.classList.remove('dragging');
+  const wasDrag = drag && drag.moved, startNode = drag && drag.node, orbited = wasDrag && drag.orbit;
+  drag = null; cv.classList.remove('dragging');
+  if (orbited && COMBINED) placeInet(view.oyaw);   // the view is set: sort the arc for it once
   if (wasDrag) return;
-  const n = pick(e.clientX, e.clientY);
-  if (!n) return;
- 
+  const n = pick(e.clientX, e.clientY) || startNode;
+  if (!n) { const c = clusterAt(e.clientX, e.clientY); if (c) zoomCluster(c); return; }
+  if (n.domain) {
+    document.dispatchEvent(new CustomEvent('ioc:open', {detail: {id: n.id}}));
+    return;
+  }
+  if (n.inet) {
+    const key = 'ip:' + n.d.id;
+    if (iocIds.has(key)) document.dispatchEvent(new CustomEvent('ioc:open', {detail: {id: key}}));
+    else if (n.info.targets.length && D.focus[n.info.targets[0][0]]) focus(n.info.targets[0][0]);
+    return;
+  }
+  if (n.ext) {
+    const key = 'ip:' + n.d.id;
+    if (iocIds.has(key)) document.dispatchEvent(new CustomEvent('ioc:open', {detail: {id: key}}));
+    return;
+  }
   if (!n.ext && D.focus[n.id]) focus(n.id);
 });
-cv.addEventListener('dblclick', e => { if (!pick(e.clientX, e.clientY)) { overview(); } });
-cv.addEventListener('pointerleave', () => { state.hover = null; tip(null); });
+cv.addEventListener('dblclick', e => { if (!pick(e.clientX, e.clientY) && !clusterAt(e.clientX, e.clientY)) { overview(); } });
+cv.addEventListener('pointerleave', () => { state.hover = null; state.hoverCluster = null; tip(null); });
+// move the view so the point under (sx0, sy0) ends up under (sx1, sy1); in 3D this follows the
+// camera's current yaw and tilt, so dragging left always moves the network left on screen
+function panBy(sx0, sy0, sx1, sy1) {
+  if (R3) {
+    const a = R3.unproject(sx0, sy0), b = R3.unproject(sx1, sy1);
+    if (a && b) { cam.tx += a[0] - b[0]; cam.ty += a[1] - b[1]; }
+  } else { cam.tx -= (sx1 - sx0) / cam.z; cam.ty -= (sy1 - sy0) / cam.z; }
+  cam.x = cam.tx; cam.y = cam.ty; view.idle = performance.now();
+}
 cv.addEventListener('wheel', e => {
   e.preventDefault();
+  stopSpin();
+  view.idle = performance.now();
+  // trackpad two-finger swipe sideways pans; pinch (ctrl+wheel) and the mouse wheel zoom
+  if (!e.ctrlKey && Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.5) {
+    const k = e.deltaMode === 1 ? 16 : 1;
+    panBy(e.clientX, e.clientY, e.clientX - e.deltaX * k, e.clientY - e.deltaY * k);
+    return;
+  }
+  if (R3) {   // zoom towards the point under the cursor on the network plane
+    const z = Math.max(ZOOM_MIN, Math.min(4, cam.tz * Math.exp(-e.deltaY * 0.0015)));
+    const w = R3.unproject(e.clientX, e.clientY);
+    if (w) { const f = cam.tz / z; cam.tx = w[0] + (cam.tx - w[0]) * f; cam.ty = w[1] + (cam.ty - w[1]) * f; }
+    cam.tz = z;
+    return;
+  }
   const [wx, wy] = toW(e.clientX, e.clientY);
-  const z = Math.max(0.12, Math.min(4, cam.tz * Math.exp(-e.deltaY * 0.0015)));
+  const z = Math.max(ZOOM_MIN, Math.min(4, cam.tz * Math.exp(-e.deltaY * 0.0015)));
   cam.tz = z; cam.tx = wx - (e.clientX - W / 2) / z; cam.ty = wy - (e.clientY - H / 2) / z;
 }, {passive: false});
+function placeTip(h, x, y) {
+  const el = $('tip');
+  el.innerHTML = h; el.hidden = false;
+  const r = el.getBoundingClientRect();
+  el.style.left = Math.min(W - r.width - 10, x + 16) + 'px'; el.style.top = Math.min(H - r.height - 10, y + 16) + 'px';
+}
+function subnetTip(c, x, y) {
+  const si = subnetInfo.get(c.subnet) || {hosts: 0};
+  const out = subLinks.filter(l => l.a === c || l.b === c).sort((a, b) => b.w - a.w).slice(0, 3)
+    .map(l => `${esc(shown((l.a === c ? l.b : l.a).subnet))} · ${l.w.toLocaleString()} sessions` + (l.lw ? ` (${l.lw.toLocaleString()} admin/lateral)` : ''));
+  const cn = subnetNet(c.subnet);
+  placeTip(`<b>${esc(shown(c.subnet))}</b> <span class="m">subnet${cn ? ' · ' + esc(netTag(cn)) : ''}</span><br>${si.hosts} host(s)` +
+    (si.drawn < si.hosts ? `, ${si.hosts - si.drawn} not drawn` : '') +
+    (telemetryOnly ? '' : `<br>${si.p1 || 0} P1 · ${si.likely || 0} likely exploitation · ${si.lead || 0} lead`) +
+    `<br>${si.exposed || 0} exposed to outside addresses` + (si.alert_hosts ? `, ${si.alert_hosts} with IPS alerts` : '') +
+    (out.length ? `<br><span class="m">Busiest links to other subnets:<br>${out.join('<br>')}</span>` : '') +
+    '<br><span class="m">Click to zoom in</span>', x, y);
+}
 function tip(n, x, y) {
   const el = $('tip');
   if (!n) { el.hidden = true; return; }
   let h;
-  if (n.ext) {
+  if (n.inet) {
+    const e = n.info, more = e.hosts_total - e.targets.length;
+    const arrow = t => ({in: '←', out: '→', both: '⇄'})[beamDir(t)];
+    h = `<b>${esc(e.ip)}</b> <span class="m">outside address</span><br>${esc(KIND_TXT[e.kind])}` +
+      `<br><span class="m">${e.hosts_total} internal host(s) · ${e.sessions.toLocaleString()} session(s)` + (e.alerts ? ` · ${e.alerts} IPS alert(s) not blocked` : '') + '</span>' +
+      (e.out_sessions != null ? `<br><span class="m">Inbound ${e.in_sessions.toLocaleString()} · </span><span style="color:${RETURN}">outbound ${e.out_sessions.toLocaleString()} from ${e.out_hosts} host(s)</span>` : '') +
+      (COMBINED && (e.islands || []).length > 1 ? `<br>Exchanged traffic with hosts in ${e.islands.length} of the compared reports` : '') +
+      '<br>' + e.targets.slice(0, 5).map(t => `${esc(shown(t[0]))}${COMBINED ? ` <span class="m">(${esc(netLabel(nodes.get(t[0]) && nodes.get(t[0]).d))})</span>` : ''} ${arrow(t)} <span style="color:${KIND[t[1]]}">${esc(KIND_TXT[t[1]])}</span>` +
+        (beamDir(t) === 'both' && t[1] !== 'outbound' ? ` <span style="color:${RETURN}">+ host connected out</span>` : '')).join('<br>') +
+      (more > 0 ? `<br><span class="m">+${more} more host(s)</span>` : '') +
+      (iocIds.has('ip:' + e.ip) ? '<br><span style="color:' + C('#2ee6d6') + '">Click for IOC details</span>' : '<br><span class="m">Click to focus its top target</span>');
+  } else if (n.domain) {
+    const observed = n.info.observed && n.info.observed['dns event'];
+    h = `<b>${esc(n.d.id)}</b> <span class="m">domain IOC · ${observed ? 'observed DNS query' : 'observed domain match'}</span>` +
+      '<br>Exact IOC match. A DNS query alone does not prove a connection or compromise.' +
+      '<br><span style="color:' + C('#2ee6d6') + '">Click for report overview</span>';
+  } else if (n.ext) {
     const a = n.info;
     h = `<b>${esc(a.ip)}</b> <span class="m">outside address · north/south</span><br>${esc(KIND_TXT[a.kind])}` +
-      (a.dir !== 'out' ? `<br><span class="m">Inbound: ${a.sessions} session(s), ${a.established} completed, ${a.blocked} blocked` +
+      (a.dir !== 'out' ? `<br><span class="m">Inbound: ${a.sessions} session(s), ${a.established} completed, ${a.blocked} blocked or refused` +
         (a.ports.length ? `; ports ${esc(a.ports.join(', '))}` : '') + '</span>' : '') +
       (a.out_sessions ? `<br><span class="m">Outbound from the host: ${a.out_sessions} session(s), ${a.out_established} completed` +
         (a.out_ports.length ? `; ports ${esc(a.out_ports.join(', '))}` : '') + '</span>' : '') +
       (a.alerts || a.alerts_blocked ? `<br>IPS: ${a.alerts} not blocked, ${a.alerts_blocked} blocked` : '') +
       (a.signatures.length ? `<br><span class="m">${esc(a.signatures.join('; '))}</span>` : '') +
-      (a.returned && a.dir === 'both' ? '<br><span style="color:#b98cff">The host also connected out to this address (lead)</span>' : '');
+      (a.returned && a.dir === 'both' ? '<br><span style="color:' + C('#b98cff') + '">The host also connected out to this address (lead)</span>' : '') +
+      (iocIds.has('ip:' + a.ip) ? '<br><span style="color:' + C('#2ee6d6') + '">Click for IOC details</span>' : '');
   } else {
     const d = n.d, info = state.mode === 'focus' && n.info && n.id !== state.focus ? n.info : null;
-    h = `<b>${esc(d.name || d.id)}</b>${d.name ? ` <span class="m">${esc(d.id)}</span>` : ''}<br>` +
-      (d.scanned ? `<span class="pill ${esc(d.pri)}">${esc(d.pri)}</span> worst finding ${esc(d.sev || 'none')}` : '<span class="m">Not in the vulnerability scan</span>') +
+    h = `<b>${esc(d.name || shown(d.id))}</b>${d.name ? ` <span class="m">${esc(shown(d.id))}</span>` : ''}<br>` +
+      (COMBINED ? `<span class="m">${esc(netLabel(d))}</span><br>` : '') +
+      (telemetryOnly ? '<span class="m">Vulnerability data unavailable; status unknown</span>' :
+        d.scanned ? `<span class="pill ${esc(d.pri)}">${esc(d.pri)}</span> worst finding ${esc(d.sev || 'none')}` : '<span class="m">Not in the vulnerability scan</span>') +
       (info && info.band === 'None' ? `<br>East/west attempts only, no completed session<br><span class="m">${esc(info.why.join('; '))}</span>` : '') +
-      (info && info.band !== 'None' ? `<br>Estimated likelihood if ${esc(state.focus)} is exploited: <b style="color:${BAND[info.band]}">${Math.round(info.p * 100)}% ${info.band}</b>` +
+      (info && info.band !== 'None' && !telemetryOnly ? `<br>Estimated likelihood if ${esc(shown(state.focus))} is exploited: <b style="color:${BAND[info.band]}">${Math.round(info.p * 100)}% ${info.band}</b>` +
         `<br><span class="m">${esc(info.why.join('; '))}</span>` : '') +
+      (COMBINED && (d.sh || []).length ? `<br>Also in other reports: ${d.sh.slice(0, 3).map(j => esc(ITEMS[j].label)).join(', ')}` +
+        (d.sh.length > 3 ? ` and ${d.sh.length - 3} more` : '') : '') +
+      (COMBINED && iocCounts[d.id] ? `<br><span style="color:#2ee6d6">${iocCounts[d.id]} IOC match${iocCounts[d.id] === 1 ? '' : 'es'}</span>` : '') +
       (D.focus[n.id] && n.id !== state.focus ? '<br><span class="m">Click to focus</span>' : '');
   }
   el.innerHTML = h; el.hidden = false;
@@ -454,17 +1335,30 @@ function tip(n, x, y) {
   el.style.left = Math.min(W - r.width - 10, x + 16) + 'px'; el.style.top = Math.min(H - r.height - 10, y + 16) + 'px';
 }
 addEventListener('keydown', e => {
+  if (e.target.closest('#analyst-chat') || e.target.closest('#btn-ai')) return;
   if (e.target.tagName === 'INPUT') { if (e.key === 'Escape') e.target.blur(); return; }
   if (e.key === 'Escape') { state.history.length ? focus(state.history.pop(), false) : overview(); }
   else if (e.key === '/') { e.preventDefault(); $('search').focus(); }
+  else if (e.key === '?') toggleAbout();
   else if (e.key === 'l' || e.key === 'L') toggleLabels();
   else if (e.key === 'm' || e.key === 'M') toggleMotion();
+  else if (e.key === '3' && can3d) set3d(!R3, true);
+  else if (e.key === '2') set3d(false, true);
+  else if (R3 && state.mode === 'overview' && 'qQeEtTyYuUrR'.includes(e.key)) {
+    const k = e.key.toLowerCase();
+    if (k === 'q') rotateView(1); else if (k === 'e') rotateView(-1);
+    else if (k === 't') setView('top'); else if (k === 'y') setView('tilted'); else if (k === 'u') setView('low'); else setView(DEFAULT_VIEW, true);
+  }
+  else if (e.shiftKey && e.key.startsWith('Arrow')) {   // Shift+arrows pan
+    const d = 80, cx = W / 2, cy = H / 2;
+    panBy(cx, cy, cx + (e.key === 'ArrowLeft' ? d : e.key === 'ArrowRight' ? -d : 0), cy + (e.key === 'ArrowUp' ? d : e.key === 'ArrowDown' ? -d : 0));
+  }
   else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
     const ids = hostOrder(); const i = ids.indexOf(state.focus);
     focus(ids[(i + (e.key === 'ArrowRight' ? 1 : ids.length - 1)) % ids.length]);
   }
 });
-addEventListener('resize', () => { resize(); state.mode === 'focus' ? focus(state.focus, false) : fitOverview(); });
+addEventListener('resize', () => { resize(); placeViewctl(); state.mode === 'focus' ? focus(state.focus, 'resize') : fitOverview(); });
 
 // ---------------------------------------------------------------- panels
 function hostOrder() {
@@ -473,83 +1367,358 @@ function hostOrder() {
     return (A.pri || 'P9').localeCompare(B.pri || 'P9') || (B.score - A.score) || a.localeCompare(b);
   });
 }
+// the host list's groups: one per subnet, or on the all-networks map one per report's network
+const groupOf = id => { const d = nodes.get(id).d; return COMBINED ? 'net:' + (d.net || 0) : d.subnet || 'other'; };
 function renderList() {
   const q = $('search').value.trim().toLowerCase();
   const rows = hostOrder().filter(id => {
+    if (iocOnly && !iocCounts[id]) return false;
+    if (netFilter && !netFilter.split(',').includes(String(nodes.get(id).d.net ?? 'none'))) return false;
     if (!q) return true;
     const d = nodes.get(id).d, F = D.focus[id];
-    return (id + ' ' + d.name + ' ' + d.os + ' ' + F.findings.map(f => f.name + ' ' + f.cves.join(' ')).join(' ')).toLowerCase().includes(q);
+    return (shown(id) + ' ' + d.name + ' ' + d.os + ' ' + netTag(netOf(d)) + ' ' + netLabel(d) + ' ' + F.findings.map(f => f.name + ' ' + f.cves.join(' ')).join(' ')).toLowerCase().includes(q);
   });
-  $('hostlist').innerHTML = rows.map(id => {
+  const rowHtml = id => {
     const d = nodes.get(id).d, F = D.focus[id];
+    const iocCount = iocCounts[id] || 0;
+  const iocHint = iocCount ? `<span class="ioc-host-badge" title="${iocCount} exact IOC match${iocCount === 1 ? '' : 'es'}; review the source and traffic" aria-label="${iocCount} IOC match${iocCount === 1 ? '' : 'es'}">IOC ${iocCount}</span>` : '';
     return `<div class="hrow${id === state.focus ? ' on' : ''}" role="listitem" tabindex="0" data-id="${esc(id)}">` +
-      `<span class="pill ${esc(d.pri)}">${esc(d.pri)}</span><span class="nm">${esc((d.name || id).split('.')[0])}` +
-      `<br><span class="ip">${esc(id)} · ${F.attackers_total} N/S · ${F.peers_total} E/W</span></span>` +
+      (telemetryOnly ? '' : `<span class="pill ${esc(d.pri)}">${esc(d.pri)}</span>`) + `<span class="nm">${esc(d.name ? d.name.split('.')[0] : shown(id))} ${iocHint}` +
+      (netOf(d) && netOf(d).cloud ? ` <span class="net-badge${netOf(d).cloud ? ' cloud' : ''}" title="${esc(netOf(d).name)}">${esc(netOf(d).cloud ? netOf(d).type.toUpperCase() : netOf(d).name)}</span>` : '') +
+      `<br><span class="ip">${esc(shown(id))} · ${F.attackers_total} N/S · ${F.peers_total} E/W</span></span>` +
       (d.ev ? `<span class="tag ${d.ev}">${d.ev === 'likely' ? 'LIKELY' : 'LEAD'}</span>` : '') + '</div>';
-  }).join('') || '<div class="hrow">No match</div>';
+  };
+  if (!rows.length) { $('hostlist').innerHTML = `<div class="hrow">${iocOnly ? 'No IOC hosts match' : 'No match'}</div>`; return; }
+  if (!groupByNet) { $('hostlist').innerHTML = rows.map(rowHtml).join(''); return; }
+  // one collapsible group per subnet (per network on the all-networks map), riskiest first (likely
+  // compromises, then P1 hosts, IOC hosts, size); hosts inside keep the priority order; a search or a
+  // filter opens every group that still has a match
+  const groups = new Map();
+  rows.forEach(id => { const k = groupOf(id); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(id); });
+  if (state.focus && nodes.get(state.focus)) openNets.add(groupOf(state.focus));
+  const filtered = !!q || iocOnly;
+  const tally = ids => { const ds = ids.map(id => nodes.get(id).d);
+    return [ds.filter(d => d.ev === 'likely').length, ds.filter(d => d.pri === 'P1').length, ids.filter(id => iocCounts[id]).length, ids.length]; };
+  const order = [...groups].map(g => [g[0], g[1], tally(g[1])])
+    .sort((a, b) => b[2][0] - a[2][0] || b[2][1] - a[2][1] || b[2][2] - a[2][2] || b[2][3] - a[2][3]);
+  $('hostlist').innerHTML = order.map(([k, ids, [likely, p1, ioc]]) => {
+    const open = filtered || openNets.has(k);
+    const net = COMBINED ? null : netOf(nodes.get(ids[0]).d);
+    const label = COMBINED ? netLabel(nodes.get(ids[0]).d) : k === 'other' ? 'Other addresses' : k;
+    return `<div class="hgroup${open ? ' open' : ''}" role="listitem">` +
+      `<div class="hghead" role="button" tabindex="0" aria-expanded="${open}" data-net="${esc(k)}">` +
+      `<span class="chev" aria-hidden="true">▸</span><span class="hgname">${esc(label)}` +
+      (net ? ` <span class="net-badge${net.cloud ? ' cloud' : ''}" title="${esc(net.name)}">${esc(net.cloud ? net.type.toUpperCase() : net.name)}</span>` : '') + `</span>` +
+      `<span class="hgcount">${ids.length} host${ids.length === 1 ? '' : 's'}` +
+      (!COMBINED && PROBED[k] ? ` · <span title="Addresses in this subnet that were probed and never answered; not counted as hosts">${PROBED[k]} probed, no answer</span>` : '') +
+      (!telemetryOnly && p1 ? ` · <b class="p1">${p1} P1</b>` : '') + (likely ? ` · <b class="lk">${likely} likely</b>` : '') +
+      (ioc ? ` · <b class="ioc">${ioc} IOC</b>` : '') + `</span></div>` +
+      (open ? `<div role="list">${ids.map(rowHtml).join('')}</div>` : '') + '</div>';
+  }).join('') + (() => {
+    // ranges where nothing answered at all have no hosts to list; say they were probed
+    if (COMBINED || filtered) return '';
+    const seen = new Set(order.map(o => o[0])), rest = Object.entries(PROBED).filter(([sn]) => !seen.has(sn));
+    const n = rest.reduce((a, [, c]) => a + c, 0);
+    return n ? `<div class="hgroup" role="listitem"><div class="hghead" style="cursor:default"><span class="hgname">No answer</span>` +
+      `<span class="hgcount" title="${esc(rest.slice(0, 40).map(([sn, c]) => `${sn} (${c})`).join(', '))}">${n.toLocaleString()} probed address${n === 1 ? '' : 'es'} in ${rest.length} more range${rest.length === 1 ? '' : 's'}; none are hosts</span></div></div>` : '';
+  })();
 }
-$('hostlist').addEventListener('click', e => { const r = e.target.closest('.hrow[data-id]'); if (r) { focus(r.dataset.id); } });
-$('hostlist').addEventListener('keydown', e => { const r = e.target.closest('.hrow[data-id]'); if (r && e.key === 'Enter') { focus(r.dataset.id); } });
+// These are recorded source/originator -> destination/responder tuples, not
+// arrows inferred from an internet/internal boundary or a vulnerability scan.
+function connectionExamples(items, total) {
+  if (!items || !items.length) return '';
+  const endpoint = (ip, port) => `${esc(ip)}:${port == null ? '?' : esc(port)}`;
+  return `<div class="conn-examples">${items.map(f =>
+    `<div class="conn-line"><span class="conn-path">${endpoint(f.src_ip, f.src_port)} → ${endpoint(f.dst_ip, f.dst_port)}</span>` +
+    ` · ${esc(f.proto || 'transport unknown')}${f.app ? ` · logged app/service: ${esc(f.app)}` : ''}` +
+    `${f.action !== 'allow' ? ` · ${esc(f.action)}` : !f.established ? ' · not completed' : ''}` +
+    `${f.source ? ` <span class="conn-source">(${esc(f.source)})</span>` : ''}</div>`).join('')}` +
+    (total > items.length ? `<div class="conn-more">${total} sessions total; representative distinct tuples shown.</div>` : '') +
+    '</div>';
+}
+function alertExamples(items) {
+  if (!items || !items.length) return '';
+  return `<div class="conn-examples">${items.map(a =>
+    `<div class="conn-line">Alert metadata: ${esc(a.src_ip)} → ${esc(a.dst_ip)}${a.dst_port == null ? '' : ':' + esc(a.dst_port)}` +
+    ` · transport and source port not logged · ${a.blocked ? 'blocked' : 'not blocked'}</div>`).join('')}</div>`;
+}
+function otExamples(items, total) {
+  if (!items || !items.length) return '';
+  return `<h3>Industrial protocol records</h3><p class="onward-note">Zeek protocol records show message operations; they are not extra connection sessions or vulnerability findings.</p>` +
+    items.map(e => {
+      const direction = e.src_ip && e.dst_ip ? `${esc(e.src_ip)} → ${esc(e.dst_ip)}` :
+        `${esc(e.originator || '?')} ↔ ${esc(e.responder || '?')} (message direction not logged)`;
+      return `<div class="ot-record"><b>${esc(e.protocol)}</b>${e.operation ? ` · ${esc(e.operation)}` : ''}<br>` +
+        `<span class="conn-path">${direction}</span>` +
+        `${e.message_side !== 'unknown' ? ` · sent by Zeek ${esc(e.message_side)}` : ''}` +
+        `${e.source ? ` · ${esc(e.source)}` : ''}</div>`;
+    }).join('') + (total > items.length ?
+      `<div class="conn-more">Showing ${items.length} of ${total} industrial records. See normalized/ot_events.jsonl for all records.</div>` : '');
+}
+let iocOnly = false, netFilter = '';
+// host list grouped by subnet (the default), every subnet folded until clicked
+let groupByNet = true;
+const openNets = new Set();
+try { groupByNet = localStorage.getItem('vulnscope-explorer-hostgroups') !== '0'; } catch (_) {}
+$('group-toggle').setAttribute('aria-pressed', String(groupByNet));
+$('group-toggle').addEventListener('click', () => {
+  groupByNet = !groupByNet; $('group-toggle').setAttribute('aria-pressed', String(groupByNet));
+  try { localStorage.setItem('vulnscope-explorer-hostgroups', groupByNet ? '1' : '0'); } catch (_) {}
+  renderList();
+});
+function toggleNet(k) { openNets.has(k) ? openNets.delete(k) : openNets.add(k); renderList(); }
+if (NETS.length) {
+  const names = [...new Map(NETS.map((n, i) => [n.name, i])).entries()];
+  const sel = $('net-filter');
+  sel.hidden = false;
+  sel.innerHTML = '<option value="">All networks</option>' +
+    names.map(([name, i]) => `<option value="${NETS.map((m, j) => m.name === name ? j : null).filter(j => j !== null).join(',')}">${esc(netTag(NETS[i]))}</option>`).join('') +
+    (COMBINED ? '' : '<option value="none">Not in the network map</option>');
+  if (COMBINED) sel.title = 'Show hosts from one network';
+  sel.addEventListener('change', () => { netFilter = sel.value; renderList(); });
+}
+const iocHostTotal = Object.values(iocCounts).filter(count => count > 0).length;
+if (iocHostTotal) {
+  $('ioc-filter').hidden = false;
+  $('ioc-host-count').textContent = `(${iocHostTotal})`;
+  $('ioc-filter').title = 'Show only hosts with exact IOC matches';
+  $('ioc-filter').addEventListener('click', () => {
+    iocOnly = !iocOnly;
+    $('ioc-filter').setAttribute('aria-pressed', String(iocOnly));
+    renderList();
+  });
+}
+// ---------------------------------------------------------------- all networks: shared items
+// a link to a host in its own report's Explorer (the all-networks map keeps only part of each card)
+function ownLink(id, text) {
+  const n = nodes.get(id), R = repOf(n && n.d);
+  return R && R.href ? `<a class="own-link" href="${esc(R.href)}#host=${encodeURIComponent(shown(id))}" target="_blank" rel="noopener">${esc(text)} ↗</a>` : esc(text);
+}
+const repName = r => { const c = COMBINED.compared[r]; return c ? c.name + (netKey(c.network) === netKey(c.name) ? '' : ` (${c.network})`) : '?'; };
+const itemTag = it => it.k === 'ioc' ? `<span class="sh-kind">${esc(it.type.toUpperCase())}</span>` :
+  `<span class="sh-sev sev-${esc(it.sev)}">${esc(it.sev)}</span>`;
+// the host card's list of its IOCs and vulnerabilities that other reports have too
+function sharedSection(id, d) {
+  const R = repOf(d), js = d.sh || [];
+  const own = R && R.href ? `<p class="own">${ownLink(id, `Open in ${R.name}'s own Explorer`)}</p>` : '';
+  if (!js.length) return own;
+  return own + `<h3>Seen in other reports</h3><p class="onward-note">IOCs and vulnerabilities of this host that the comparison found in other reports too.</p>` +
+    js.map(j => {
+      const it = ITEMS[j], others = it.seen.filter(x => x[0] !== R.r);
+      return `<div class="fd shared-fd">${itemTag(it)} <span class="sh-name">${esc(it.label)}</span>` +
+        (it.k === 'ioc' ? ' · ' + iocButton(it.type, it.label, 'details') : '') +
+        `<div class="meta">${it.reports} reports · ${it.networks} network${it.networks === 1 ? '' : 's'} · ${it.hosts.toLocaleString()} host${it.hosts === 1 ? '' : 's'} in all</div>` +
+        (others.length ? `<div class="meta">Also in ${others.map(([r, n]) => `${esc(repName(r))}: ${n.toLocaleString()} host${n === 1 ? '' : 's'}`).join('; ')}</div>` : '') + '</div>';
+    }).join('');
+}
+if (COMBINED) {
+  $('group-toggle').textContent = 'By network';
+  $('group-toggle').title = 'Group the host list by network (click a network to open or fold it)';
+}
+$('hostlist').addEventListener('click', e => {
+  const g = e.target.closest('.hghead'); if (g) { toggleNet(g.dataset.net); return; }
+  const r = e.target.closest('.hrow[data-id]'); if (r) { focus(r.dataset.id); }
+});
+$('hostlist').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const g = e.target.closest('.hghead');
+  if (g) { e.preventDefault(); const k = g.dataset.net; toggleNet(k); const h = [...document.querySelectorAll('.hghead')].find(x => x.dataset.net === k); if (h) h.focus(); return; }
+  const r = e.target.closest('.hrow[data-id]'); if (r && e.key === 'Enter') { focus(r.dataset.id); }
+});
 $('search').addEventListener('input', renderList);
 $('search').addEventListener('keydown', e => { if (e.key === 'Enter') { const r = document.querySelector('.hrow[data-id]'); if (r) focus(r.dataset.id); } });
 
+const panelLists = {
+  atk: {query: '', sort: 'priority', expanded: false, page: 0},
+  peer: {query: '', sort: 'priority', expanded: false, page: 0},
+};
+const IP_PREVIEW = 8, IP_PAGE = 20;
+function ipRow(kind, item) {
+  if (kind === 'atk') {
+    const a = item;
+    return `<details class="ip-entry" data-k="atk" data-ip="${esc(a.ip)}"><summary class="row"><span class="kind k-${a.kind}" title="${esc(KIND_TXT[a.kind])}"></span>` +
+      `<span class="ip">${esc(a.ip)}</span><span class="lk">${a.sessions ? '← ' + a.sessions : ''}${a.sessions && a.out_sessions ? '  ' : ''}${a.out_sessions ? '→ ' + a.out_sessions : ''}${a.alerts ? ' · ' + a.alerts + ' IPS' : ''}</span></summary>` +
+      `<div class="ip-detail">${esc(KIND_TXT[a.kind])}${iocIds.has('ip:' + a.ip) ? ' · ' + iocButton('ip', a.ip, 'Report overview') : ''}` +
+      `${a.established ? ' · ' + a.established + ' inbound completed' : ''}${a.blocked ? ' · ' + a.blocked + ' blocked or refused' : ''}` +
+      `${a.ports.length ? ' · ports ' + esc(a.ports.join(', ')) : ''}${a.alerts_blocked ? ' · ' + a.alerts_blocked + ' IPS blocked' : ''}` +
+      `${a.dir === 'both' && a.out_sessions ? ' · host also connected out' + (a.out_ports.length ? ' on ' + esc(a.out_ports.join(', ')) : '') : ''}` +
+      `${a.dir === 'out' && a.out_ports.length ? ' · ports ' + esc(a.out_ports.join(', ')) : ''}` +
+      `${a.signatures.length ? '<br>' + esc(a.signatures.join('; ')) : ''}` +
+      connectionExamples(a.connection_examples, a.sessions + a.out_sessions) +
+      (a.connection_examples.length ? '' : alertExamples(a.alert_examples)) + '</div></details>';
+  }
+  const q = item, pd = nodes.get(q.ip)?.d || {name: '', scanned: false, sev: ''};
+  const nm = pd.name ? pd.name.split('.')[0] : shown(q.ip), none = q.band === 'None';
+  const o = none ? q.out_tries : q.out, i = none ? q.in_tries : q.in;
+  const dir = (o ? `→ ${o}` : '') + (o && i ? '  ' : '') + (i ? `← ${i}` : '');
+  return `<details class="ip-entry" data-k="peer" data-ip="${esc(q.ip)}"><summary class="row peer"><div class="bar b-${q.band}"><i style="width:${Math.round(q.p * 100)}%"></i></div>` +
+    `<span>${pd.name ? `${esc(nm)} <span class="ip" style="color:var(--muted);font-size:11px">${esc(shown(q.ip))}</span>` : `<span class="ip">${esc(shown(q.ip))}</span>`}</span>` +
+    `<span class="lk" style="color:${BAND[q.band] || 'var(--muted)'}">${none ? 'no session' : telemetryOnly ? 'observed' : Math.round(q.p * 100) + '% ' + q.band}</span></summary>` +
+    `<div class="ip-detail">${D.focus[q.ip] ? `<button type="button" class="go" data-go="${esc(q.ip)}">Focus ${esc(nm)}</button> · ` : ''}` +
+    `${esc(dir)} ${none ? 'attempts, none completed' : 'completed sessions'}${q.ports_out.length ? ' · ' + (none ? 'tried ' : 'uses ') + esc(q.ports_out.join(', ')) : ''}` +
+    `${telemetryOnly ? ' · vulnerability status unknown' : pd.scanned ? ' · worst ' + esc(pd.sev || 'none') : ' · not scanned'}` +
+    connectionExamples(q.connection_examples, q.out_tries + q.in_tries) +
+    `<ul class="why">${q.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div></details>`;
+}
+function renderIpList(kind) {
+  const F = D.focus[state.focus], s = panelLists[kind];
+  if (!F) return;
+  const list = kind === 'atk' ? F.attackers : F.peers, total = kind === 'atk' ? F.attackers_total : F.peers_total;
+  const query = s.query.trim().toLowerCase();
+  const filtered = query ? list.filter(x => String(shown(x.ip)).toLowerCase().includes(query) ||
+    (kind === 'peer' && (nodes.get(x.ip)?.d.name || '').toLowerCase().includes(query))) : list.slice();
+  if (s.sort === 'ip') filtered.sort((a, b) => a.ip.localeCompare(b.ip, undefined, {numeric: true}));
+  if (s.sort === 'activity') filtered.sort((a, b) =>
+    (kind === 'atk' ? b.sessions + b.out_sessions - a.sessions - a.out_sessions :
+      b.out_tries + b.in_tries - a.out_tries - a.in_tries) || a.ip.localeCompare(b.ip));
+  if (s.sort === 'likelihood' && kind === 'peer') filtered.sort((a, b) => b.p - a.p || a.ip.localeCompare(b.ip));
+  const expanded = s.expanded || !!query, pageSize = expanded ? IP_PAGE : IP_PREVIEW;
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  s.page = Math.min(s.page, pages - 1);
+  const start = s.page * pageSize, end = Math.min(filtered.length, start + pageSize);
+  const label = kind === 'atk' ? 'outside addresses' : 'internal peers';
+  const rows = filtered.slice(start, end).map(x => ipRow(kind, x)).join('') ||
+    `<div class="ip-empty">${query ? 'No matching ' + label + '.' : 'No ' + label + ' recorded for this host.'}</div>`;
+  document.querySelector(`[data-ip-results="${kind}"]`).innerHTML =
+    `<div class="ip-list-count">${filtered.length ? `Showing ${start + 1}–${end} of ${filtered.length}` : '0'} ${label}${query ? ` matching “${esc(s.query)}”` : ''}</div>` +
+    (!COMBINED && list.length < total ? `<div class="ip-list-count list-cut" role="note">${cutNote(state.focus, kind, list.length, total)}</div>` : '') + rows +
+    (!expanded && filtered.length > IP_PREVIEW ? `<button type="button" class="ip-list-action" data-ip-expand="${kind}">Show all ${filtered.length} ${label}</button>` : '') +
+    (expanded && pages > 1 ? `<div class="ip-pager"><button type="button" data-ip-page="${kind}" data-step="-1" ${s.page ? '' : 'disabled'}>Previous</button>` +
+      `<span>Page ${s.page + 1} of ${pages}</span><button type="button" data-ip-page="${kind}" data-step="1" ${s.page + 1 < pages ? '' : 'disabled'}>Next</button></div>` : '') +
+    (s.expanded && !query && filtered.length > IP_PREVIEW ? `<button type="button" class="ip-list-action" data-ip-collapse="${kind}">Show fewer</button>` : '') +
+    (COMBINED && list.length < total ? `<div class="ip-list-count">The top ${list.length} of ${total.toLocaleString()} are kept on this map; ` +
+      `${ownLink(state.focus, 'its report\'s own Explorer')} lists them all.</div>` : '');
+}
+// ---------------------------------------------------------------- full lists of a host
+// On busy networks the page keeps only the top rows of a host's lists (D.lists; IPS alerts are always
+// kept, and every count is from the full lists). Opened through VulnScope, the page loads the host's
+// full lists when it is focused, from the address VulnScope gives it in <meta name="vulnscope-contacts">
+// (empty when the report was saved without its flow copies); opened from disk, it says the lists are cut.
+const CONTACTS = (() => { const m = document.querySelector('meta[name="vulnscope-contacts"]'); return m ? m.content : null; })();
+const fullLists = {};                    // host -> 'loading' | 'done' | 'error: <reason>'
+const isCut = F => F.attackers.length < F.attackers_total || F.peers.length < F.peers_total;
+function loadFullLists(id) {
+  const F = D.focus[id];
+  if (COMBINED || !CONTACTS || !F || !isCut(F) || fullLists[id]) return;
+  fullLists[id] = 'loading';
+  fetch(CONTACTS + encodeURIComponent(id), {credentials: 'include', cache: 'no-store'})
+    .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t.slice(0, 160) || 'HTTP ' + r.status))))
+    .then(full => {
+      if (!full || !Array.isArray(full.attackers) || !Array.isArray(full.peers)) throw new Error('unexpected reply');
+      F.attackers = full.attackers; F.peers = full.peers; fullLists[id] = 'done';
+    })
+    .catch(err => { fullLists[id] = 'error: ' + ((err && err.message) || err); })
+    .then(() => { if (state.mode === 'focus' && state.focus === id) refreshFocus(id); });
+}
+// redraw the focused host with its full lists, keeping what the analyst set in the panel
+function refreshFocus(id) {
+  const keep = JSON.parse(JSON.stringify(panelLists)), top = $('panel').scrollTop;
+  focus(id, 'resize');
+  for (const k of ['atk', 'peer']) {
+    Object.assign(panelLists[k], keep[k]);
+    const q = document.querySelector(`[data-ip-search="${k}"]`), so = document.querySelector(`[data-ip-sort="${k}"]`);
+    if (q) q.value = panelLists[k].query;
+    if (so) so.value = panelLists[k].sort;
+    renderIpList(k);
+  }
+  $('panel').scrollTop = top;
+}
+function cutNote(id, kind, n, total) {
+  const label = kind === 'atk' ? 'outside addresses' : 'internal peers', st = fullLists[id] || '';
+  if (st === 'loading') return `Loading all ${total.toLocaleString()} ${label} from VulnScope…`;
+  const head = `This page keeps the top ${n.toLocaleString()} of ${total.toLocaleString()} ${label}` +
+    (kind === 'atk' ? ' (addresses with IPS alerts are always kept)' : '') + '; the counts above cover them all. ';
+  if (st.startsWith('error: ')) return head + `VulnScope could not send the full list: ${esc(st.slice(7))}`;
+  if (CONTACTS === null) return head + 'Open this report in VulnScope (Open report) to list every one.';
+  return head + 'This report was saved without full copies of the flows, so the full list is not available. ' +
+    'Analyze again without “Skip full copies of flows and Zeek events” to list every one.';
+}
+// header badge: some lists are cut and this copy of the page can't load them
+(() => {
+  const b = $('lists-cut');
+  if (!b || COMBINED || !D.lists || CONTACTS) return;
+  b.hidden = false;
+  b.textContent = 'LISTS CAPPED';
+  b.title = `Busy hosts keep their top ${D.lists.cap} outside addresses and internal peers in this page; counts and views use the full lists. ` +
+    (CONTACTS === null ? 'Opened from disk: open this report in VulnScope (Open report) to list every contact.'
+      : 'This report was saved without full copies of the flows, so the full lists are not available.');
+})();
 function renderPanel(id) {
   const F = D.focus[id], d = nodes.get(id).d, p = $('panel');
-  const nAlert = F.attackers.filter(a => a.kind === 'alert').length;
-  const atk = F.attackers.map(a =>
-    `<div class="row" data-k="atk" data-ip="${esc(a.ip)}"><span class="kind k-${a.kind}" title="${esc(KIND_TXT[a.kind])}"></span>` +
-    `<span class="ip">${esc(a.ip)}</span><span class="lk">${a.sessions ? '← ' + a.sessions : ''}${a.sessions && a.out_sessions ? '  ' : ''}${a.out_sessions ? '→ ' + a.out_sessions : ''}${a.alerts ? ' · ' + a.alerts + ' IPS' : ''}</span>` +
-    `<span class="sub">${esc(KIND_TXT[a.kind])}${a.ports.length ? ' · ports ' + esc(a.ports.join(', ')) : ''}` +
-    `${a.alerts_blocked ? ' · ' + a.alerts_blocked + ' IPS blocked' : ''}` +
-    `${a.dir === 'both' && a.out_sessions ? ' · <span style="color:var(--violet)">host also connected out' + (a.out_ports.length ? ' on ' + esc(a.out_ports.join(', ')) : '') + '</span>' : ''}` +
-    `${a.dir === 'out' && a.out_ports.length ? ' · ports ' + esc(a.out_ports.join(', ')) : ''}` +
-    `${a.signatures.length ? '<br>' + esc(a.signatures.join('; ')) : ''}</span></div>`).join('') ||
-    '<div class="row"><span></span><span class="sub">No north/south traffic to or from this host in the telemetry.</span></div>';
-  const peers = F.peers.map(q => {
-    const pd = peerNode(q.ip).d, nm = pd.name ? pd.name.split('.')[0] : q.ip, none = q.band === 'None';
-    const o = none ? q.out_tries : q.out, i = none ? q.in_tries : q.in;
-    const dir = (o ? `→ ${o}` : '') + (o && i ? '  ' : '') + (i ? `← ${i}` : '');
-    return `<div class="row peer" data-k="peer" data-ip="${esc(q.ip)}"><div class="bar b-${q.band}"><i style="width:${Math.round(q.p * 100)}%"></i></div>` +
-      `<span>${D.focus[q.ip] ? `<span class="go" data-go="${esc(q.ip)}">${esc(nm)}</span>` : esc(nm)} <span class="ip" style="color:var(--muted);font-size:11px">${esc(q.ip)}</span></span>` +
-      `<span class="lk" style="color:${BAND[q.band]}">${none ? 'no session' : Math.round(q.p * 100) + '% ' + q.band}</span>` +
-      `<span class="sub">${esc(dir)} ${none ? 'attempts, none completed' : 'sessions'}${q.ports_out.length ? ' · ' + (none ? 'tried ' : 'uses ') + esc(q.ports_out.join(', ')) : ''}${pd.scanned ? ' · worst ' + esc(pd.sev || 'none') : ' · not scanned'}</span>` +
-      `<ul class="why" hidden>${q.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`;
-  }).join('') || '<div class="row"><span></span><span class="sub">No east/west traffic to or from this host in the telemetry.</span></div>';
+  for (const kind of ['atk', 'peer']) panelLists[kind] = {query: '', sort: 'priority', expanded: false, page: 0};
+  const nAlert = F.capped ? F.capped.kinds.alert || 0 : F.attackers.filter(a => a.kind === 'alert').length;
+  const ipSection = (kind, title) => `<section class="ip-section"><h3>${title}</h3><div class="ip-list-tools">` +
+    `<input type="search" data-ip-search="${kind}" aria-label="Search ${kind === 'atk' ? 'outside addresses' : 'internal peers'}" placeholder="Search IP${kind === 'peer' ? ' or name' : ''}">` +
+    `<select data-ip-sort="${kind}" aria-label="Sort ${kind === 'atk' ? 'outside addresses' : 'internal peers'}"><option value="priority">Priority</option>` +
+    `<option value="ip">IP address</option><option value="activity">Activity</option>${kind === 'peer' ? '<option value="likelihood">Likelihood estimate</option>' : ''}</select></div>` +
+    `<div data-ip-results="${kind}"></div></section>`;
   const h2list = F.hop2.filter(q => q.p >= 0.05).slice(0, 12);
-  const hop2 = h2list.length ? `<h3>Two hops out</h3>` + h2list.map(q =>
-    `<div class="row peer" data-k="peer" data-ip="${esc(q.ip)}"><div class="bar b-${q.band}"><i style="width:${Math.round(q.p * 100)}%"></i></div>` +
-    `<span class="ip">${esc(q.ip)}</span><span class="lk" style="color:${BAND[q.band]}">${Math.round(q.p * 100)}%</span>` +
-    `<span class="sub">via ${esc(q.via)}</span><ul class="why" hidden>${q.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`).join('') : '';
+  const hop2 = h2list.length ? `<h3>Possible onward connections</h3>` +
+    `<p class="onward-note">Each path follows observed connections through a directly connected internal host. These scores are investigation leads, not confirmed compromise.</p>` +
+    h2list.map(q =>
+      `<div class="row peer" data-k="peer" data-ip="${esc(q.ip)}"><div class="bar b-${q.band}"><i style="width:${Math.round(q.p * 100)}%"></i></div>` +
+      `<span class="ip">${esc(shown(q.ip))}</span><span class="lk" style="color:${BAND[q.band]}">${Math.round(q.p * 100)}%</span>` +
+      `<span class="sub">via ${esc(shown(q.via))}</span><ul class="why" hidden>${q.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`).join('') : '';
+  const sharedVuln = new Map((d.sh || []).filter(j => ITEMS[j].k === 'vuln').map(j => [ITEMS[j].label, ITEMS[j]]));
   const fds = F.findings.map(f =>
     `<div class="fd"><span class="pill ${esc(f.pri)}">${esc(f.pri)}</span> <b>${esc(f.name)}</b>` +
+    (sharedVuln.has(f.name) ? ` <span class="shared-badge" title="Also found in other compared reports">IN ${sharedVuln.get(f.name).reports} REPORTS</span>` : '') +
     `<div class="meta">${f.port ? esc(f.port + '/' + f.proto) : 'host-level'} · ${esc(f.sev)} · CVSS ${Number(f.cvss).toFixed(1)}` +
-    `${f.exploit ? ' · public exploit' : ''} · score ${f.score}${f.cves.length ? ' · ' + esc(f.cves.join(', ')) : ''}<br>${esc(f.exposure)}</div>` +
+    `${f.exploit ? ' · public exploit' : ''} · score ${f.score}${f.cves.length ? ' · ' + f.cves.map(c => iocButton('cve', c)).join(', ') : ''}<br>${esc(f.exposure)}</div>` +
     f.evidence.map(e => `<div class="ev"><span class="tag ${e.c === 'corroborated' ? 'likely' : 'lead'}">${e.c === 'corroborated' ? 'LIKELY' : 'LEAD'}</span> ${esc(e.t)}</div>`).join('') + '</div>').join('');
   p.innerHTML =
-    `<div style="display:flex;justify-content:space-between;gap:8px;align-items:start"><div><h2>${esc(d.name ? d.name.split('.')[0] : id)}</h2>` +
-    `<div class="ipline">${esc(id)}${d.name ? ' · ' + esc(d.name) : ''}</div><div class="ipline">${esc(d.os)}</div></div>` +
-    `<div style="text-align:right"><span class="pill ${esc(d.pri)}">${esc(d.pri)}</span><div class="ipline">score ${d.score}</div>` +
+    `<div style="display:flex;justify-content:space-between;gap:8px;align-items:start"><div><h2>${esc(d.name ? d.name.split('.')[0] : shown(id))}</h2>` +
+    `<div class="ipline">${esc(shown(id))}${d.name ? ' · ' + esc(d.name) : ''}</div><div class="ipline">${esc(d.os)}</div>` +
+    (COMBINED ? `<div class="ipline net-line">${esc(netLabel(d))} · ${esc((repOf(d).generated || '').slice(0, 10))}</div>` :
+      netOf(d) ? `<div class="ipline net-line${netOf(d).cloud ? ' cloud' : ''}">${esc(netTag(netOf(d)))} · ${esc(netOf(d).cidr)}</div>` : '') + `</div>` +
+    `<div style="text-align:right">${telemetryOnly ? '<span class="pill">UNKNOWN</span><div class="ipline">No vulnerability data</div>' : `<span class="pill ${esc(d.pri)}">${esc(d.pri)}</span><div class="ipline">score ${d.score}</div>`}` +
     (d.ev ? `<span class="tag ${d.ev}">${d.ev === 'likely' ? 'LIKELY EXPLOITATION' : 'LEAD'}</span>` : '') + `</div></div>` +
     `<div class="stats"><div class="stat red"><b>${F.attackers_total}</b><span>outside addresses (N/S)${nAlert ? `, ${nAlert} with IPS alerts` : ''}</span></div>` +
-    `<div class="stat pink"><b>${F.peers_total}</b><span>internal hosts (E/W) · ${F.blast.high} high, ${F.blast.medium} med</span></div>` +
-    `<div class="stat"><b>${F.hop2.length}</b><span>more two hops out</span></div></div>` +
-    (state.history.length ? `<p style="margin:10px 0 0"><button id="btn-back">← Back to ${esc(state.history[state.history.length - 1])}</button></p>` : '') +
-    `<h3>North / south: outside addresses</h3>${atk}` +
-    (F.attackers_total > F.attackers.length ? `<div class="row"><span></span><span class="sub">${F.attackers_total - F.attackers.length} more not shown</span></div>` : '') +
-    `<h3>East / west: internal hosts · blast radius if exploited</h3>${peers}${hop2}` +
-    (F.peers_total > F.peers.length ? `<div class="row"><span></span><span class="sub">${F.peers_total - F.peers.length} more not shown</span></div>` : '') +
-    `<h3>Vulnerabilities</h3>${fds || '<div class="fd">None at the configured severity.</div>'}` +
-    `<div class="note">This view shows all traffic to and from the host in the telemetry: outside addresses on the left, internal hosts on the right. Inbound outside traffic is targeting, not proof of compromise. ` +
-    `Likelihood is an estimate from observed sessions, the ports in use and the scanner's findings on each peer. Use it to decide where to look first; only host evidence confirms a compromise. Click a row for the reasons.</div>`;
+    `<div class="stat pink"><b>${F.peers_total}</b><span>internal hosts (E/W)${telemetryOnly ? '' : ` · ${F.blast.high} high, ${F.blast.medium} med`}</span></div></div>` +
+    (F.probed_only ? `<p class="direction-note">Also probed ${F.probed_only.toLocaleString()} internal address${F.probed_only === 1 ? '' : 'es'} that never answered (not counted as hosts)${F.probed_blocked ? `; a firewall blocked the traffic to ${F.probed_blocked.toLocaleString()} of them` : ''}: ` +
+      (F.probed_ranges || []).map(([sn, n]) => `${esc(sn)} (${n})`).join(', ') +
+      (F.probed_ranges_total > (F.probed_ranges || []).length ? ` and ${F.probed_ranges_total - F.probed_ranges.length} more range${F.probed_ranges_total - F.probed_ranges.length === 1 ? '' : 's'}` : '') + `.</p>` : '') +
+    (state.history.length ? `<p style="margin:10px 0 0"><button id="btn-back">← Back to ${esc(shown(state.history[state.history.length - 1]))}</button></p>` : '') +
+    (COMBINED ? sharedSection(id, d) : '') +
+    `<p class="direction-note">Recorded direction: source/originator → destination/responder. Ports are source → destination; ? means the log did not provide a port. Logged application labels appear only when supplied.</p>` +
+    ipSection('atk', 'North / south: outside addresses') +
+    ipSection('peer', telemetryOnly ? 'East / west: observed internal connections' : 'East / west: internal hosts · blast radius if exploited') + hop2 +
+    otExamples(F.ot_events, F.ot_events_total) +
+    `<h3>Vulnerabilities</h3>${telemetryOnly || (COMBINED && repOf(d).telemetry_only) ? '<div class="fd">No vulnerability data available; status unknown.</div>' : fds || '<div class="fd">None at the configured severity.</div>'}` +
+    (D.ioc_matches && D.ioc_matches.some(item => item.hosts.includes(id))
+      ? `<h3>IOC matches</h3><div class="note">Exact IOC matches are leads for review.</div>` +
+        D.ioc_matches.filter(item => item.hosts.includes(id)).map(item =>
+          `<div class="fd">${iocButton(item.type, item.value)} <span class="meta">${esc(item.type)} · ${item.articles.length} source link(s)</span> · ${iocButton(item.type, item.value, 'View details')}</div>`).join('')
+      : '') +
+    `<div class="note">This view shows observed traffic to and from the host: outside addresses on the left, internal hosts on the right. Outside contact alone is not proof of compromise. ` +
+    (telemetryOnly ? 'Vulnerability status is unknown. Review alerts and IOC matches as leads; only host evidence confirms a compromise.' :
+    `Likelihood is an estimate from observed sessions, the ports in use and the scanner's findings on each peer. Use it to decide where to look first; only host evidence confirms a compromise. Click a row for the reasons.`) + '</div>';
   p.hidden = false; p.scrollTop = 0;
+  renderIpList('atk'); renderIpList('peer');
   const back = $('btn-back'); if (back) back.onclick = () => focus(state.history.pop(), false);
 }
 $('panel').addEventListener('click', e => {
   const go = e.target.closest('[data-go]'); if (go) { focus(go.dataset.go); return; }
+  const expand = e.target.closest('[data-ip-expand]');
+  if (expand) { panelLists[expand.dataset.ipExpand].expanded = true; renderIpList(expand.dataset.ipExpand); return; }
+  const collapse = e.target.closest('[data-ip-collapse]');
+  if (collapse) { const s = panelLists[collapse.dataset.ipCollapse]; s.expanded = false; s.page = 0; renderIpList(collapse.dataset.ipCollapse); return; }
+  const page = e.target.closest('[data-ip-page]');
+  if (page) { const s = panelLists[page.dataset.ipPage]; s.page += Number(page.dataset.step); renderIpList(page.dataset.ipPage); return; }
   const row = e.target.closest('.row.peer'); if (row) { const w = row.querySelector('.why'); if (w) w.hidden = !w.hidden; }
 });
+$('panel').addEventListener('input', e => {
+  if (!e.target.matches('[data-ip-search]')) return;
+  const kind = e.target.dataset.ipSearch, s = panelLists[kind];
+  s.query = e.target.value; s.page = 0; renderIpList(kind);
+});
+$('panel').addEventListener('change', e => {
+  if (!e.target.matches('[data-ip-sort]')) return;
+  const kind = e.target.dataset.ipSort, s = panelLists[kind];
+  s.sort = e.target.value; s.page = 0; renderIpList(kind);
+});
 $('panel').addEventListener('mouseover', e => {
-  const row = e.target.closest('.row[data-ip]'); const F = D.focus[state.focus];
+  const row = e.target.closest('[data-k][data-ip]'); const F = D.focus[state.focus];
   if (!row || !F) { state.hoverEdge = null; return; }
   const ip = row.dataset.ip;
   state.hoverEdge = (row.dataset.k === 'atk' ? F.attackers : F.peers.concat(F.hop2)).find(x => x.ip === ip) || null;
@@ -560,38 +1729,156 @@ $('panel').addEventListener('mouseleave', () => { state.hoverEdge = null; state.
 // ---------------------------------------------------------------- controls
 function toggleLabels() { state.labels = !state.labels; $('btn-labels').setAttribute('aria-pressed', state.labels); }
 function toggleMotion() {
-  state.motion = !state.motion; $('btn-motion').setAttribute('aria-pressed', state.motion);
+  state.motion = !state.motion; $('btn-motion').setAttribute('aria-pressed', state.motion); markView();
   if (state.mode === 'focus') focus(state.focus, false);
 }
 $('btn-overview').onclick = () => { overview(); };
 $('btn-labels').onclick = toggleLabels;
 $('btn-motion').onclick = toggleMotion;
-// Fly-Through: each click flies to the next P1/P2 host (Shift+click goes back); it never advances on its own
-$('btn-tour').onclick = e => {
-  const ids = hostOrder().filter(id => ['P1', 'P2'].includes(nodes.get(id).d.pri));
-  const list = ids.length ? ids : hostOrder();
-  const at = list.indexOf(state.focus);
-  focus(list[at < 0 ? 0 : (at + (e.shiftKey ? list.length - 1 : 1)) % list.length]);
+$('btn-3d').hidden = !can3d;
+// one switcher for the four views: flat network, 3D network, attack paths (attackpaths.js), timeline (timeline3d.js)
+let otherOpen = false;   // Attack paths or Timeline was showing at the last markSeg
+function markSeg() {
+  const ap = document.getElementById('attack-paths'), paths = !!ap && !ap.hidden;
+  const tv = document.getElementById('timeline-view'), tl = !!tv && !tv.hidden, other = paths || tl;
+  // leaving Attack paths / Timeline back onto the 3D overview (Esc or its 3D button) restarts the Low spin
+  if (otherOpen && !other && R3 && state.mode === 'overview') homeView();
+  otherOpen = other;
+  $('vw-flat').classList.toggle('on', !other && !R3); $('btn-3d').classList.toggle('on', !other && !!R3);
+  $('btn-paths').classList.toggle('on', paths); $('btn-timeline').classList.toggle('on', tl);
+  for (const id of ['vw-flat', 'btn-3d', 'btn-paths', 'btn-timeline']) $(id).setAttribute('aria-current', $(id).classList.contains('on') ? 'true' : 'false');
+  placeViewctl(); updateAbout();
+}
+// "what am I looking at": the ? at the right end of the top buttons opens a short note, worded for the current view, centered under the picture.
+// It opens by itself for 15 s when the page loads or the view changes, then folds back into the ?
+// (hovering keeps it open); the ? or the ? key opens and closes it by hand.
+const ABOUT_MS = 15000;
+let aboutTimer = 0, aboutShown = '';
+const ABOUT = telemetryOnly ? {
+  flat: 'Each dot is an internal host seen in the logs, grouped by subnet; <b>bigger dots</b> had more contact with outside addresses and <b>blue lines</b> are traffic between hosts. No scan was loaded, so vulnerability status is unknown. Click a host to see who it talked to.',
+  '3d': 'Each platform is a subnet and each pillar a host; <b>taller</b> means more contact with outside addresses. Outside addresses sit on the arc above: <b>beams down</b> reach a host, <b>violet beams up</b> are hosts calling out. Click a host to see who it talked to.',
+  focus: h => `<b>${esc(h)}</b> in the middle. <b>Left:</b> outside addresses it exchanged traffic with (north/south). <b>Right:</b> internal hosts it talked to (east/west). Esc or ← All hosts goes back.`,
+} : {
+  flat: 'Each dot is a scanned host, grouped by subnet and colored by its worst finding; <b>bigger dots</b> carry a higher risk score and <b>blue lines</b> are traffic between hosts. Click a host to see who reached it and how far a compromise could spread.',
+  '3d': 'Each platform is a subnet and each pillar a host; <b>taller</b> means a higher risk score. Outside addresses sit on the arc above: <b>beams down</b> reach a host, <b>violet beams up</b> are hosts calling out. Click a host for detail.',
+  focus: h => `<b>${esc(h)}</b> in the middle. <b>Left:</b> outside addresses that touched it (north/south). <b>Right:</b> internal hosts it can reach, colored by how likely a compromise could spread there (east/west). Esc or ← All hosts goes back.`,
 };
+if (COMBINED) {
+  ABOUT.flat = 'Each dashed ring is one compared report\'s network, its subnets and hosts drawn as in its own Explorer; ' +
+    'reports from the same network sit together inside a solid ring with the network\'s name. ' +
+    'Hosts with no IOC match or vulnerability are dim and a <b>teal ring</b> marks an IOC match. ' +
+    '<b>Hover</b> a host to see what it shares with the other reports.';
+  ABOUT['3d'] = 'Each dashed ring is one compared report\'s network: platforms are its subnets and pillars its hosts. ' +
+    'Reports from the same network sit together inside a solid ring with the network\'s name. ' +
+    'Dim hosts have no IOC match or vulnerability. Outside addresses on the arc beam down to every network they reached: ' +
+    '<b>hover</b> one, or a host, to see what it shares with the other reports.';
+}
+function aboutKey() { return state.mode === 'focus' ? 'focus:' + state.focus : R3 ? '3d' : 'flat'; }
+function aboutHtml() {
+  if (state.mode !== 'focus') { const t = ABOUT[R3 ? '3d' : 'flat']; return LIGHT ? t.replace('violet beams', 'blue beams') : t; }
+  const d = D.nodes.find(n => n.id === state.focus) || {};
+  return ABOUT.focus(d.name ? d.name.split('.')[0] + ' (' + shown(state.focus) + ')' : shown(state.focus));
+}
+// The note sits centered under the picture: above the legend, between the host list on the left and
+// whatever is open on the right (host panel, 3D camera controls, Security Assistant).
+function placeAbout() {
+  const box = id => { const el = $(id); if (!el || el.hidden) return null; const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return null; const b = el.getBoundingClientRect(); return b.width && b.height ? b : null; };
+  let l = 18, r = innerWidth - 18, bottom = innerHeight - 14;
+  const rail = box('rail'); if (rail) l = Math.max(l, rail.right + 14);
+  for (const id of ['panel', 'viewctl', 'analyst-chat']) { const b = box(id); if (b && b.bottom > innerHeight / 2) r = Math.min(r, b.left - 14); }
+  const lg = box('legend'); if (lg) bottom = lg.top - 10;
+  if (r - l < 280) { l = 18; r = innerWidth - 18; }   // no room between the side panels: use the full width
+  const root = document.documentElement.style;
+  root.setProperty('--about-left', Math.round(l) + 'px');
+  root.setProperty('--about-right', Math.round(innerWidth - r) + 'px');
+  root.setProperty('--about-bottom', Math.round(innerHeight - bottom) + 'px');
+}
+function closeAbout() { clearTimeout(aboutTimer); $('about').hidden = true; $('about-toggle').setAttribute('aria-expanded', 'false'); }
+function openAbout(ms = ABOUT_MS) {
+  $('about').innerHTML = aboutHtml(); aboutShown = aboutKey(); placeAbout();
+  $('about').hidden = false; $('about-toggle').setAttribute('aria-expanded', 'true');
+  requestAnimationFrame(placeAbout);   // side panels may still be opening for this view
+  clearTimeout(aboutTimer); aboutTimer = setTimeout(closeAbout, ms);
+}
+// called whenever the view may have changed: a new view opens the note again, the same view only refreshes it
+function updateAbout() {
+  if (aboutKey() !== aboutShown) openAbout(); else if (!$('about').hidden) { $('about').innerHTML = aboutHtml(); placeAbout(); requestAnimationFrame(placeAbout); }
+}
+function toggleAbout() { if ($('about').hidden) openAbout(); else closeAbout(); }
+$('about-toggle').onclick = toggleAbout;
+$('about').addEventListener('mouseenter', () => clearTimeout(aboutTimer));
+$('about').addEventListener('mouseleave', () => { clearTimeout(aboutTimer); aboutTimer = setTimeout(closeAbout, 3000); });
+addEventListener('resize', () => { if (!$('about').hidden) placeAbout(); });
+// re-place when a side panel opens or closes (host panel, Security Assistant drawer)
+{ const mo = new MutationObserver(() => { if (!$('about').hidden) placeAbout(); });
+  for (const el of [document.body, $('panel'), $('analyst-chat')]) if (el) mo.observe(el, { attributes: true, attributeFilter: ['class', 'hidden'] }); }
+const closePaths = () => { if (window.VFPaths) window.VFPaths.close(); if (window.VFTimeline) window.VFTimeline.close(); };
+$('vw-flat').onclick = () => { closePaths(); set3d(false, true); };
+$('btn-3d').onclick = () => { closePaths(); set3d(true, true); };
+// the 3D camera controls sit in the lower right, just above the legend
+function placeViewctl() { document.documentElement.style.setProperty('--legend-h', ($('legend').offsetHeight + 24) + 'px'); }
+$('vc-left').onclick = () => rotateView(1);
+$('vc-right').onclick = () => rotateView(-1);
+$('vc-top').onclick = () => setView('top');
+$('vc-tilted').onclick = () => setView('tilted');
+$('vc-low').onclick = () => setView('low');
+$('vc-reset').onclick = () => setView(DEFAULT_VIEW, true);
+$('vc-spin').onclick = () => { view.spin = !(view.spin && state.motion); if (view.spin && !state.motion) toggleMotion(); markView(); };
+markView();
 if (!state.motion) $('btn-motion').setAttribute('aria-pressed', 'false');
 
 $('legend').innerHTML =
+  `<span class="only3d m">Drag: rotate and tilt · right-drag or Shift-drag: pan · middle-drag: up/down · Q / E: rotate · T top · Y tilted · U low · R reset (low, turning)</span>` +
+  `<span class="only3d">${telemetryOnly ? 'Pillar height: outside exposure' : 'Pillar height: risk score'}</span>` +
+  `<span class="only3d"><i style="background:${C('#2ee6d6')}"></i>Arc above: top outside addresses, beams down to hosts they reached, ${LIGHT ? 'blue' : 'violet'} beams up from hosts that called out</span>` +
+  `<span class="only3d"><i style="background:${C('#6ea8ff')}"></i><i style="background:${C('#ff8a3d')};width:12px"></i>Traffic between subnets (orange: mostly admin protocols)</span>` +
+  `<span class="only3d"><i style="background:${C('#ff2e88')}"></i><i style="background:${C('#ffb020')};width:12px"></i>Risky host paths: admin protocol into P1 or flagged host / either one</span>` +
+  (NETS.some(n => n.cloud) ? `<span><i style="background:repeating-linear-gradient(90deg,${CLOUD_COL} 0 6px,transparent 6px 9px)"></i>${CALM ? '' : '☁ '}Cloud network (from the network map)</span>` : '') +
+  (COMBINED ? `<span><span class="sw" style="background:transparent;border:2px solid ${C('#2ee6d6')}"></span>Host with an IOC match</span>` +
+    `<span><i style="background:repeating-linear-gradient(90deg,${C('#78aaff')} 0 8px,transparent 8px 12px)"></i>One report's network · dim hosts: no IOC or vulnerability</span>` : '') +
   `<span><i style="background:${KIND.alert}"></i>IPS alert, not blocked</span>` +
-  `<span><i style="background:${KIND.vuln}"></i>Reached a vulnerable service</span>` +
+  (telemetryOnly ? '' : `<span><i style="background:${KIND.vuln}"></i>Reached a vulnerable service</span>`) +
   `<span><i style="background:${KIND.reached}"></i>Reached the host</span>` +
-  `<span><i style="background:repeating-linear-gradient(90deg,#5b6b82 0 5px,transparent 5px 9px)"></i>Blocked or failed, no session</span>` +
+  `<span><i style="background:repeating-linear-gradient(90deg,${C('#5b6b82')} 0 5px,transparent 5px 9px)"></i>Blocked or failed, no session</span>` +
   `<span><i style="background:${RETURN}"></i>Host connected out</span>` +
-  `<span><i style="background:${BAND.High}"></i><i style="background:${BAND.Medium};width:12px"></i><i style="background:${BAND.Low};width:12px"></i>Blast-radius likelihood high / medium / low</span>` +
-  `<span><span class="sw" style="background:${SEV.Critical}"></span>Critical <span class="sw" style="background:${SEV.High}"></span>High <span class="sw" style="background:${SEV.Medium}"></span>Medium <span class="sw" style="background:${SEV.Low}"></span>Low</span>` +
-  `<span class="cal">Leads and estimates, not confirmed compromise</span>`;
+  `<span><span class="sw" style="background:transparent;border:2px solid ${C('#2ee6d6')}"></span>Click outlined IP or domain IOC for report overview</span>` +
+  (telemetryOnly ? '' : `<span><i style="background:${BAND.High}"></i><i style="background:${BAND.Medium};width:12px"></i><i style="background:${BAND.Low};width:12px"></i>Blast-radius likelihood high / medium / low</span>` +
+  `<span><span class="sw" style="background:${SEV.Critical}"></span>Critical <span class="sw" style="background:${SEV.High}"></span>High <span class="sw" style="background:${SEV.Medium}"></span>Medium <span class="sw" style="background:${SEV.Low}"></span>Low</span>`) +
+  `<span class="cal">${telemetryOnly ? 'No vulnerability data; status unknown' : 'Leads and estimates, not confirmed compromise'}</span>`;
+
+// Restrained themes: a one-line key. Mouse and keyboard help lives in the "?" note and the button tooltips.
+if (CALM) $('legend').innerHTML =
+  `<span><i style="background:${KIND.alert}"></i>IPS alert, not blocked</span>` +
+  (telemetryOnly ? '' : `<span><i style="background:${KIND.vuln}"></i>Vulnerable service reached</span>`) +
+  `<span><i style="background:${KIND.reached}"></i>Other traffic</span>` +
+  (telemetryOnly ? '' : `<span class="only3d"><i style="background:${BAND.High}"></i>Admin path into a P1 or flagged host</span>`) +
+  `<span><i style="background:${RETURN}"></i>Host connected out</span>` +
+  `<span><i style="background:repeating-linear-gradient(90deg,${KIND.blocked} 0 5px,transparent 5px 9px)"></i>Blocked or failed</span>` +
+  `<span><span class="sw" style="background:transparent;border:2px solid ${C('#2ee6d6')}"></span>IOC match</span>` +
+  (NETS.some(n => n.cloud) ? `<span><i style="background:repeating-linear-gradient(90deg,${CLOUD_COL} 0 6px,transparent 6px 9px)"></i>Cloud network</span>` : '') +
+  (telemetryOnly ? '' : `<span><span class="sw" style="background:${SEV.Critical}"></span>Critical <span class="sw" style="background:${SEV.High}"></span>High <span class="sw" style="background:${SEV.Medium}"></span>Medium <span class="sw" style="background:${SEV.Low}"></span>Low</span>`) +
+  `<span class="cal">${telemetryOnly ? 'No vulnerability data; status unknown' : 'Leads and estimates, not confirmed compromise'}</span>`;
 
 const c = D.counts, w = D.window;
-$('subtitle').textContent = `${c.hosts} scanned hosts · ${c.flows.toLocaleString()} sessions · ${c.p1} P1 · ${c.alerts} IPS alerts` +
+if (COMBINED) {
+  const nI = ITEMS.filter(it => it.k === 'ioc').length, nV = ITEMS.length - nI, C = COMBINED;
+  $('subtitle').textContent = `${REPS.length} reports · ${C.networks} network${C.networks === 1 ? '' : 's'} · ` +
+    `${C.drawn.toLocaleString()}${C.drawn < C.hosts ? ' of ' + C.hosts.toLocaleString() : ''} hosts · ` +
+    `${nI} shared IOC${nI === 1 ? '' : 's'} · ${nV} shared vulnerabilit${nV === 1 ? 'y' : 'ies'}` +
+    (w[0] ? ` · ${w[0].slice(0, 10)} → ${(w[1] || '').slice(0, 10)}` : '');
+} else $('subtitle').textContent = (telemetryOnly ? `${c.hosts} observed hosts · no vulnerability data · ${c.flows.toLocaleString()} sessions · ${c.alerts} IPS alerts` : `${c.hosts} scanned hosts · ${c.flows.toLocaleString()} sessions · ${c.p1} P1 · ${c.alerts} IPS alerts`) +
   (w[0] ? ` · ${w[0].slice(0, 10)} → ${(w[1] || '').slice(0, 10)}` : '');
 
 // ---------------------------------------------------------------- start
-resize(); renderList(); fitOverview();
-const introText = `Correlating ${c.hosts} hosts against ${c.flows.toLocaleString()} sessions`;
+resize();
+{
+  let pref = null; try { pref = localStorage.getItem(KEY3D); } catch (_) {}
+  const q = location.search + location.hash;
+  set3d(can3d && !/[?&#]2d\b/.test(q) && (/[?&#]3d\b/.test(q) || pref !== '0'), false);
+}
+renderList(); fitOverview(); placeViewctl();
+const introText = COMBINED ? `Combining ${REPS.length} reports from ${COMBINED.networks} network${COMBINED.networks === 1 ? '' : 's'}` : telemetryOnly ? `Exploring ${c.hosts} observed hosts and ${c.flows.toLocaleString()} sessions` : `Correlating ${c.hosts} hosts against ${c.flows.toLocaleString()} sessions`;
 if (state.motion) {
   let i = 0; const it = setInterval(() => { $('intro-text').textContent = introText.slice(0, ++i) + (i < introText.length ? '▌' : ''); if (i >= introText.length) clearInterval(it); }, 22);
   setTimeout(() => $('intro').classList.add('gone'), 1500);
@@ -600,5 +1887,12 @@ const m = location.hash.match(/host=([^&]+)/);
 if (m && D.focus[decodeURIComponent(m[1])]) {
   if (state.motion) setTimeout(() => focus(decodeURIComponent(m[1])), 900); else { focus(decodeURIComponent(m[1])); snap(); }
 }
+// lets the Attack paths view (attackpaths.js) hand a host back to this view
+// stats(): read-only counts for the browser smoke test (scripts/smoke): hosts in the data and, in 3D, host bodies drawn
+// and, on the all-networks map, where each report's island and each network's ring are
+const stats = () => Object.assign({hosts: D.nodes.length, mode: state.mode, is3d: !!R3}, R3 && R3.stats ? R3.stats() : {},
+  COMBINED ? {islands: islands.filter(Boolean).map(i => ({k: i.k, net: netKey(i.info.network), x: i.x, y: i.y, r: i.r})),
+              nets: nets.map(nt => ({name: nt.name, x: nt.x, y: nt.y, r: nt.r, ks: nt.ks}))} : {});
+window.VFExplorer = {focus: id => focus(id), overview: () => overview(), set3d: on => set3d(on, true), is3d: () => !!R3, can3d, markSeg, stats};
 requestAnimationFrame(frame);
-})();
+});
