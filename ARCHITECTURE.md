@@ -66,7 +66,8 @@ The same path in text:
 ```text
 Folder path, Browse, upload, or command line
   → format detection by content (PCAP → Zeek logs; Filebeat export → Zeek records)
-  → streaming parsers, batches of records
+  → streaming parsers, batches of records; ordinary Zeek conn logs and Palo Alto CSV are read
+    by DuckDB directly (native readers), anything unusual by the Python parser
   → Parquet (flows; Zeek/OT events zstd-compressed), one process per input file in parallel,
     in a temporary working directory
   → DuckDB: sort, de-duplicate across sensors, join with scan findings
@@ -78,14 +79,18 @@ Folder path, Browse, upload, or command line
 | Module | Knowledge hidden behind its interface |
 | --- | --- |
 | `vulnflow/parsers/` | Format detection and per-source field rules: Zeek TSV/JSON and Zui/Brim exports, Palo Alto, Suricata, generic flows, Nessus, Filebeat ECS reversal |
+| `vulnflow/parsers/native.py` | DuckDB readers for ordinary Zeek conn TSV and Palo Alto CSV; any file they cannot take whole goes to the Python parser (`VULNSCOPE_NATIVE_READERS=0` turns them off) |
 | `vulnflow/pcap.py` | Finding Zeek, running it on a capture into a temporary folder, reporting unreadable captures |
 | `vulnflow/normalize.py`, `schema.py` | Canonical `Flow`, `ThreatEvent`, `Finding` and Zeek/OT event records; IP, protocol and time normalization |
+| `vulnflow/db.py` | The one place a DuckDB connection is opened: refuses DuckDB older than 1.2 and 1.3.0, and turns off extension downloads |
 | `vulnflow/store.py` | Batched Parquet writing, cross-sensor de-duplication and DuckDB queries |
+| `vulnflow/model.sql`, `sqlfile.py` | The correlator's named SQL queries in one file, and the loader for them |
 | `vulnflow/resources.py` | DuckDB memory, thread and spill sizing; one-job-at-a-time slot; limit-hit messages |
 | `vulnflow/correlate.py` | Exposure, blast radius, indicator grading, scoring weights and coverage |
 | `vulnflow/netmap.py` | Optional network map parsing and on-prem/cloud labeling |
 | `vulnflow/scanners.py` | Scanner detection from traffic, the optional `known_scanners.csv`, the one-way sensor check |
 | `vulnflow/ioc_archive.py`, `article_preview.py`, `article_brief.py` | IOC CSV matching, source previews, optional OpenAI article briefs |
+| `vulnflow/results_schema.py` | The declared shape of `results.json` (published as `docs/results.schema.json`); fresh and reopened reports are checked against it |
 | `vulnflow/report.py`, `diagram.py`, `visual.py`, `explore.py` | Report shape and wording, themes, the hostile activity diagram, Explorer data |
 | `vulnflow/static/` | Explorer, 3D, Attack paths and Timeline views (three.js bundled) |
 | `vulnflow/llm.py`, `offline_assistant.py` | Provider adapters, grounding, redaction, and the built-in offline assistant |

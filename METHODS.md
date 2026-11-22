@@ -27,7 +27,7 @@ skipped. Zeek and Palo Alto files can be plain or `.gz`.
 
 | Kind | Format | Notes |
 | --- | --- | --- |
-| Telemetry | Zeek `conn.log` (TSV or JSON) | `conn_state` decides completed vs. failed sessions. A session the capture joined mid-stream (`OTH`, `SH`, `SHR`) counts as completed when the history shows an ACK or data from both sides; a UDP/ICMP session (an answered ping) when packets went both ways. `REJ` (the host answered with a reset) is reported as *refused by the host*, not as a firewall block; only firewall/IPS logs report blocks. |
+| Telemetry | Zeek `conn.log` (TSV or JSON; JSON with `id.orig_h`, nested `id` objects or `id_orig_h` field names) | `conn_state` decides completed vs. failed sessions. A session the capture joined mid-stream (`OTH`, `SH`, `SHR`) counts as completed when the history shows an ACK or data from both sides; a UDP/ICMP session (an answered ping) when packets went both ways. `REJ` (the host answered with a reset) is reported as *refused by the host*, not as a firewall block; only firewall/IPS logs report blocks. |
 | Alerts | Zeek `notice.log` (TSV or JSON) | Notices about hosts become IPS/IDS alerts used as exploitation evidence. `CaptureLoss::` notices and `capture_loss.log` are a sensor-quality signal instead: the reports warn when Zeek estimated 1% or more packet loss. Zeek's bookkeeping logs (`loaded_scripts`, `stats`, `packet_filter`, `reporter`, ...) are skipped. |
 | Context | Other Zeek streams (TSV or JSON, including `.log.gz`) | `#path` identifies TSV streams; JSON uses `_path` or the filename. DNS, HTTP, SMTP, files, custom streams and others are preserved in `normalized/zeek_events.jsonl` with typed fields and per-stream counts. They do not create extra sessions. |
 | Industrial telemetry | Zeek Modbus, DNP3, BACnet, S7, EtherNet/IP, CIP, OPC UA logs | Preserved in `normalized/ot_events.jsonl` with protocol, operation, endpoints and direction when available. Observed operations do not become alerts automatically. |
@@ -311,7 +311,8 @@ it is set.
 
 **A local interface does not make every feature offline.** VulnScope never contacts the hosts,
 IPs or domains in your data: there are no DNS, reverse-DNS, WHOIS or geolocation lookups, no CVE
-feed downloads and no update checks. Zeek reads captures offline. The only outbound connections are:
+feed downloads and no update checks. Zeek reads captures offline, and DuckDB's on-demand extension
+downloads are turned off. The only outbound connections are:
 
 | Feature | When | What is sent | Stopped by `VULNSCOPE_OFFLINE=1` |
 | --- | --- | --- | --- |

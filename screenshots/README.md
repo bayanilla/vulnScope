@@ -30,11 +30,11 @@ Outside addresses appear to the left, connected internal hosts to the right, and
 
 ## Upload workflow and reports
 
-<a href="upload_current.jpg"><img src="upload_current.jpg" alt="Current Múcaro VulnScope upload page" width="600"></a>
+<a href="upload_current.jpg"><img src="upload_current.jpg" alt="The upload page: report details, options, then a folder to analyze" width="600"></a>
 
-The upload page accepts a local folder or selected telemetry, scan, and IOC CSV files.
+The upload page: optional report details, then Options used by either way of analyzing (internal networks, an IOC CSV, skipping the large copies), a folder to analyze in place, and uploads folded under **Upload files instead**.
 
-<a href="upload_olive_drab.jpg"><img src="upload_olive_drab.jpg" alt="Upload page with the Olive Drab map background" width="600"></a>
+<a href="upload_olive_drab.jpg"><img src="upload_olive_drab.jpg" alt="The upload page in the Olive Drab theme" width="600"></a>
 
 Olive Drab uses a subdued map backdrop; SOC Dark and Matrix use signal lines, while Light uses a soft gradient.
 

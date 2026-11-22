@@ -88,4 +88,5 @@ To check the container, `docker compose ps` should show it as `Up` (not `Restart
 | Problem | What to do |
 |---|---|
 | `ModuleNotFoundError: No module named 'duckdb'` | DuckDB is installed in a different Python than the one running VulnScope. Activate your virtual environment, then `python3 -m pip install -r requirements.txt` with the same `python3`. |
+| "DuckDB … is installed, and it gives wrong or no results for this analysis" | That DuckDB version is refused: older than 1.2 cannot run the analysis and 1.3.0 silently drops rows. Run `python3 -m pip install -r requirements.txt` (it asks for `duckdb>=1.2,!=1.3.0,<2`). |
 | "Packet captures need Zeek to be analyzed" | Zeek is not installed or not on the PATH. Install it (`brew install zeek` or your Linux package) or set `VULNSCOPE_ZEEK=/path/to/zeek`, or use the Docker image, which includes Zeek. |

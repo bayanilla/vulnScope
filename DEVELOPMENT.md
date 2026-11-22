@@ -95,7 +95,11 @@ failing step's log is one click away under **Details**.
 | `test_fuzz_parsers.py` | Fuzzing every reader, format detection and the PCAP hand-off with hostile and damaged files |
 | `test_accuracy_kit.py`, `test_correlation_accuracy.py` | Hand-checked correlation answers: the three-round kit and targeted regression cases |
 | `test_workflow.py` | Parsing, normalization, correlation, scoring and reports end to end; the bundled samples; the Docker entry point |
-| `test_scale.py`, `test_resources.py` | Streaming, Parquet/DuckDB de-duplication, memory/thread/disk sizing |
+| `test_scale.py`, `test_resources.py`, `test_parallel_parse.py` | Streaming, Parquet/DuckDB de-duplication, memory/thread/disk sizing, parallel parsing and the optional normalized copies |
+| `test_db.py`, `test_model_sql.py`, `test_sql_exports.py` | DuckDB connection rules (refused versions, no extension downloads); `model.sql` matches the correlator; work moved into SQL gives what the Python loops gave |
+| `test_native_readers.py` | The native DuckDB readers give exactly what the Python parsers give, including on damaged files |
+| `test_results_schema.py` | Every analysis fits the declared `results.json` shape, the published schema matches the code, a broken saved file is refused |
+| `test_vpcflow.py`, `test_zeek_underscore_ids.py` | AWS VPC Flow Logs delivery shapes and request/reply joining; Zeek JSON with `id_orig_h` names |
 | `test_pcap.py`, `test_filebeat.py` | Packet capture conversion; Filebeat CSV/NDJSON back to Zeek |
 | `test_capture_accuracy.py` | Mid-stream sessions, answered pings, broadcasts, capture loss, Zui/Brim exports, Suricata mid-stream flows |
 | `test_explore.py`, `test_visual.py` | Explorer data, drawing limits, HTML output |
@@ -103,11 +107,11 @@ failing step's log is one click away under **Details**.
 | `test_scanners.py` | Hosts vs probed-only addresses, scanner detection, `known_scanners.csv`, probed ranges, firewall blocks, the one-way sensor warning |
 | `test_llm.py`, `test_offline_assistant.py` | Provider adapters, redaction, grounding; the built-in assistant |
 | `test_article_brief.py`, `test_radar.py` | Article briefs and Radar lookups with stubbed services |
-| `test_branding.py` | Branding page, logo validation |
+| `test_branding.py`, `test_theme.py` | Branding page, logo validation; Graphite as the default theme |
 | `test_saved.py`, `test_report_name.py` | Reopening a saved report; report names, networks and timestamped run folders |
 | `test_compare.py` | Compare reports: counts per report and network, the re-hunt over saved data, the all-networks Explorer (islands, shared items per host, fair trimming), command line and page, the two-company sample |
 | `test_sites.py` | A folder with a `sites.csv`: reading and checking the list, files shared by every site, a report per site and their comparison from the command line and the upload page |
-| `test_web_errors.py` | Which analysis errors the upload page shows, and which go to the server console |
+| `test_web_errors.py`, `test_upload_options.py` | Which analysis errors the upload page shows, and which go to the server console; the shared Options (IOC CSV with a folder run) and the folded upload form |
 | `test_release.py` | The ready-made image's `compose.release.yaml` matches `compose.yaml` apart from the image and project name; default port 8765 on the host; `.env.example` does not pin an image |
 
 ## Samples

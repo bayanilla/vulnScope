@@ -101,12 +101,13 @@ If detection guesses a format wrong, force it with `--format file.csv=paloalto`.
 
 On the upload page:
 
-1. Enter a folder path or click **Browse…**, then **Analyze folder**. Files are read where they
-   sit; nothing is copied. You can also upload files (up to 1 GB each by default).
-2. Optionally list your internal networks. The default is RFC 1918, CGNAT, loopback, link-local and
-   ULA ranges.
-3. Optionally open **Report details** to name the run and its network. These label the reports and
-   group runs in Compare reports.
+1. Optionally fill in **Report details** to name the run and its network. These label the reports
+   and group runs in Compare reports.
+2. Optionally set **Options**: your internal networks (the default is RFC 1918, CGNAT, loopback,
+   link-local and ULA ranges), an IOC CSV, and **Skip full copies** for large inputs. They apply to
+   a folder run and to uploads alike.
+3. Enter a folder path or click **Browse…**, then **Analyze folder**. Files are read where they
+   sit; nothing is copied. Or open **Upload files instead** (up to 1 GB per upload by default).
 
 From the command line:
 
@@ -204,6 +205,8 @@ made with. Settings, runs and branding are kept. Coming from PRO, MAX or ULTRA? 
 | [Development](DEVELOPMENT.md) | Tests, benchmarks, builds and releases |
 | [Local API](API.md) | The upload page's HTTP routes |
 | [Configured limits](docs/LIMITS.md) | Every numeric bound in one table |
+| [Engine](docs/ENGINE.md) | The DuckDB engine changes carried over from ULTRA, and their speed |
+| [Upgrade](UPGRADE.md) | Moving from vulnScope PRO, VulnScope MAX or ULTRA |
 | [Changelog](CHANGELOG.md) | Notable changes per release |
 
 ## License
