@@ -236,6 +236,13 @@ class CompareTests(unittest.TestCase):
         blob = re.search(r'<script type="application/json" id="cmp-data">(.*?)</script>', page, re.S)[1]
         self.assertEqual(json.loads(blob)["reports"][0]["name"], "</script><script>alert(1)</script>")
         self.assertEqual(json.loads(blob)["explorer"]["file"], "explorer.html")      # the page links the map
+        # a shared page doesn't say where the reports sit on disk (the path names the analyst's account);
+        # comparison.json, which stays with the analyst, keeps them
+        for rep in reps:
+            self.assertNotIn(rep.folder, page)
+        self.assertFalse({"key", "folder", "reopened_from"} & set(json.loads(blob)["reports"][0]))
+        with open(paths["comparison.json"], encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh)["reports"][0]["folder"], reps[0].folder)
 
     # -- all networks on one map (combine.py) --------------------------------------------------
     def combined(self, *run_ids):

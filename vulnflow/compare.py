@@ -567,6 +567,9 @@ def write(result: dict, outdir: str, log=None) -> dict[str, str]:
     return paths
 
 
+PRIVATE_REPORT_KEYS = ("key", "folder", "reopened_from")   # local paths: kept in comparison.json only
+
+
 def page(result: dict) -> str:
     """The comparison as one self-contained page (data, styles and script inline)."""
     import html
@@ -579,7 +582,10 @@ def page(result: dict) -> str:
             return fh.read()
     slim = {**result,
             "iocs": [{**r, "seen": [{**s, "related": s["related"][:SAMPLE_HOSTS]} for s in r["seen"]]} for r in result["iocs"]],
-            "vulns": [{**r, "seen": [{**s, "related": s["related"][:SAMPLE_HOSTS]} for s in r["seen"]]} for r in result["vulns"]]}
+            "vulns": [{**r, "seen": [{**s, "related": s["related"][:SAMPLE_HOSTS]} for s in r["seen"]]} for r in result["vulns"]],
+            # the page never shows where each report sits on disk; leave the folder paths (which name
+            # the analyst's account, e.g. /Users/<name>/...) out of a page that may be shared
+            "reports": [{k: v for k, v in r.items() if k not in PRIVATE_REPORT_KEYS} for r in result.get("reports", [])]}
     blob = json.dumps(slim, separators=(",", ":")).replace("<", "\\u003c")
     return (f"{HTML_OPEN}<head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
