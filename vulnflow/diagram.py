@@ -280,7 +280,7 @@ def blast_svg(host: dict, res: dict, spread_targets: set[str]) -> str:
         x1, y1 = cx + dx / L * 24, cy + dy / L * 24
         out.append(f'<line x1="{x1:.0f}" y1="{y1:.0f}" x2="{x2:.0f}" y2="{y2:.0f}" class="edge-line {cls}" '
                    f'stroke-width="{2.4 if spread else 1}" opacity="{1 if spread else .55}"'
-                   + (f' marker-end="url(#dg-arr-spread)"' if spread else "") + "/>")
+                   + (' marker-end="url(#dg-arr-spread)"' if spread else "") + "/>")
         ports = ", ".join(str(p) for p in r["ports"][:3])
         if ports:
             out.append(f'<text x="{(x1 + x2) / 2:.0f}" y="{(y1 + y2) / 2 - 3:.0f}" text-anchor="middle" font-size="10" '

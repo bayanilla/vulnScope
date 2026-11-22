@@ -1,0 +1,9 @@
+# Tools for the code checks (lint, type check, coverage, fuzz tests). Not needed to run VulnScope.
+# Pinned so CI and a local run give the same answers; bump on purpose.
+-r requirements.txt
+ruff==0.17.5
+mypy==2.4.1
+coverage==7.17.3 ; python_version >= "3.11"
+coverage==7.16.2 ; python_version < "3.11"   # newer releases need Python 3.11
+hypothesis==6.170.15 ; python_version >= "3.11"
+hypothesis==6.168.5 ; python_version < "3.11"   # newer releases need Python 3.11

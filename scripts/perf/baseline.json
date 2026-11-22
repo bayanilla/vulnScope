@@ -1,0 +1,36 @@
+{
+  "wall_s": 16.7,
+  "peak_rss_mb": 763.0,
+  "explorer_mb": 4.28,
+  "results_mb": 3.99,
+  "counts": {
+    "flows": 164746,
+    "findings": 1048,
+    "hosts": 300,
+    "threat_alerts": 182,
+    "duplicate_flows_removed": 5307,
+    "priority_counts": {
+      "P1": 31,
+      "P2": 37,
+      "P3": 350,
+      "P4": 630
+    }
+  },
+  "calibration_s": 0.482,
+  "time_ratio": 34.64,
+  "dataset": {
+    "size": "40M",
+    "hours": 4,
+    "hosts": 300,
+    "externals": 4000,
+    "seed": 7,
+    "bytes_on_disk": 31905040
+  },
+  "limits": {
+    "time_ratio": 1.6,
+    "peak_rss_mb": 1.35,
+    "explorer_mb": 1.25,
+    "results_mb": 1.25
+  },
+  "machine": "Linux x86_64, 4 CPUs"
+}

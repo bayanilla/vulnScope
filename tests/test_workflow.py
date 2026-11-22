@@ -1,3 +1,4 @@
+import csv
 import os
 import re
 import gzip
@@ -6,16 +7,20 @@ import shutil
 import tempfile
 import threading
 import unittest
+from datetime import datetime, timezone
+from unittest.mock import patch
 import urllib.parse
 import urllib.request
 import uuid
+from email.message import Message
 from http.server import ThreadingHTTPServer
 
+from vulnflow import explore
 from vulnflow.correlate import Config, correlate
 from vulnflow.normalize import load
 from vulnflow.parsers import detect
 from vulnflow.pipeline import run
-from vulnflow.samples import generate
+from vulnflow.samples import generate, generate_bundles
 
 
 class Base(unittest.TestCase):
@@ -35,7 +40,66 @@ class ParserTests(Base):
     def test_detects_sample_formats(self):
         got = {os.path.basename(p): detect(p) for p in self.samples}
         self.assertEqual(got, {"zeek_conn.log": "zeek", "paloalto_traffic.csv": "paloalto",
-                               "netflow_segment6.csv": "generic", "quarterly_scan.nessus": "nessus"})
+                               "netflow_segment6.csv": "generic", "quarterly_scan.nessus": "nessus",
+                               "modbus.log": "zeek"})
+
+    def test_ioc_csv_links_survive_standalone_reports(self):
+        archive = self.write("mucaro-archive.csv",
+            "indicatorType,indicator,articleUrls,sources,disposition,firstSeenAt,lastSeenAt\n"
+            "cve,CVE-2024-21887,https://research.example/report,Research,Actionable,2026-10-01,2026-10-20\n"
+            "ip,8.8.8.8,https://research.example/indicator,Research,Actionable,2026-10-01,2026-10-20\n"
+            "ip,9.9.9.9,javascript:alert(1),Unknown,Actionable,2026-10-01,2026-10-20\n")
+        output = os.path.join(self.tmp, "archive-output")
+        with patch("vulnflow.article_preview.fetch_preview",
+                   return_value={"title": "Source report", "overview": "A short source-backed overview."}):
+            res, paths = run(self.samples + [archive], output)
+        self.assertEqual(res["ioc_archive"]["indicators"], 3)
+        self.assertIn("CVE-2024-21887", [m["value"] for m in res["ioc_matches"]])
+        self.assertIn("8.8.8.8", [m["value"] for m in res["ioc_matches"]])
+        for name in ("executive_summary.html", "technical_report.html", "explorer.html"):
+            with open(paths[name], encoding="utf-8") as fh:
+                page = fh.read()
+            self.assertIn('id="ioc-drawer"', page)
+            self.assertIn("https://research.example/report", page)
+            self.assertIn("A short source-backed overview.", page)
+            self.assertNotIn("javascript:alert(1)", page)
+
+    def test_ioc_csv_without_source_links_matches_scan(self):
+        indicators = self.write("plain-indicators.csv", "type,indicator\ncve,CVE-2024-21887\n")
+        res, _ = run(self.samples + [indicators], os.path.join(self.tmp, "plain-ioc-output"))
+        match = next(item for item in res["ioc_matches"] if item["value"] == "CVE-2024-21887")
+        self.assertEqual(match["articles"], [])
+        self.assertEqual(res["ioc_archive"]["indicators"], 1)
+
+    def test_article_preview_reads_short_source_description(self):
+        from vulnflow.article_preview import fetch_preview, _public_address
+        self.assertIsNone(_public_address("http://127.0.0.1/private"))
+
+        class Response:
+            status = 200
+            headers = Message()
+            headers["Content-Type"] = "text/html; charset=utf-8"
+
+            def read(self, _limit):
+                return (b'<html><head><title>Research note</title>'
+                        b'<meta name="description" content="A concise source overview."></head>'
+                        b'<body><p>Longer article content stays on the source page.</p></body></html>')
+
+        class Connection:
+            def request(self, *_args, **_kwargs):
+                pass
+
+            def getresponse(self):
+                return Response()
+
+            def close(self):
+                pass
+
+        with patch("vulnflow.article_preview._public_address",
+                   return_value=("research.example", 443, "93.184.215.14", "/report")), \
+             patch("vulnflow.article_preview.http.client.HTTPSConnection", return_value=Connection()):
+            preview = fetch_preview("https://research.example/report")
+        self.assertEqual(preview, {"title": "Research note", "overview": "A concise source overview."})
 
     def test_paloalto_syslog_without_header(self):
         line = ("<14>Oct 16 03:12:00 fw01 1,2026/10/16 03:12:00,0164,TRAFFIC,end,2560,2026/10/16 03:12:00,"
@@ -48,6 +112,24 @@ class ParserTests(Base):
         f = ds.flows[0]
         self.assertEqual((f.src_ip, f.dst_ip, f.dst_port, f.action, f.src_zone), ("203.0.113.9", "10.1.1.5", 443, "allow", "untrust"))
         self.assertEqual(ds.stats[0].dropped["SYSTEM log type not used"], 1)
+
+    def test_paloalto_csv_threat_rows_take_receive_time(self):
+        # web UI exports leave Start Time empty on THREAT rows; Receive Time is the alert's time
+        csv_text = ("Receive Time,Type,Source address,Destination address,Destination Port,Action,Start Time,Threat/Content Name\n"
+                    "2026/10/12 05:36:45,THREAT,192.0.2.216,10.10.3.31,3389,reset-both,,RDP exploit\n"
+                    "2026/10/13 20:23:51,TRAFFIC,192.0.2.216,10.10.3.31,3389,deny,2026/10/13 20:23:50,\n")
+        ds = load([self.write("pa.csv", csv_text)])
+        self.assertEqual(len(ds.threats), 1)
+        self.assertEqual(ds.threats[0].ts, datetime(2026, 10, 12, 5, 36, 45, tzinfo=timezone.utc))
+        self.assertEqual(ds.flows[0].ts, datetime(2026, 10, 13, 20, 23, 50, tzinfo=timezone.utc))   # Start Time still wins
+
+    def test_sample_firewall_log_has_only_valid_addresses(self):
+        import ipaddress
+        p = next(x for x in self.samples if x.endswith("paloalto_traffic.csv"))
+        with open(p, newline="") as fh:
+            for row in csv.DictReader(fh):
+                ipaddress.ip_address(row["Source address"])
+                ipaddress.ip_address(row["Destination address"])
 
     def test_threat_sources(self):
         pan = ("<14>Oct 16 03:12:00 fw01 1,2026/10/16 03:12:00,0164,THREAT,vulnerability,2560,2026/10/16 03:12:00,"
@@ -71,7 +153,7 @@ class ParserTests(Base):
         p = self.write("conn.json", '{"ts":1760000000.1,"id.orig_h":"10.0.0.1","id.orig_p":5000,'
                        '"id.resp_h":"10.0.0.2","id.resp_p":445,"proto":"tcp","conn_state":"REJ"}\n')
         f = load([p]).flows[0]
-        self.assertEqual((f.action, f.established, f.dst_port), ("deny", False, 445))
+        self.assertEqual((f.action, f.established, f.dst_port), ("reject", False, 445))   # host refused, not a firewall
 
     def test_zeek_streams_do_not_become_connections(self):
         dns = self.write("00_dns.log", '{"ts":1760000001,"uid":"D1","id.orig_h":"10.0.0.1",'
@@ -209,9 +291,69 @@ class EndToEndTests(Base):
         with open(paths["executive_summary.md"]) as fh:
             self.assertIn("Likely exploitation", fh.read())
 
-    def test_missing_scan_is_rejected(self):
-        with self.assertRaises(ValueError):
-            run([p for p in self.samples if not p.endswith(".nessus")], os.path.join(self.tmp, "x"))
+    def test_network_telemetry_without_scan(self):
+        inputs = [p for p in self.samples if not p.endswith(".nessus")]
+        ioc = self.write("network-ioc.csv", "type,indicator\nip,203.0.113.45\n")
+        res, paths = run(inputs + [ioc], os.path.join(self.tmp, "telemetry-only"))
+        self.assertFalse(res["summary"]["vulnerability_data_available"])
+        self.assertEqual(res["findings"], [])
+        self.assertEqual(res["summary"]["priority_counts"], {p: None for p in ("P1", "P2", "P3", "P4")})
+        self.assertTrue(res["hosts"])
+        self.assertTrue(res["telemetry_leads"])
+        self.assertTrue(res["ioc_matches"])
+        self.assertIn("10.10.1.10", res["ioc_matches"][0]["hosts"])
+        for name in ("executive_summary.md", "technical_report.md", "explorer.html"):
+            with open(paths[name], encoding="utf-8") as fh:
+                text = fh.read()
+            self.assertIn("No vulnerability data", text)
+            self.assertNotIn("No vulnerability reached Priority 1", text)
+        with open(paths["explorer.html"], encoding="utf-8") as fh:
+            page = fh.read()
+        data = explore.read_data(page)
+        self.assertIn("10.10.1.10", data["focus"])
+        self.assertEqual(data["focus"]["10.10.1.10"]["findings"], [])
+        self.assertEqual(data["focus"]["10.10.1.10"]["peers"][0]["band"], "Unknown")
+        from vulnflow.report import save_article_briefs
+        save_article_briefs(res, os.path.join(self.tmp, "telemetry-only"))
+        with open(paths["technical_report.html"], encoding="utf-8") as fh:
+            self.assertIn("Vulnerability status: unknown", fh.read())
+        from vulnflow.llm import Analyst, LLMConfig
+        self.assertIn("without vulnerability scan data", Analyst(res, LLMConfig.from_env(provider="local")).system)
+        self.assertIn("vulnerability status is unknown", Analyst(res, LLMConfig.offline()).brief())
+
+    def test_empty_scan_and_missing_telemetry(self):
+        empty_scan = self.write("empty.nessus", "")
+        telemetry = next(p for p in self.samples if p.endswith("zeek_conn.log"))
+        res, _ = run([telemetry, empty_scan], os.path.join(self.tmp, "empty-scan-output"))
+        self.assertFalse(res["summary"]["vulnerability_data_available"])
+        with self.assertRaisesRegex(ValueError, "No network telemetry"):
+            run([empty_scan], os.path.join(self.tmp, "missing-telemetry-output"))
+        with self.assertRaisesRegex(ValueError, "No network telemetry"):
+            run([], os.path.join(self.tmp, "empty-input-output"))
+
+    def test_alert_only_telemetry(self):
+        notice = os.path.join(os.path.dirname(__file__), "..", "samples", "scan_and_telemetry", "notice.log")
+        res, paths = run([notice], os.path.join(self.tmp, "alert-only-output"))
+        self.assertFalse(res["summary"]["vulnerability_data_available"])
+        self.assertEqual(res["summary"]["flows"], 0)
+        self.assertEqual(res["summary"]["threat_alerts"], 1)
+        self.assertTrue(res["hosts"])
+        self.assertTrue(res["telemetry_leads"])
+        self.assertTrue(os.path.exists(paths["explorer.html"]))
+
+    def test_cli_network_only_and_scan_regression(self):
+        from vulnflow.cli import main
+        from contextlib import redirect_stdout
+        from io import StringIO
+        telemetry = next(p for p in self.samples if p.endswith("zeek_conn.log"))
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main(["explore", telemetry, "--no-open", "-o", os.path.join(self.tmp, "explore-only")]), 0)
+        self.assertIn("No vulnerability data available", output.getvalue())
+        with redirect_stdout(StringIO()):
+            res, _ = run(self.samples, os.path.join(self.tmp, "scan-regression"))
+        self.assertTrue(res["summary"]["vulnerability_data_available"])
+        self.assertGreater(res["summary"]["findings_scored"], 0)
 
     def test_recursive_folder_combines_zeek_ot_and_scan(self):
         from vulnflow.cli import main
@@ -221,9 +363,9 @@ class EndToEndTests(Base):
         for p in self.samples:
             sub = "scans" if p.endswith(".nessus") else "zeek"
             shutil.copy2(p, os.path.join(root, sub, os.path.basename(p)))
-        self.write("modbus.log", '{"ts":1760000001,"uid":"M1","id.orig_h":"10.0.0.1",'
+        self.write("modbus_extra.log", '{"ts":1760000001,"uid":"M1","id.orig_h":"10.0.0.1",'
                    '"id.resp_h":"10.0.0.2","is_orig":true,"func":"READ_COILS"}\n')
-        shutil.copy2(os.path.join(self.tmp, "modbus.log"), os.path.join(root, "zeek", "modbus.log"))
+        shutil.copy2(os.path.join(self.tmp, "modbus_extra.log"), os.path.join(root, "zeek", "modbus_extra.log"))
         for name, field in (("dns", '"query":"plant.example"'),
                             ("smtp", '"mailfrom":"operator@example.com"')):
             source = self.write(name + ".log", '{"ts":1760000002,"uid":"X1",'
@@ -233,12 +375,13 @@ class EndToEndTests(Base):
         self.assertEqual(main(["analyze", root, "-o", out]), 0)
         with open(os.path.join(out, "results.json")) as fh:
             result = json.load(fh)
-        self.assertEqual(result["summary"]["ot_protocol_counts"], {"Modbus": 1})
-        self.assertEqual(result["summary"]["zeek_event_counts"], {"dns": 1, "modbus": 1, "smtp": 1})
-        self.assertEqual(result["summary"]["flows"], 9764)
+        self.assertEqual(result["summary"]["ot_protocol_counts"], {"Modbus": 5})
+        self.assertEqual(result["summary"]["zeek_event_counts"],
+                         {"dns": 1, "modbus": 4, "modbus_extra": 1, "smtp": 1})
+        self.assertEqual(result["summary"]["flows"], len(load(self.samples).flows))
         self.assertEqual(len(result["inputs"]), len(self.samples) + 3)
         with open(os.path.join(out, "normalized", "ot_events.jsonl")) as fh:
-            event = json.loads(fh.readline())
+            event = next(e for e in map(json.loads, fh) if e["operation"] == "READ_COILS")
         self.assertEqual(event["operation"], "READ_COILS")
         self.assertEqual(event["direction"], "originator")
 
@@ -248,7 +391,9 @@ class EndToEndTests(Base):
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         try:
             boundary = uuid.uuid4().hex
-            body = b""
+            with urllib.request.urlopen(f"http://127.0.0.1:{srv.server_port}/") as resp:
+                token = re.search(r'name="csrf" value="([^"]+)"', resp.read().decode())[1]
+            body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{token}\r\n").encode()
             for p in self.samples:
                 field = "folder"
                 with open(p, "rb") as fh:
@@ -268,6 +413,31 @@ class EndToEndTests(Base):
                 self.assertEqual(resp.status, 200)
             with self.assertRaises(urllib.error.HTTPError):
                 urllib.request.urlopen(run_url + "..%2f..%2fin%2f00_x")
+        finally:
+            srv.shutdown()
+
+    def test_web_telemetry_only_upload(self):
+        from vulnflow.web import make_handler
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(os.path.join(self.tmp, "telemetry-runs"), Config()))
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            boundary = uuid.uuid4().hex
+            telemetry = next(p for p in self.samples if p.endswith("zeek_conn.log"))
+            with open(telemetry, "rb") as fh:
+                payload = fh.read()
+            with urllib.request.urlopen(f"http://127.0.0.1:{srv.server_port}/") as resp:
+                token = re.search(r'name="csrf" value="([^"]+)"', resp.read().decode())[1]
+            body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{token}\r\n"
+                    f"--{boundary}\r\nContent-Disposition: form-data; name=\"telemetry\"; "
+                    f"filename=\"zeek_conn.log\"\r\nContent-Type: application/octet-stream\r\n\r\n").encode()
+            body += payload + f"\r\n--{boundary}--\r\n".encode()
+            req = urllib.request.Request(f"http://127.0.0.1:{srv.server_port}/analyze", data=body,
+                                         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+            with urllib.request.urlopen(req) as resp:
+                index, run_url = resp.read().decode(), resp.url
+            self.assertIn("No vulnerability data available", index)
+            with urllib.request.urlopen(run_url + "results.json") as resp:
+                self.assertFalse(json.load(resp)["summary"]["vulnerability_data_available"])
         finally:
             srv.shutdown()
 
@@ -323,7 +493,7 @@ class EndToEndTests(Base):
             gone = os.path.join(self.tmp, "pick", "missing", "deeper")   # falls back to the nearest folder
             with urllib.request.urlopen(call("/browse", {"path": gone, "csrf": csrf})) as resp:
                 self.assertEqual(json.loads(resp.read())["path"], os.path.realpath(os.path.join(self.tmp, "pick")))
-            if not web.NATIVE_PICKER:
+            if not web.folders.NATIVE_PICKER:
                 with urllib.request.urlopen(call("/pick-folder", {"csrf": csrf})) as resp:
                     self.assertTrue(json.loads(resp.read())["unsupported"])
         finally:
@@ -348,6 +518,309 @@ class EndToEndTests(Base):
                              any(f.endswith("x.log") for _, _, fs in os.walk(os.path.join(self.tmp, "runs2")) for f in fs))
         finally:
             srv.shutdown()
+
+
+class BundledSamplesTests(unittest.TestCase):
+    def test_generator_writes_the_sample_folders(self):
+        with tempfile.TemporaryDirectory() as root:
+            paths = generate_bundles(root)
+            self.assertEqual(sorted(os.listdir(root)),
+                             ["artex_ai_agentic_intrusion", "compare_two_companies", "cyberstrike_ai_fortigate_intrusion",
+                              "gootloader_seo_poisoning", "hosts_onprem_and_aws",
+                              "scan_and_telemetry", "telemetry_only"])
+            self.assertEqual(len(paths), 91)
+            self.assertEqual(sorted(os.listdir(os.path.join(root, "compare_two_companies"))),
+                             ["corvane", "ridgeline", "sites.csv"])               # a folder per company
+            self.assertTrue(os.path.isfile(os.path.join(root, "scan_and_telemetry", "quarterly_scan.nessus")))
+            self.assertFalse(any(name.endswith((".nessus", "scan.csv"))
+                                 for name in os.listdir(os.path.join(root, "telemetry_only"))))
+            self.assertTrue(os.path.isfile(os.path.join(root, "telemetry_only", "modbus.log")))
+
+    def test_checked_in_folders_keep_scan_and_network_only_contracts(self):
+        from vulnflow.pipeline import input_files as _input_files
+        root = os.path.join(os.path.dirname(__file__), "..", "samples")
+        self.assertEqual(sorted(name for name in os.listdir(root) if os.path.isdir(os.path.join(root, name))),
+                         ["artex_ai_agentic_intrusion", "compare_two_companies", "cyberstrike_ai_fortigate_intrusion",
+                              "gootloader_seo_poisoning", "hosts_onprem_and_aws",
+                          "scan_and_telemetry", "telemetry_only"])
+        with tempfile.TemporaryDirectory() as output:
+            full_files = _input_files([os.path.join(root, "scan_and_telemetry")], output)
+            network_files = _input_files([os.path.join(root, "telemetry_only")], output)
+            self.assertFalse(any(name.endswith((".nessus", "scan.csv")) for name in network_files))
+            for path in network_files:
+                matching_path = os.path.join(root, "scan_and_telemetry", os.path.basename(path))
+                with open(path, "rb") as network_file, open(matching_path, "rb") as full_file:
+                    self.assertEqual(network_file.read(), full_file.read(), os.path.basename(path))
+            full, _ = run(full_files, os.path.join(output, "full"), article_previews=False)
+            network, paths = run(network_files, os.path.join(output, "network"), article_previews=False)
+            self.assertEqual(full["coverage"]["scanned_hosts"], 250)
+            self.assertTrue({f"10.10.6.{i}" for i in range(10, 15)} <= set(load(full_files).scanned_hosts))
+            self.assertTrue(full["summary"]["vulnerability_data_available"])
+            self.assertTrue(full["findings"])
+            self.assertFalse(network["summary"]["vulnerability_data_available"])
+            self.assertEqual(network["findings"], [])
+            self.assertEqual(full["summary"]["flows"], network["summary"]["flows"])
+            self.assertEqual(full["summary"]["ot_protocol_counts"], {"Modbus": 4})
+            self.assertEqual(network["summary"]["ot_protocol_counts"], {"Modbus": 4})
+            ds = load(network_files)
+            self.assertEqual(sum(f.src_ip == "10.10.6.11" and f.dst_ip == "198.51.100.77"
+                                 for f in ds.flows), 3)
+            self.assertEqual(sum(f.src_ip == "10.10.7.46" and f.dst_ip == "198.51.100.77"
+                                 for f in ds.flows), 2)
+            self.assertEqual(sum(f.src_ip == "10.10.7.46" and f.dst_ip == "10.10.6.11"
+                                 and f.dst_port == 3389 for f in ds.flows), 2)
+            firewall_path = os.path.join(root, "telemetry_only", "paloalto_traffic.csv")
+            with open(firewall_path, newline="") as firewall_file:
+                vpn_access = [row for row in csv.DictReader(firewall_file)
+                              if row["Rule"] == "GlobalProtect-Engineer-VPN"]
+            self.assertEqual(len(vpn_access), 2)
+            self.assertTrue(all(row["Source address"] == "10.10.7.46"
+                                and row["Destination address"] == "10.10.6.11"
+                                and row["Source Zone"] == "vpn" and row["Destination Zone"] == "ot"
+                                and row["Application"] == "ms-rdp" and row["Action"] == "allow"
+                                for row in vpn_access))
+            self.assertEqual({event.operation for event in ds.ot_events},
+                             {"READ_HOLDING_REGISTERS", "READ_INPUT_REGISTERS"})
+            self.assertTrue(all(event.src_ip == "10.10.6.10" and event.dst_ip in
+                                {"10.10.6.13", "10.10.6.14"} for event in ds.ot_events))
+            with open(paths["explorer.html"], encoding="utf-8") as fh:
+                page = fh.read()
+            data = explore.read_data(page)
+            self.assertEqual(data["focus"]["10.10.6.10"]["ot_events_total"], 4)
+            self.assertIn("No vulnerability data", page)
+
+    def test_host_sample_has_4324_hosts_on_prem_and_in_aws(self):
+        from vulnflow import sample_hosts
+        from vulnflow.pipeline import input_files as _input_files
+        root = os.path.join(os.path.dirname(__file__), "..", "samples", sample_hosts.FOLDER)
+        with tempfile.TemporaryDirectory() as tmp:
+            fresh = os.path.join(tmp, "fresh")
+            for path in sample_hosts.generate(fresh):          # checked-in folder matches the generator
+                with open(path, "rb") as a, open(os.path.join(root, os.path.basename(path)), "rb") as b:
+                    self.assertEqual(a.read(), b.read(), os.path.basename(path))
+            files = _input_files([root], tmp)
+            fmts = {os.path.basename(p): detect(p) for p in files}
+            self.assertEqual(fmts["aws_vpcflow_prod_us-east-2.log"], "aws_vpcflow")
+            self.assertEqual(fmts["estate_scan.nessus"], "nessus")
+            res, paths = run(files, os.path.join(tmp, "out"), article_previews=False)
+            with open(paths["explorer.html"], encoding="utf-8") as fh:
+                page = fh.read()
+        data = explore.read_data(page)
+        drawn = {n["id"] for n in data["nodes"]}
+        self.assertEqual(len(drawn), 2000)                     # capped, riskiest first
+        self.assertLessEqual(set(data["focus"]), drawn)          # the host list only offers drawn hosts
+        self.assertIn("10.60.1.16", drawn)
+        self.assertEqual(data["counts"]["hosts"], 4324)
+        cov = res["coverage"]
+        self.assertEqual((cov["scanned_hosts"], cov["telemetry_internal_hosts"], cov["scanned_and_seen"]),
+                         (4324, 4324, 4324))
+        self.assertEqual(sum(place.startswith("aws") for *_, place in sample_hosts.HOSTS.values()), 413)
+        self.assertTrue(any(h["host"].startswith(("10.60.", "10.61.")) for h in res["hosts"]))
+        self.assertTrue(all(sum(st["dropped"].values()) == 0 for st in res["inputs"]))
+        self.assertEqual(res["summary"]["hosts_to_investigate"], ["10.60.1.16"])       # web-prod-07
+        self.assertEqual(res["summary"]["threat_alerts"], 4)
+        self.assertEqual([(n["name"], n["scanned"]) for n in res["networks"]],
+                         [("HQ on-prem", 3911), ("AWS prod (us-east-2)", 280), ("AWS dev (us-west-2)", 133)])
+        self.assertNotIn("network_map.csv", [i["file"] for i in res["inputs"]])   # not read as telemetry
+        self.assertEqual(next(h for h in res["hosts"] if h["host"] == "10.60.1.16")["network"], "AWS prod (us-east-2)")
+        self.assertEqual(data["networks"][1]["type"], "aws")
+        self.assertEqual(next(n for n in data["nodes"] if n["id"] == "10.60.1.16")["net"], 1)
+
+    def test_gootloader_sample_replays_the_intrusion_with_timed_alerts(self):
+        import ipaddress
+        from datetime import datetime, timezone
+        from vulnflow import sample_gootloader as g
+        from vulnflow.pipeline import input_files as _input_files
+        root = os.path.join(os.path.dirname(__file__), "..", "samples", g.FOLDER)
+        with tempfile.TemporaryDirectory() as tmp:
+            fresh = os.path.join(tmp, "fresh")
+            for path in g.generate(fresh):                     # checked-in folder matches the generator
+                with open(path, "rb") as a, open(os.path.join(root, os.path.basename(path)), "rb") as b:
+                    self.assertEqual(a.read(), b.read(), os.path.basename(path))
+            files = _input_files([root], tmp)
+            fmts = {os.path.basename(p): detect(p) for p in files}
+            self.assertEqual((fmts["conn.log"], fmts["dns.log"], fmts["files.log"], fmts["suricata_eve.json"],
+                              fmts["paloalto_traffic.csv"], fmts["domain_scan.nessus"]),
+                             ("zeek", "zeek", "zeek", "suricata", "paloalto", "nessus"))
+            ds = load([p for p in files if not p.endswith(("ioc_indicators.csv", "article_previews.json"))])
+            res, paths = run(files, os.path.join(tmp, "out"), article_previews=False)
+            with open(paths["explorer.html"], encoding="utf-8") as fh:
+                page = fh.read()
+        # every address is valid (no 2-octet prefixes), and every alert keeps its own time
+        for f in ds.flows:
+            ipaddress.ip_address(f.src_ip), ipaddress.ip_address(f.dst_ip)
+        self.assertEqual(res["summary"]["threat_alerts"], len(ds.threats))
+        self.assertTrue(all(t.ts is not None for t in ds.threats))
+        first = {t.name: t.ts for t in sorted(ds.threats, key=lambda t: t.ts, reverse=True)}
+        self.assertEqual(first["Gootloader JavaScript Downloader Payload Retrieval"],
+                         datetime(2026, 10, 26, 23, 2, 12, tzinfo=timezone.utc))      # T0 + 9 h, the firewall row
+        self.assertLess(first["Gootloader JavaScript Downloader Payload Retrieval"],
+                        first["ET RPC DCERPC SVCCTL - Remote Service Control Manager Access"])
+        self.assertLess(first["ET RPC DCERPC SVCCTL - Remote Service Control Manager Access"],
+                        first["ET MALWARE SystemBC Powershell bot registration"])
+        self.assertEqual(res["coverage"]["scanned_hosts"], 115)
+        self.assertIn(g.PATIENT0, {h for m in res["ioc_matches"] for h in m["hosts"]})
+        matched = {(m["type"], m["value"]) for m in res["ioc_matches"]}
+        self.assertTrue({("ip", g.CS_C2), ("ip", g.SYSTEMBC_C2), ("ip", g.GOOT_SERVER),
+                         ("domain", "blog.lilianpraskova.cz")} <= matched)
+        self.assertEqual(sum(t == "hash" for t, _ in matched), 12)                    # 4 beacons x md5/sha1/sha256
+        self.assertIn(g.DC1, res["summary"]["hosts_to_investigate"])
+        data = explore.read_data(page)
+        tl = data["timeline"]
+        self.assertEqual(len(tl["alerts"]), len(ds.threats))                       # none dropped for lack of time
+        t0 = datetime.fromisoformat(tl["t0"].replace("Z", "+00:00"))
+        payload = next(a for a in tl["alerts"] if a[3].startswith("Gootloader"))
+        self.assertAlmostEqual(payload[0], (first[payload[3]] - t0).total_seconds() / 3600, places=3)
+        self.assertTrue(tl["ioc_lookups"])
+
+    def _agentic_sample(self, mod):
+        """Checked-in folder matches the generator; analyze it and return (results, explorer data, dataset)."""
+        from vulnflow.pipeline import input_files as _input_files
+        root = os.path.join(os.path.dirname(__file__), "..", "samples", mod.FOLDER)
+        with tempfile.TemporaryDirectory() as tmp:
+            for path in mod.generate(os.path.join(tmp, "fresh")):
+                with open(path, "rb") as a, open(os.path.join(root, os.path.basename(path)), "rb") as b:
+                    self.assertEqual(a.read(), b.read(), os.path.basename(path))
+            files = _input_files([root], tmp)
+            res, paths = run(files, os.path.join(tmp, "out"), article_previews=True)
+            with open(paths["explorer.html"], encoding="utf-8") as fh:
+                page = fh.read()
+            with open(paths["technical_report.md"], encoding="utf-8") as fh:
+                report = fh.read()
+        data = explore.read_data(page)
+        files = {i["file"] for i in res["inputs"]}
+        self.assertIn("README.md", os.listdir(root))
+        self.assertFalse(files & {"README.md", "article_previews.json"})     # notes, not telemetry
+        self.assertTrue(all(not i["dropped"] for i in res["inputs"]), res["inputs"])
+        self.assertEqual(len(data["timeline"]["alerts"]), res["summary"]["threat_alerts"])
+        for m in res["ioc_matches"]:                  # overviews come from the folder's own cache
+            self.assertEqual(set(m["article_previews"]), set(m["articles"]), m["value"])
+        return res, data, report
+
+    def test_artex_sample_tells_the_story(self):
+        from vulnflow import sample_artex as a
+        res, data, report = self._agentic_sample(a)
+        self.assertEqual(res["coverage"]["scanned_hosts"], 92)
+        self.assertEqual(res["summary"]["hosts_corroborated"], [a.PORTAL])
+        self.assertTrue({a.SSO, a.CRM, a.DC1} <= set(res["summary"]["hosts_to_investigate"]))
+        matched = {(m["type"], m["value"]): m["hosts"] for m in res["ioc_matches"]}
+        self.assertTrue({("ip", ip) for ip in a.OPERATORS} | {("domain", "webhook.site")} <= set(matched))
+        self.assertIn(a.PORTAL, matched[("ip", a.OPS_SHELL)])
+        portal = next(f for f in res["findings"] if f["host"] == a.PORTAL and f["plugin_id"] == "900101")
+        kinds = {i["type"] for i in portal["indicators"]}
+        self.assertTrue({"threat_alert", "return_connection", "exfil", "corroborated"} <= kinds)
+        self.assertIn("portal01", report)
+        self.assertTrue(data["timeline"]["ioc_lookups"])
+        # agent fingerprints are in the logs an analyst greps
+        root = os.path.join(os.path.dirname(__file__), "..", "samples", a.FOLDER)
+        with open(os.path.join(root, "http.log")) as fh:
+            http = fh.read()
+        for text in ("norma/0.4", "artex-enrich/1.0", "/reports/cl1217.jsp", "/reports/z1219.jsp", "ArtexProbe"):
+            self.assertIn(text, http)
+        with open(os.path.join(root, "ssl.log")) as fh:
+            self.assertIn("api.deepseek.com", fh.read())
+
+    def test_cyberstrike_sample_tells_the_story(self):
+        from vulnflow import sample_cyberstrike as c
+        res, data, report = self._agentic_sample(c)
+        self.assertEqual(res["coverage"]["scanned_hosts"], 79)
+        self.assertEqual(res["summary"]["hosts_corroborated"], [c.WEB])
+        self.assertTrue({c.FW, c.BACKUP, c.DC1} <= set(res["summary"]["hosts_to_investigate"]))
+        matched = {(m["type"], m["value"]): m["hosts"] for m in res["ioc_matches"]}
+        self.assertTrue({("ip", ip) for ip in c.OPERATORS} <= set(matched))
+        self.assertEqual(matched[("cve", "CVE-2024-40711")], [c.BACKUP])
+        web = next(f for f in res["findings"] if f["host"] == c.WEB and f["plugin_id"] == "910203")
+        self.assertTrue({"threat_alert", "return_connection", "new_lateral", "corroborated"}
+                        <= {i["type"] for i in web["indicators"]})
+        # the implant checks in every 5 s with no jitter
+        root = os.path.join(os.path.dirname(__file__), "..", "samples", c.FOLDER)
+        with open(os.path.join(root, "conn.log")) as fh:
+            ts = [float(line.split("\t")[0]) for line in fh
+                  if not line.startswith("#") and line.split("\t")[2] == c.WEB and line.split("\t")[4] == c.CSAI]
+        gaps = {round(b - a, 3) for a, b in zip(ts, ts[1:]) if b - a < 60}
+        self.assertEqual(gaps, {5.0})
+        with open(os.path.join(root, "http.log")) as fh:
+            self.assertIn("CyberStrikeAI-WebShell/1.0", fh.read())
+
+    def test_network_map_is_optional(self):
+        """Without a network map, results, reports and the Explorer carry no network fields."""
+        from vulnflow import sample_hosts
+        src = os.path.join(os.path.dirname(__file__), "..", "samples", sample_hosts.FOLDER)
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = os.path.join(tmp, "in")
+            shutil.copytree(src, folder, ignore=shutil.ignore_patterns("network_map.csv"))
+            from vulnflow.pipeline import input_files as _input_files
+            res, paths = run(_input_files([folder], tmp), os.path.join(tmp, "out"), article_previews=False)
+            with open(paths["explorer.html"], encoding="utf-8") as fh:
+                page = fh.read()
+            with open(paths["executive_summary.md"], encoding="utf-8") as fh:
+                summary = fh.read()
+        self.assertNotIn("networks", res)
+        self.assertFalse(any("network" in h for h in res["hosts"]))
+        self.assertNotIn("## Networks", summary)
+        data = explore.read_data(page)
+        self.assertEqual(data["networks"], [])
+        self.assertFalse(any("net" in n for n in data["nodes"]) or any("net" in s for s in data["subnets"]))
+
+    def test_bad_network_map_names_the_line(self):
+        from vulnflow import netmap
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "network_map.csv")
+            with open(path, "w") as fh:
+                fh.write("cidr,name,type\n10.0.0.0/8,Office,on-prem\nnot-a-range,AWS,aws\n")
+            with self.assertRaisesRegex(ValueError, "line 3"):
+                netmap.read(path)
+            with open(path, "w") as fh:
+                fh.write("10.0.0.0/8,Office\n")
+            with self.assertRaisesRegex(ValueError, "cidr"):
+                netmap.read(path)
+            nm = netmap.NetMap([{"cidr": "10.0.0.0/8", "name": "Office", "type": "on-prem", "cloud": False},
+                                {"cidr": "10.60.0.0/16", "name": "AWS", "type": "aws", "cloud": True}])
+            self.assertEqual((nm.name("10.60.1.1"), nm.name("10.1.1.1"), nm.name("8.8.8.8")), ("AWS", "Office", ""))
+
+
+class DockerEntrypointTests(unittest.TestCase):
+    """docker/entrypoint.py hands vulnflow's commands to ``python -m vulnflow`` and anything else to the shell."""
+
+    def entrypoint(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "vulnscope_entrypoint", os.path.join(os.path.dirname(__file__), "..", "docker", "entrypoint.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def run_entrypoint(self, argv):
+        import sys
+        ep = self.entrypoint()
+        with patch.object(ep, "drop_privileges"), patch("os.umask"), patch("os.execv") as execv, \
+                patch("os.execvp") as execvp, patch.object(sys, "argv", ["entrypoint.py"] + argv), \
+                patch.dict(os.environ, {"VULNSCOPE_WORKDIR": "", "VULNSCOPE_HOME": ""}):
+            ep.main()
+        return execv.call_args[0][1][3:] if execv.called else ("shell", execvp.call_args[0][1])
+
+    def test_every_vulnflow_command_runs_in_the_container(self):
+        import contextlib
+        import io
+        from vulnflow.cli import main
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+            main(["--help"])
+        commands = set(re.search(r"\{([a-z,-]+)\}", out.getvalue())[1].split(","))
+        self.assertIn("compare-sample", commands)
+        self.assertLessEqual(commands, self.entrypoint().VULNFLOW_COMMANDS)
+
+    def test_compare_sample_loads_into_the_upload_pages_folder(self):
+        self.assertEqual(self.run_entrypoint(["compare-sample"]), ["compare-sample", "--data-dir=/runs/web"])
+        self.assertEqual(self.run_entrypoint(["compare-sample", "--data-dir", "/runs/x"]),
+                         ["compare-sample", "--data-dir", "/runs/x"])
+        self.assertEqual(self.run_entrypoint(["compare-sample", "--data-dir=/runs/x", "--again"]),
+                         ["compare-sample", "--data-dir=/runs/x", "--again"])
+        self.assertEqual(self.run_entrypoint(["analyze-sites", "/data/two"]),
+                         ["analyze-sites", "/data/two", "--data-dir=/runs/web"])
+        self.assertEqual(self.run_entrypoint(["analyze-sites", "/data/two", "--data-dir", "/runs/x"]),
+                         ["analyze-sites", "/data/two", "--data-dir", "/runs/x"])
+        self.assertEqual(self.run_entrypoint(["ls", "/runs"]), ("shell", ["ls", "/runs"]))
 
 
 if __name__ == "__main__":

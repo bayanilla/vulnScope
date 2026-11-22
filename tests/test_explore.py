@@ -1,12 +1,16 @@
 import json
+import ipaddress
 import os
 import re
 import tempfile
 import unittest
+from collections import Counter
+from datetime import datetime, timezone
 
 from vulnflow import explore
 from vulnflow.correlate import Config, correlate
-from vulnflow.normalize import load
+from vulnflow.normalize import Dataset, load
+from vulnflow.schema import Flow, OTEvent, ThreatEvent, ZeekEvent
 from vulnflow.report import write_all
 from vulnflow.samples import generate
 
@@ -47,7 +51,7 @@ class ExploreTests(unittest.TestCase):
     def test_all_traffic_both_directions(self):
         # every outside and internal address that exchanged flows with a host appears, whatever the direction
         net_ext = lambda ip: not ip.startswith("10.")
-        for host, f in self.data["focus"].items():
+        for host, f in explore.build(self.res, self.ds, cap=None)["focus"].items():
             seen = {x for fl in self.ds.flows if host in (fl.src_ip, fl.dst_ip)
                     for x in (fl.src_ip, fl.dst_ip) if x != host}
             self.assertEqual({a["ip"] for a in f["attackers"] if a["sessions"] or a["out_sessions"]},
@@ -56,16 +60,294 @@ class ExploreTests(unittest.TestCase):
 
     def test_html_embeds_data_safely(self):
         page = explore.html(self.data)
-        m = re.search(r'<script id="vf-data" type="application/json">(.*?)</script>', page, re.S)
+        m = re.search(r'<script id="vf-data" type="application/octet-stream" data-encoding="gzip-base64">(.*?)</script>',
+                      page, re.S)
         self.assertIsNotNone(m)
-        self.assertNotIn("</", m.group(1))
-        self.assertIn("10.10.1.10", json.loads(m.group(1))["focus"])
+        self.assertRegex(m.group(1), r"^[A-Za-z0-9+/=]+$")       # base64 only: nothing can close the tag
+        self.assertEqual(explore.read_data(page), json.loads(json.dumps(self.data, default=str)))
         self.assertIn("not confirmed compromise", page)
+
+    def test_views_wait_for_builtin_unpacking(self):
+        # the browser's own gzip decoder unpacks the data (no bundled library), and every view that reads
+        # it starts only once it is there, in page order after vf_data.js
+        page = explore.html(self.data)
+        self.assertIn("new DecompressionStream('gzip')", page)
+        self.assertNotIn("fflate", page)
+        starts = [page.index("window.vfWhenReady = ")] + [page.index(f"window.{name} = ") for name in
+                                                          ("VFExplorer", "VFPaths", "VFTimeline")]
+        self.assertEqual(starts, sorted(starts))
+        self.assertEqual(page.count("vfWhenReady(function (D) {   // starts once"), 3)
+        self.assertNotIn("window.VF_DATA;", page)    # no view reads the data before it is unpacked
+
+    def test_ioc_host_hints_count_distinct_matches(self):
+        res = dict(self.res)
+        res["ioc_matches"] = [
+            {"id": "ip:203.0.113.45", "hosts": ["10.10.1.10", "10.10.2.25"]},
+            {"id": "ip:203.0.113.45", "hosts": ["10.10.1.10"]},
+            {"id": "domain:example.test", "hosts": ["10.10.1.10", "203.0.113.45"]},
+        ]
+        data = explore.build(res, self.ds)
+        self.assertEqual(data["ioc_counts"], {"10.10.1.10": 2, "10.10.2.25": 1})
+        page = explore.html(data)
+        self.assertIn('id="ioc-filter"', page)
+        self.assertEqual(explore.read_data(page)["ioc_counts"], {"10.10.1.10": 2, "10.10.2.25": 1})
 
     def test_write_all_includes_explorer(self):
         out = os.path.join(self.tmp, "out")
         write_all(self.res, self.ds, out)
         self.assertTrue(os.path.exists(os.path.join(out, "explorer.html")))
+
+    def test_connection_details_keep_recorded_direction_and_ot_operations(self):
+        ts = datetime(2026, 11, 4, 10, 0, tzinfo=timezone.utc)
+        ds = Dataset(flows=[
+            Flow(ts, "10.70.10.10", "10.70.20.11", 502, "tcp", src_port=53001,
+                 app="Modbus TCP", source="ot_flows.csv"),
+            Flow(ts, "10.70.20.11", "10.70.10.10", 53001, "tcp", src_port=502,
+                 app="Modbus TCP", source="ot_flows.csv"),
+            Flow(ts, "10.70.10.10", "10.70.20.11", None, "udp",
+                 source="partial-flow.csv"),
+        ], ot_events=[OTEvent(ts, "modbus", "M1", "10.70.10.10", "10.70.20.11",
+                             {"id.orig_h": "10.70.10.10", "id.resp_h": "10.70.20.11"},
+                             source="modbus.log", protocol="Modbus",
+                             operation="READ_HOLDING_REGISTERS", direction="originator"),
+                      OTEvent(ts, "dnp3", "D1", None, None,
+                              {"id.orig_h": "10.70.10.10", "id.resp_h": "10.70.20.11"},
+                              source="dnp3.log", protocol="DNP3", operation="READ",
+                              direction="unknown")])
+        data = explore.build(correlate(ds), ds)
+        self.assertFalse(data["vulnerability_data_available"])
+        peer = next(p for p in data["focus"]["10.70.10.10"]["peers"] if p["ip"] == "10.70.20.11")
+        self.assertEqual([(e["src_ip"], e["src_port"], e["dst_ip"], e["dst_port"], e["proto"], e["app"])
+                          for e in peer["connection_examples"]], [
+            ("10.70.10.10", 53001, "10.70.20.11", 502, "tcp", "Modbus TCP"),
+            ("10.70.10.10", None, "10.70.20.11", None, "udp", ""),
+            ("10.70.20.11", 502, "10.70.10.10", 53001, "tcp", "Modbus TCP")])
+        event = data["focus"]["10.70.10.10"]["ot_events"][0]
+        self.assertEqual((event["protocol"], event["operation"], event["message_side"]),
+                         ("Modbus", "READ_HOLDING_REGISTERS", "originator"))
+        self.assertEqual(data["focus"]["10.70.10.10"]["ot_events_total"], 2)
+        self.assertEqual(data["focus"]["10.70.10.10"]["ot_events"][1]["message_side"], "unknown")
+        self.assertEqual(data["focus"]["10.70.10.10"]["findings"], [])
+
+    def test_scan_mode_also_exposes_recorded_connection_details(self):
+        attacker = next(a for a in self.data["focus"]["10.10.1.10"]["attackers"]
+                        if a["ip"] == "203.0.113.45")
+        self.assertTrue(attacker["connection_examples"])
+        self.assertTrue(all(e["src_ip"] in ("203.0.113.45", "10.10.1.10")
+                            and e["proto"] in ("tcp", "udp") for e in attacker["connection_examples"]))
+
+    def test_panel_data_reaches_past_graph_limit_without_double_counting_alerts(self):
+        host = "10.70.1.10"
+        outside = [str(ipaddress.IPv4Address("198.18.0.1") + i) for i in range(405)]
+        peers = [str(ipaddress.IPv4Address("10.71.0.1") + i) for i in range(405)]
+        flows = ([Flow(None, src, host, 443, "tcp") for src in outside[:-1]] +
+                 [Flow(None, host, outside[-1], 443, "tcp")] +
+                 [Flow(None, host, dst, 445, "tcp") for dst in peers])
+        # An alert on an address that only has outbound flows must not add a duplicate IP row.
+        ds = Dataset(flows=flows, threats=[ThreatEvent(None, outside[-1], host, 443, "IPS signature")])
+        data = explore.build(correlate(ds), ds, cap=None)
+        focus = data["focus"][host]
+        self.assertEqual(focus["attackers_total"], 405)
+        self.assertEqual(focus["peers_total"], 405)
+        self.assertEqual(len({a["ip"] for a in focus["attackers"]}), 405)
+        self.assertEqual(len({p["ip"] for p in focus["peers"]}), 405)
+        self.assertEqual({a["ip"] for a in focus["attackers"]}, set(outside))
+        self.assertEqual({p["ip"] for p in focus["peers"]}, set(peers))
+        self.assertIn(outside[-1], explore.read_data(explore.html(data))["focus"][host]["attackers"][0]["ip"])
+
+    def test_long_lists_are_cut_with_exact_totals(self):
+        # Past MAX_LIST a host's lists keep their first rows (alerts always), but every count, the
+        # internet panel and the Attack paths figures still come from the full lists.
+        host = "10.70.1.10"
+        outside = [str(ipaddress.IPv4Address("198.18.0.1") + i) for i in range(260)]
+        peers = [str(ipaddress.IPv4Address("10.71.0.1") + i) for i in range(230)]
+        late = outside[-1]                    # the quietest address, but it set off an IPS alert
+        flows = ([Flow(None, src, host, 443, "tcp", established=True) for src in outside[:-1] for _ in range(3)] +
+                 [Flow(None, host, late, 443, "tcp", established=False, action="deny")] +
+                 [Flow(None, host, dst, 445, "tcp") for dst in peers])
+        ds = Dataset(flows=flows, threats=[ThreatEvent(None, late, host, 443, "IPS signature")])
+        res = correlate(ds)
+        full, cut = explore.build(res, ds, cap=None), explore.build(res, ds, cap=50)
+        f, c = full["focus"][host], cut["focus"][host]
+        self.assertEqual((c["attackers_total"], c["peers_total"]), (260, 230))
+        self.assertEqual(c["attackers"][0]["ip"], late)                     # the alert ranks first and stays
+        self.assertEqual(c["attackers"], f["attackers"][:50][:explore.MAX_LIST_EXAMPLES] + [
+            {**a, "connection_examples": []} for a in f["attackers"][explore.MAX_LIST_EXAMPLES:50]])
+        self.assertEqual([p["ip"] for p in c["peers"]], [p["ip"] for p in f["peers"][:50]])
+        self.assertEqual(c["blast"], f["blast"])
+        for key in ("internet", "internet_total", "internet_in_total", "internet_out_total", "subnets", "nodes", "links"):
+            self.assertEqual(cut[key], full[key], key)
+        self.assertEqual(c["capped"]["kinds"], dict(sorted(Counter(a["kind"] for a in f["attackers"]).items())))
+        self.assertEqual(cut["lists"], {"cap": 50, "file": False})
+        self.assertNotIn("lists", full)
+        self.assertEqual({row[0] for row in cut["outside_all"]}, set(outside))
+        self.assertTrue(all(row[-1] == 1 for row in cut["outside_all"]))        # one host each
+
+    def test_overview_keeps_outbound_internet_traffic(self):
+        # Many inbound scanners must not crowd hosts calling out off the overview's internet arc.
+        hosts = [f"10.80.1.{i}" for i in range(1, 11)]
+        scanners = [str(ipaddress.IPv4Address("198.18.0.1") + i) for i in range(200)]
+        called = [str(ipaddress.IPv4Address("203.0.113.1") + i) for i in range(30)]
+        flows = ([Flow(None, src, h, 443, "tcp") for src in scanners for h in hosts[:3]] +
+                 [Flow(None, h, dst, 443, "tcp") for dst in called for h in hosts[3:]])
+        ds = Dataset(flows=flows)
+        data = explore.build(correlate(ds), ds)
+        inet = data["internet"]
+        self.assertEqual(len(inet), explore.MAX_INTERNET)
+        self.assertEqual((data["internet_in_total"], data["internet_out_total"]), (200, 30))
+        out = [e for e in inet if e["dir"] == "out"]
+        self.assertEqual(len(out), 26)                     # every third slot, inbound fills the rest
+        self.assertTrue(all(e["ip"] in called and e["out_sessions"] for e in out))
+        self.assertTrue(all(t[3] == "out" and t[0] in hosts[3:] for e in out for t in e["targets"]))
+        # the 48 drawn first are mixed, not all inbound
+        self.assertGreaterEqual(sum(e["dir"] == "out" for e in inet[:48]), 15)
+        self.assertEqual(len({e["ip"] for e in inet}), len(inet))
+
+    def test_overview_internet_both_directions(self):
+        ds = Dataset(flows=[Flow(None, "198.51.100.7", "10.90.0.5", 22, "tcp"),
+                            Flow(None, "10.90.0.5", "198.51.100.7", 443, "tcp")])
+        e = explore.build(correlate(ds), ds)["internet"][0]
+        self.assertEqual((e["dir"], e["in_sessions"], e["out_sessions"], e["out_hosts"]), ("both", 1, 1, 1))
+        self.assertEqual(e["targets"][0][3], "both")
+
+    def test_timeline_orders_flows_alerts_and_ioc_lookups(self):
+        t = self.data["timeline"]
+        nodes = [n["id"] for n in self.data["nodes"]]
+        # every timed flow is drawn, including traffic between hosts the network view leaves out
+        self.assertEqual(len(t["flows"]), sum(1 for f in self.ds.flows if f.ts and f.src_ip != f.dst_ip))
+        self.assertEqual(t["hidden"], 0)
+        self.assertFalse(t["sampled"])
+        self.assertEqual([f[0] for f in t["flows"]], sorted(f[0] for f in t["flows"]))
+        self.assertTrue(all(0 <= f[0] <= t["hours"] for f in t["flows"]))
+        ext, more = [e[0] for e in t["ext"]], [m[0] for m in t["more"]]
+        name = lambda r: ext[-r - 1] if r < 0 else nodes[r] if r < len(nodes) else more[r - len(nodes)]
+        # every IPS alert is placed at its own time, in order
+        self.assertEqual(len(t["alerts"]), len(self.ds.threats))
+        self.assertEqual(t["untimed"], [])
+        t0 = datetime.fromisoformat(t["t0"].replace("Z", "+00:00"))
+        self.assertEqual(sorted(round((a.ts - t0).total_seconds() / 3600, 4) for a in self.ds.threats),
+                         [a[0] for a in t["alerts"]])
+        web = [a for a in t["alerts"] if a[2] == "203.0.113.45"]
+        self.assertEqual(len(web), 1)
+        self.assertEqual(name(web[0][1]), "10.10.1.10")
+        self.assertFalse(web[0][4])
+        # flows to or from the alerting address are flagged; one of them is the callback on 4444
+        bad = [f for f in t["flows"] if f[4] & 2]
+        self.assertIn(("10.10.1.10", "203.0.113.45", 4444), {(name(f[1]), name(f[2]), f[3]) for f in bad})
+        self.assertTrue(any(f[4] & 4 for f in t["flows"]))          # onto a vulnerable port
+        self.assertEqual(t["ioc_lookups"], [])                       # no IOC archive in this run
+
+    def test_timeline_marks_ioc_domain_lookups(self):
+        ts = datetime(2026, 1, 1, 8, tzinfo=timezone.utc)
+        ds = Dataset(flows=[Flow(ts, "10.20.0.5", "10.20.0.53", 53, "udp"), Flow(ts, "10.20.0.5", "198.51.100.3", 443, "tcp")],
+                     zeek_events=[ZeekEvent(ts, "dns", "C1", "10.20.0.5", "10.20.0.53", {"query": "Bad.Example."}),
+                                  ZeekEvent(ts, "dns", "C2", "10.20.0.5", "10.20.0.53", {"query": "good.example"})])
+        res = correlate(ds)
+        res["ioc_matches"] = [{"id": "domain:bad.example", "type": "domain", "value": "bad.example", "hosts": ["10.20.0.5"]}]
+        data = explore.build(res, ds)
+        nodes = [n["id"] for n in data["nodes"]]
+        self.assertEqual([(nodes[x[1]], x[2]) for x in data["timeline"]["ioc_lookups"]], [("10.20.0.5", "bad.example")])
+
+    def test_timeline_samples_large_runs_but_keeps_flagged_flows(self):
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        from datetime import timedelta
+        flows = [Flow(base + timedelta(minutes=i), "10.60.0.%d" % (i % 50 + 1), "10.60.1.1", 445, "tcp") for i in range(3000)]
+        flows += [Flow(base + timedelta(minutes=i * 7), "198.51.100.9", "10.60.1.1", 443, "tcp") for i in range(40)]
+        ds = Dataset(flows=flows, threats=[ThreatEvent(base, "198.51.100.9", "10.60.1.1", 443, "Exploit attempt")])
+        old = explore.MAX_TIMELINE_FLOWS
+        explore.MAX_TIMELINE_FLOWS = 500
+        try:
+            t = explore.build(correlate(ds), ds)["timeline"]
+        finally:
+            explore.MAX_TIMELINE_FLOWS = old
+        self.assertTrue(t["sampled"])
+        self.assertEqual(t["total"], 3040)
+        self.assertEqual(len(t["flows"]), 500)
+        self.assertEqual(sum(1 for f in t["flows"] if f[4] & 2), 40)   # every flagged flow survives the sample
+        self.assertEqual([f[0] for f in t["flows"]], sorted(f[0] for f in t["flows"]))
+
+    def test_timeline_spreads_flagged_flows_over_the_whole_run(self):
+        # more flagged flows than half the budget: the kept ones must cover the run, not just its start
+        from datetime import timedelta
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        flows = [Flow(base + timedelta(minutes=i), "198.51.100.9", "10.60.1.1", 443, "tcp") for i in range(2000)]
+        flows += [Flow(base + timedelta(minutes=i), "10.60.0.2", "10.60.1.1", 445, "tcp") for i in range(2000)]
+        ds = Dataset(flows=flows, threats=[ThreatEvent(base, "198.51.100.9", "10.60.1.1", 443, "Exploit attempt")])
+        old = explore.MAX_TIMELINE_FLOWS
+        explore.MAX_TIMELINE_FLOWS = 400
+        try:
+            t = explore.build(correlate(ds), ds)["timeline"]
+        finally:
+            explore.MAX_TIMELINE_FLOWS = old
+        hot = [f[0] for f in t["flows"] if f[4] & 2]
+        self.assertEqual(len(hot), 200)
+        self.assertLess(min(hot), t["hours"] * 0.1)
+        self.assertGreater(max(hot), t["hours"] * 0.9)
+        # the per-bucket counts cover every flow in the run
+        self.assertEqual(sum(n for _, n in t["hist"]["counts"]), t["total"])
+
+    def test_timeline_draws_hosts_left_out_of_the_network_view(self):
+        ts = datetime(2026, 1, 1, 8, tzinfo=timezone.utc)
+        ds = Dataset(flows=[Flow(ts, "10.70.0.%d" % i, "10.70.1.%d" % i, 502, "tcp") for i in range(1, 6)])
+        old = explore.MAX_NODES
+        explore.MAX_NODES = 2
+        try:
+            data = explore.build(correlate(ds), ds)
+        finally:
+            explore.MAX_NODES = old
+        t = data["timeline"]
+        self.assertEqual(len(data["nodes"]), 2)
+        self.assertEqual(len(t["flows"]), 5)
+        self.assertEqual(len(t["more"]), 8)
+        self.assertTrue(all(m[1] in ("10.70.0.0/24", "10.70.1.0/24") for m in t["more"]))
+        self.assertTrue(all(0 <= r < 2 + 8 for f in t["flows"] for r in f[1:3]))
+
+    def test_timeline_lists_untimed_alerts_apart(self):
+        ts = datetime(2026, 1, 1, 8, tzinfo=timezone.utc)
+        ds = Dataset(flows=[Flow(ts, "198.51.100.7", "10.90.0.5", 3389, "tcp", action="deny", established=False)],
+                     threats=[ThreatEvent(None, "198.51.100.7", "10.90.0.5", 3389, "RDP exploit", action="reset-both")])
+        t = explore.build(correlate(ds), ds)["timeline"]
+        self.assertEqual(t["alerts"], [])                     # not placed at a guessed time
+        self.assertEqual(t["untimed_total"], 1)
+        self.assertEqual(t["untimed"][0][1:], ["198.51.100.7", "RDP exploit", True])
+
+    def test_timeline_alerts_name_their_destination_address(self):
+        # an alert onto an outside address (a C2 callback) still says where it went
+        ts = datetime(2026, 1, 1, 8, tzinfo=timezone.utc)
+        ds = Dataset(flows=[Flow(ts, "10.90.0.5", "198.51.100.7", 443, "tcp")],
+                     threats=[ThreatEvent(ts, "10.90.0.5", "198.51.100.7", 443, "Beacon")])
+        a = explore.build(correlate(ds), ds)["timeline"]["alerts"][0]
+        self.assertEqual((a[1], a[5]), (-1, "198.51.100.7"))
+
+    def test_timeline_thins_alerts_over_the_run_keeping_unblocked_ones(self):
+        from datetime import timedelta
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        threats = [ThreatEvent(base + timedelta(hours=i), "198.51.100.%d" % (i + 1), "10.90.0.5", 3389, "scan", action="drop")
+                   for i in range(50)]
+        threats.append(ThreatEvent(base + timedelta(hours=49, minutes=30), "203.0.113.9", "10.90.0.5", 443, "exploit"))
+        ds = Dataset(flows=[Flow(base, "10.90.0.6", "10.90.0.5", 445, "tcp"), Flow(base + timedelta(hours=50), "10.90.0.6", "10.90.0.5", 445, "tcp")],
+                     threats=threats)
+        old = explore.MAX_TIMELINE_ALERTS
+        explore.MAX_TIMELINE_ALERTS = 6
+        try:
+            t = explore.build(correlate(ds), ds)["timeline"]
+        finally:
+            explore.MAX_TIMELINE_ALERTS = old
+        self.assertEqual((len(t["alerts"]), t["alerts_total"]), (6, 51))
+        self.assertIn("exploit", [a[3] for a in t["alerts"]])
+        hours = [a[0] for a in t["alerts"]]
+        self.assertEqual(hours, sorted(hours))
+        self.assertGreater(max(h for h, *_, blocked in t["alerts"] if blocked), 30)
+
+    def test_timeline_needs_timestamps(self):
+        ds = Dataset(flows=[Flow(None, "198.51.100.7", "10.90.0.5", 22, "tcp")])
+        self.assertIsNone(explore.build(correlate(ds), ds)["timeline"])
+
+    def test_html_includes_timeline_view(self):
+        page = explore.html(self.data)
+        self.assertIn('id="btn-timeline"', page)
+        self.assertIn('id="timeline-view"', page)
+        self.assertIn("window.VFTimeline", page)
 
 
 if __name__ == "__main__":

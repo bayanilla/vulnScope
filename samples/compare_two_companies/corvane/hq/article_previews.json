@@ -1,0 +1,14 @@
+{
+  "https://thedfirreport.com/2024/02/26/seo-poisoning-to-domain-control-the-gootloader-saga-continues/": {
+    "title": "SEO Poisoning to Domain Control: The Gootloader Saga Continues",
+    "overview": "The DFIR Report follows an intrusion that began when a user downloaded a poisoned search result: Gootloader JavaScript fetched a Cobalt Strike payload about nine hours later, and the attacker moved over SMB, WinRM and RDP, used SystemBC as a SOCKS5 tunnel and reached the domain controllers, file shares and backup server."
+  },
+  "https://github.com/PaloAltoNetworks/Unit42-timely-threat-intel/blob/main/2026-10-30-activity-using-ARTEX-agentic-AI.txt": {
+    "title": "ARTEX Agentic AI Framework Used to Abuse Exposed APIs and Probe Identity Providers",
+    "overview": "Unit 42 describes intrusion attempts from 24 September to 27 October 2026 that it assesses used ARTEX, an openly published multi-agent AI penetration-testing framework, or a derivative: application mapping from JavaScript source maps, runtime configuration and OpenAPI specifications; identity-provider probing (login baselining with made-up users, OAuth redirect-URI abuse, password spraying, account-recovery abuse); then a fall-back to exposed APIs, where self-registered accounts read data and approved changes and a development API accepted unauthenticated writes. Requests came in bursts of 1-14 about a second apart with 25-31 second pauses. Not all ARTEX activity is malicious, so the addresses are indicators rather than block-list entries."
+  },
+  "https://unit42.paloaltonetworks.com/cairn-framework-ai-autonomous-attacks/": {
+    "title": "Attackers Use Autonomous AI to Target Semiconductor, Defense and Civil Society Sectors",
+    "overview": "Unit 42 describes CL-STA-1238, assessed with moderate confidence as China-nexus, running a customized fork of the open-source Cairn AI penetration-testing framework in 25 operations against at least 19 semiconductor, defense and civil society organizations in August and September 2026. AI agents mapped targets, exploited web applications and identity weaknesses, collected credentials and reached internal networks; the operators supplied extra intelligence such as VPN gateway addresses and shared group passwords."
+  }
+}

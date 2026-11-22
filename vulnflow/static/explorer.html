@@ -1,21 +1,56 @@
-<canvas id="stage" aria-label="Network graph of scanned hosts"></canvas>
+<canvas id="stage3d" aria-hidden="true" hidden></canvas>
+<canvas id="stage" aria-label="Network graph of observed hosts"></canvas>
 <div id="vignette"></div>
 <header id="hud">
-  <div class="brand"><span class="dot"></span>vulnflow <b>EXPLORER</b></div>
+  <div class="brand"><!--BRAND--><span class="view">EXPLORER</span><!--REPORT--><span id="lists-cut" class="lists-cut" hidden></span></div>
   <div id="subtitle" class="mono"></div>
 </header>
+<div id="about" role="note" hidden></div>
 <div id="controls">
-  <button id="btn-overview" title="Back to the whole network (Esc)">Overview</button>
-  <button id="btn-tour" title="Fly to the next highest-priority host (Shift+click: previous)">Fly-Through</button>
+  <button id="btn-overview" type="button" title="Back to all hosts (Esc)">← All hosts</button>
+  <div id="viewseg" class="seg" role="group" aria-label="View">
+    <button id="vw-flat" type="button" title="Flat network view (2)">Flat</button>
+    <button id="btn-3d" type="button" title="3D network view (3). Drag to rotate, right-drag or Shift-drag to pan, middle-drag to move up or down" hidden>3D</button>
+    <button id="btn-paths" type="button" title="Most likely attack paths (P)" hidden>Attack paths</button>
+    <button id="btn-timeline" type="button" title="Flows over time (I)" aria-controls="timeline-view" aria-expanded="false" hidden>Timeline</button>
+  </div>
   <button id="btn-labels" aria-pressed="true" title="Show or hide labels (L)">Labels</button>
   <button id="btn-motion" aria-pressed="true" title="Animated traffic (M)">Motion</button>
+  <button id="btn-ai" type="button" aria-controls="analyst-chat" aria-expanded="false" hidden>Security Assistant</button>
+  <button id="about-toggle" type="button" aria-expanded="false" aria-controls="about" title="What am I looking at? (?)" aria-label="What am I looking at?">?</button>
+</div>
+<div id="viewctl" role="group" aria-label="3D view">
+  <button id="vc-left" type="button" title="Rotate left (Q)" aria-label="Rotate left"><svg class="ico" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.6-3.7"/><path d="M2.5 2.5v3h3"/></svg></button>
+  <button id="vc-right" type="button" title="Rotate right (E)" aria-label="Rotate right"><svg class="ico" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13.5 2.5v3h-3"/></svg></button>
+  <button id="vc-top" type="button" title="Top-down view (T)" aria-pressed="false">Top</button>
+  <button id="vc-tilted" type="button" title="Tilted view (Y)" aria-pressed="false">Tilted</button>
+  <button id="vc-low" type="button" title="Low view (U)" aria-pressed="true">Low</button>
+  <button id="vc-spin" type="button" title="Turn slowly to the left (stops when you move the camera)" aria-pressed="true">Spin</button>
+  <button id="vc-reset" type="button" title="Reset to the low, turning view (R)">Reset</button>
 </div>
 <aside id="rail">
-  <input id="search" type="search" placeholder="Find host, IP, CVE  ( / )" aria-label="Find a host" autocomplete="off">
+  <div class="railtop"><input id="search" type="search" placeholder="Find host, IP, CVE" title="Find a host, IP, or CVE ( / )" aria-label="Find a host" autocomplete="off">
+  <button id="group-toggle" type="button" aria-pressed="true" title="Group the host list by subnet (click a subnet to open or fold it)">By subnet</button>
+  <button id="ioc-filter" type="button" aria-pressed="false" hidden>IOC hosts <span id="ioc-host-count"></span></button>
+  <select id="net-filter" aria-label="Show hosts from one network" title="Show hosts from one network (from the network map)" hidden></select></div>
   <div id="hostlist" role="list"></div>
 </aside>
 <aside id="panel" aria-live="polite" hidden></aside>
+<section id="analyst-chat" class="analyst-chat ai-chat-overlay" data-ai-chat data-ask-url="ask"
+  role="dialog" aria-modal="false" aria-labelledby="ai-chat-title" hidden>
+  <div class="ai-chat-header"><h2 id="ai-chat-title">Security Assistant</h2>
+    <button type="button" class="ai-chat-close" aria-label="Close Security Assistant">Close</button></div>
+  <p class="ai-chat-status"></p><a class="ai-chat-settings" href="#">Change provider</a>
+  <div class="ai-chat-log" role="log" aria-label="Security Assistant conversation" aria-live="polite"
+    aria-relevant="additions" tabindex="0"></div>
+  <form class="ai-chat-form"><label for="ai-question">Ask about these results</label>
+    <textarea id="ai-question" rows="2" maxlength="4000" placeholder="Ask about a host, finding, or next step"></textarea>
+    <div class="ai-chat-actions"><button type="submit" class="ai-chat-submit">Ask</button>
+      <span class="ai-chat-busy" role="status"></span></div></form>
+</section>
 <div id="legend"></div>
 <div id="tip" role="tooltip" hidden></div>
 <div id="hint">Click a host to see who is targeting it and how far a compromise could reach.</div>
 <div id="intro"><div class="mono" id="intro-text"></div></div>
+<section id="attack-paths" aria-label="Attack paths" hidden></section>
+<section id="timeline-view" aria-label="Timeline" hidden></section>

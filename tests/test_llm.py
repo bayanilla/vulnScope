@@ -33,10 +33,24 @@ class VendorNeutralTests(Base):
         with self.assertRaises(LLMError):
             Analyst(self.res, cfg)
 
-    def test_cli_requires_a_choice(self):
+    def test_cli_falls_back_to_the_offline_assistant(self):
+        import contextlib
+        import io
         from vulnflow.cli import main
-        with mock.patch.dict(os.environ, {"VULNFLOW_LLM_PROVIDER": ""}):
-            self.assertEqual(main(["ask", self.out, "--once", "hi"]), 2)
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.dict(os.environ, {"VULNFLOW_LLM_PROVIDER": ""}), \
+                mock.patch("urllib.request.urlopen", side_effect=AssertionError("network used")), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            self.assertEqual(main(["ask", self.out, "--once", "what should we fix first"]), 0)
+        self.assertIn("built-in offline assistant", err.getvalue())
+        self.assertIn("No AI model is used", out.getvalue())
+        self.assertIn("## What to do first", out.getvalue())
+
+    def test_mock_is_an_alias_for_offline(self):
+        cfg = LLMConfig.from_env(provider="mock")
+        self.assertEqual(cfg.provider, "offline")
+        self.assertTrue(cfg.is_offline)
+        self.assertEqual(cfg.api_key, "")
 
 
 class ContextTests(Base):
@@ -49,6 +63,26 @@ class ContextTests(Base):
         if total > llm.MAX_FINDINGS_IN_CONTEXT:     # the sample estate is larger than the cap
             self.assertIn(f"of {total} findings", data["note"])
         self.assertIn("connected back", " ".join(data["findings"][0]["indicators"]).replace("outbound connection(s) to", "connected back"))
+
+    def test_local_context_is_compact_and_named_findings_are_added_on_demand(self):
+        compact = build_context(self.res, compact=True)
+        data = json.loads(compact)
+        self.assertEqual(len(data["findings"]), llm.LOCAL_FINDINGS_IN_CONTEXT)
+        self.assertLess(len(compact), 20000)
+        self.assertIn("do not treat omitted findings as absent", data["note"])
+        top_hosts = {r["host"] for r in self.res["findings"][:llm.LOCAL_FINDINGS_IN_CONTEXT]}
+        target = next(r for r in self.res["findings"][llm.LOCAL_FINDINGS_IN_CONTEXT:]
+                      if r["host"] not in top_hosts)
+        captured = {}
+        def local_reply(cfg, system, messages, effort):
+            captured["system"], captured["question"] = system, messages[-1]["content"]
+            return "Demo answer"
+        with mock.patch.dict(llm.PROVIDERS, {"local": local_reply}):
+            analyst = Analyst(self.res, LLMConfig.from_env(provider="local"))
+            self.assertEqual(analyst.ask(f"What about {target['host']}?"), "Demo answer")
+        self.assertIn(target["plugin_id"], captured["question"])
+        self.assertIn("<focus_details>", captured["question"])
+        self.assertLess(len(captured["system"]), len(build_context(self.res)) // 10)
 
     def test_focus_details_finds_hosts_and_cves(self):
         self.assertIn("97833", llm.focus_details(self.res, "Why is fs01 urgent?"))
@@ -218,17 +252,64 @@ class WebTests(Base):
         except urllib.error.HTTPError as e:
             return e.code, e.read().decode()
 
-    def test_ask_endpoint_with_mock(self):
+    def test_ask_endpoint_with_offline_assistant(self):
         host, run = self._server(LLMConfig.from_env(provider="mock"))
         with urllib.request.urlopen(host + run) as resp:
-            self.assertIn("Ask about these results", resp.read().decode())
-        status, body = self._post(host + run + "ask", json.dumps({"question": "<b>fs01?</b>", "history": []}),
+            page = resp.read().decode()
+            self.assertIn("Ask about these results", page)
+            self.assertIn('class="ai-chat-log" role="log"', page)
+            self.assertIn("overflow-y:auto", page)
+            self.assertIn("log.scrollTop = log.scrollHeight", page)
+        with urllib.request.urlopen(host + run + "ai-status") as resp:
+            self.assertEqual(resp.headers["Cache-Control"], "no-store")
+            status = json.load(resp)
+            self.assertTrue(status["enabled"])
+            self.assertTrue(status["ready"])
+            self.assertTrue(status["offline"])
+            self.assertIn("nothing leaves this machine", status["description"])
+            status_token = status["csrf"]
+        status, body = self._post(host + run + "ask", json.dumps({"question": "x", "history": []}),
                                   {"Content-Type": "application/json"})
+        self.assertEqual(status, 403)                     # no CSRF token
+        status, body = self._post(host + run + "ask", json.dumps({"question": "<b>fs01?</b>", "history": []}),
+                                  {"Content-Type": "application/json", "X-CSRF-Token": status_token})
         j = json.loads(body)
-        self.assertIn("&lt;b&gt;", j["answer_html"])   # model output is escaped
-        self.assertNotIn("<b>", j["answer_html"])
+        self.assertNotIn("<b>", j["answer_html"])       # answers are rendered with all text escaped
+        self.assertIn("fs01.corp.example (10.10.2.25)", j["answer_html"])
         with open(os.path.join(self.out, "ai_chat_log.md")) as fh:
             self.assertIn("fs01?", fh.read())
+
+    def test_offline_can_be_selected_in_browser_without_model_or_key(self):
+        import re
+        from urllib.parse import urlencode
+        host, run = self._server(LLMConfig())
+        with urllib.request.urlopen(host + "/settings?next=" + run) as resp:
+            page = resp.read().decode()
+        self.assertIn('<option value="offline" selected>Built-in (offline, no AI)</option>', page)
+        self.assertNotIn('value="mock"', page)
+        token = re.search(r'name="csrf" value="([^"]+)"', page)[1]
+        form = {"csrf": token, "next": run, "provider": "mock", "model": "old-model",
+                "api_key": "unused-key", "action": "save"}
+        status, body = self._post(host + "/settings", urlencode(form))
+        self.assertEqual(status, 200)
+        self.assertIn("Built-in offline assistant: answers are put together", body)
+        with urllib.request.urlopen(host + run + "ai-status") as resp:
+            config = json.load(resp)
+        self.assertTrue(config["ready"])
+        self.assertTrue(config["offline"])
+
+    def test_explorer_uses_same_run_chat_and_hides_it_when_ai_is_off(self):
+        host, run = self._server(LLMConfig.from_env(provider="mock"))
+        with urllib.request.urlopen(host + run + "explorer.html") as resp:
+            page = resp.read().decode()
+        self.assertIn('id="btn-ai"', page)
+        self.assertIn('data-ai-chat data-ask-url="ask"', page)
+        self.assertIn("ai-status", page)
+        self.assertIn("(?:explorer\\.html)?", page)
+        self.assertIn("analyst-chat", page)
+        disabled_host, disabled_run = self._server(None)
+        with urllib.request.urlopen(disabled_host + disabled_run + "ai-status") as resp:
+            self.assertFalse(json.load(resp)["enabled"])
 
     def test_choose_provider_and_key_in_browser(self):
         import re
@@ -236,7 +317,9 @@ class WebTests(Base):
         with mock.patch.dict(os.environ, {"VULNFLOW_LLM_PROVIDER": "", "OPENAI_API_KEY": ""}):
             host, run = self._server(LLMConfig.from_env())
             with urllib.request.urlopen(host + run) as resp:
-                self.assertIn("No AI provider selected", resp.read().decode())
+                page = resp.read().decode()
+                self.assertIn("Built-in offline assistant", page)       # works before any provider is chosen
+                self.assertIn("Instant; built from the results without AI.", page)
             with urllib.request.urlopen(host + "/settings?next=" + run) as resp:
                 page = resp.read().decode()
             token = re.search(r'name="csrf" value="([^"]+)"', page)[1]
@@ -254,6 +337,8 @@ class WebTests(Base):
                 page = resp.read().decode()
             self.assertNotIn("sk-secret-abcd", page)
             self.assertIn("…abcd", page)
+            with urllib.request.urlopen(host + run + "ai-status") as resp:
+                self.assertNotIn("sk-secret-abcd", resp.read().decode())
             status, _ = self._post(host + "/settings", urlencode({**form, "csrf": "wrong"}))
             self.assertEqual(status, 403)
             status, _ = self._post(host + "/settings", urlencode(form),

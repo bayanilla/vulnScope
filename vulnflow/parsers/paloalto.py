@@ -8,7 +8,7 @@ from __future__ import annotations
 import csv
 
 from ..schema import Flow, ParseStats, ThreatEvent
-from ._util import clean_ip, clean_port, clean_proto, norm_header, parse_ts, to_int
+from ._util import clean_ip, clean_port, clean_proto, count, norm_header, open_text, parse_ts
 
 # Offsets relative to the "Type" column (which holds TRAFFIC) in syslog CSV.
 SYSLOG_OFFSETS = {
@@ -45,7 +45,7 @@ def _flow(get, stats: ParseStats) -> Flow | None:
         return None
     action_raw = (get("action") or "").strip().lower()
     action = "deny" if action_raw.startswith(DENY_ACTIONS) else "allow"
-    b_out, b_in = to_int(get("bytes_sent"), 0), to_int(get("bytes_received"), 0)
+    b_out, b_in = count(get("bytes_sent")), count(get("bytes_received"))
     ts = parse_ts(get("ts"))
     if ts is None:
         stats.note("some rows had no parseable timestamp (kept, untimed)")
@@ -72,8 +72,8 @@ def _threat(get, stats: ParseStats) -> ThreatEvent | None:
 
 def parse(path: str, stats: ParseStats):
     stats.note("firewall timestamps are assumed to be UTC")
-    flows: list = []          # Flow records plus ThreatEvent records from THREAT rows
-    with open(path, encoding="utf-8-sig", errors="replace", newline="") as fh:
+    # yields Flow records plus ThreatEvent records from THREAT rows; .gz exports are read directly
+    with open_text(path, newline="") as fh:
         first = fh.readline()
         fh.seek(0)
         low = first.lower()
@@ -86,23 +86,30 @@ def parse(path: str, stats: ParseStats):
                     if a in header:
                         idx[key] = header.index(a)
                         break
+            # every time column the export has, in preference order: THREAT rows leave Start Time
+            # empty, so each row falls back to the next column that has a value (e.g. Receive Time)
+            ts_cols = [header.index(a) for a in HEADER_ALIASES["ts"] if a in header]
+
+            def get(k):
+                if k == "ts":
+                    return next((row[i] for i in ts_cols if i < len(row) and row[i].strip()), None)
+                return row[idx[k]] if k in idx and idx[k] < len(row) else None
             for row in reader:
                 if not any(c.strip() for c in row):
                     continue
                 stats.read += 1
-                get = lambda k: row[idx[k]] if k in idx and idx[k] < len(row) else None
                 kind = (get("type") or "TRAFFIC").strip().upper()
                 if kind == "THREAT":
                     t = _threat(get, stats)
                     if t:
-                        flows.append(t)
+                        yield t
                     continue
                 if kind != "TRAFFIC":
                     stats.drop(f"{kind} log type not used")
                     continue
                 flow = _flow(get, stats)
                 if flow:
-                    flows.append(flow)
+                    yield flow
         else:
             for line in fh:
                 if not line.strip():
@@ -131,9 +138,8 @@ def parse(path: str, stats: ParseStats):
                 if kind == "THREAT":
                     t = _threat(get, stats)
                     if t:
-                        flows.append(t)
+                        yield t
                     continue
                 flow = _flow(get, stats)
                 if flow:
-                    flows.append(flow)
-    return flows
+                    yield flow

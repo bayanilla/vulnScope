@@ -7,5 +7,22 @@ vulnflow.log
 server.log
 vulnflow_runs/
 vulnflow_out/
+demo/*_output/
 # separate git repository (github.com/bayanilla/vulnpath)
 vulnpath/
+# Docker
+dist/
+vulnscope-out/
+/data/
+.env
+# Local branding and settings (set for testing; never commit)
+.vulnscope/
+**/.vulnscope/
+branding.json
+
+# coverage (pip install -r requirements-dev.txt)
+.coverage
+.coverage.*
+coverage-html/
+htmlcov/
+.hypothesis/
