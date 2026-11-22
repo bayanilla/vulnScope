@@ -4,6 +4,22 @@ This document explains the implementation responsibilities and tradeoffs of a lo
 telemetry-and-scan correlation proof of concept. It does not claim to meet a production-service
 standard.
 
+## Diagrams
+
+Two draw.io diagrams in `docs/diagrams/`, each with a PNG of the same drawing in `screenshots/`. Open the `.drawio` file in draw.io
+(desktop app or app.diagrams.net) to edit it, then export the PNG again.
+
+- [Architecture](docs/diagrams/vulnscope-architecture.drawio): inputs, the Docker image, the
+  analysis chain from parsers to reports, the upload page, the Security Assistant, Compare, the run
+  folder and the optional outbound connections.
+- [End to end](docs/diagrams/vulnscope-end-to-end.drawio): submitting network telemetry and a
+  vulnerability scan, the analysis steps, and the results, including the error path and the
+  telemetry-only branch.
+
+![VulnScope architecture](screenshots/diagram_architecture.png)
+
+![VulnScope end to end](screenshots/diagram_end_to_end.png)
+
 ## Responsibilities
 
 ```mermaid
