@@ -234,7 +234,7 @@ class AnthropicProviderTests(Base):
 class WebTests(Base):
     def _server(self, llm_cfg):
         from vulnflow.web import make_handler
-        runs = os.path.join(self.tmp, f"runs{id(llm_cfg)}")
+        runs = tempfile.mkdtemp(prefix="runs", dir=self.tmp)   # unique: id() values are reused after garbage collection
         run_id = "0123456789abcdef"
         os.makedirs(os.path.join(runs, run_id))
         os.symlink(self.out, os.path.join(runs, run_id, "out"))
