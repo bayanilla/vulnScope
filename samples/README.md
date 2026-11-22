@@ -1,4 +1,4 @@
-# Múcaro VulnScope synthetic sample
+# VulnScope synthetic sample
 
 Choose one of the folders directly under `samples/`:
 
@@ -24,7 +24,7 @@ Choose one of the folders directly under `samples/`:
   agentic offensive frameworks (ARTEX and CyberStrikeAI) against fictional companies, as Zeek, Suricata
   and Nessus data. See [the agentic framework samples](#the-agentic-offensive-framework-samples-artex-ai-and-cyberstrike-ai) below.
 
-On the upload page, choose either subfolder under **Analyze files with Múcaro VulnScope** and click
+On the upload page, choose either subfolder under **Analyze files with VulnScope** and click
 **Analyze folder**. The scan-backed folder's executive report, technical report, and Explorer show
 28 matched indicators across five source articles. Click a matched indicator to see its article
 overview and full source link.

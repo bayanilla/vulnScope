@@ -103,7 +103,7 @@ failing step's log is one click away under **Details**.
 | `test_scanners.py` | Hosts vs probed-only addresses, scanner detection, `known_scanners.csv`, probed ranges, firewall blocks, the one-way sensor warning |
 | `test_llm.py`, `test_offline_assistant.py` | Provider adapters, redaction, grounding; the built-in assistant |
 | `test_article_brief.py`, `test_radar.py` | Article briefs and Radar lookups with stubbed services |
-| `test_branding.py` | Branding page, password lock, logo validation |
+| `test_branding.py` | Branding page, logo validation |
 | `test_saved.py`, `test_report_name.py` | Reopening a saved report; report names, networks and timestamped run folders |
 | `test_compare.py` | Compare reports: counts per report and network, the re-hunt over saved data, the all-networks Explorer (islands, shared items per host, fair trimming), command line and page, the two-company sample |
 | `test_sites.py` | A folder with a `sites.csv`: reading and checking the list, files shared by every site, a report per site and their comparison from the command line and the upload page |
@@ -178,4 +178,4 @@ Never commit private inputs, credentials, unredacted exports or local branding; 
 enforces the mechanical part in CI. `.gitignore`
 excludes `.env`, `vulnscope-out/`, `vulnflow_runs/`, `.vulnscope/` and `branding.json`; keep test
 branding in `~/.vulnscope` (or `$VULNSCOPE_HOME`), not in the repository. Never print or log a
-configured API key or the Branding password while debugging.
+configured API key while debugging.

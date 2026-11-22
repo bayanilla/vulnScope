@@ -298,24 +298,12 @@ def main(argv=None) -> int:
     fb.add_argument("-o", "--out", default="zeek_from_filebeat",
                     help="folder for conn.log, dns.log, ... (Zeek JSON; default zeek_from_filebeat)")
 
-    sub.add_parser("branding-password",
-                   help="print a hash for a new Branding page password (set it as VULNSCOPE_BRANDING_PASSWORD_HASH)")
-
     args, extra = ap.parse_known_args(argv)
     # Before Python 3.12, `ask OUT --once a question` leaves the words after --once unparsed.
     if extra and args.cmd == "ask" and not any(e.startswith("-") for e in extra):
         args.question += extra
     elif extra:
         ap.error("unrecognized arguments: " + " ".join(extra))
-    if args.cmd == "branding-password":
-        import getpass
-        from .branding import PASSWORD_ENV, hash_password
-        first = getpass.getpass("New Branding password: ")
-        if len(first.strip()) < 12 or first != getpass.getpass("Repeat it: "):
-            print("Passwords must match and be at least 12 characters.", file=sys.stderr)
-            return 1
-        print(f"{PASSWORD_ENV}='{hash_password(first)}'")
-        return 0
     if args.cmd == "filebeat-to-zeek":
         from .parsers.filebeat import export
         counts = export(args.files, args.out, log=lambda m: print(m, file=sys.stderr))

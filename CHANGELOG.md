@@ -6,6 +6,12 @@ again to get a release's changes. Upgrading from vulnScope PRO: see [UPGRADE.md]
 
 ## Unreleased
 
+- **Branding:** the default name is now just "VulnScope" (no "Múcaro" in front), and the Branding
+  page has no password any more: the analyst sets the name and logo directly. The
+  `branding-password` command, `/branding/unlock`, `/branding/lock` and
+  `VULNSCOPE_BRANDING_PASSWORD_HASH` are gone; a saved `branding.json` keeps working.
+- **Zeek JSON with `id_orig_h` field names** (SimpleRock, some Logstash and Elastic exports) is now
+  read; every connection in such files used to be dropped. Results on all samples are unchanged.
 - **Incident cases moved out of ULTRA** into their own tool, Ultra Incident (working name), which
   has its own CLI, web page and container. The `vulnflow incident` commands and the "Investigate an
   incident" page are gone from ULTRA. Internal networks, the IOC CSV and Skip full copies sit in one

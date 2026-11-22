@@ -33,7 +33,5 @@ POST = _table([
     (rf"/runs/({RUN_ID})/(brief|article-briefs|ask)", runs.ai),
     (r"/settings", settings.save),
     (r"/branding", branding_page.save),
-    (r"/branding/unlock", branding_page.unlock),
-    (r"/branding/lock", branding_page.lock),
     (r"/compare", compare_page.run),
 ])

@@ -16,7 +16,7 @@ import sys
 
 RUNS = "/runs"
 VULNFLOW_COMMANDS = {"analyze", "explore", "serve", "samples", "brief", "ask", "article-briefs", "compare",
-                     "compare-sample", "analyze-sites", "filebeat-to-zeek", "branding-password", "-h", "--help"}
+                     "compare-sample", "analyze-sites", "filebeat-to-zeek", "-h", "--help"}
 
 
 def drop_privileges():

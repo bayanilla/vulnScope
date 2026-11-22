@@ -13,8 +13,6 @@ than their name; SVG is refused because it can carry script. Logos are embedded 
 from __future__ import annotations
 
 import base64
-import hashlib
-import hmac
 import html
 import json
 import os
@@ -29,7 +27,7 @@ from pathlib import Path
 from .errors import UserError
 
 BASE_NAME = "VulnScope"
-DEFAULT_PREFIX = "Múcaro"
+DEFAULT_PREFIX = ""
 EXPLORER_NAME = "VulnScope Explorer"
 MAX_PREFIX = 40
 MAX_LOGO_BYTES = 512 * 1024
@@ -37,44 +35,6 @@ MAX_LOGO_SIDE = 2048
 LOGO_SIZES = ("small", "medium")      # small = the original 24 px top-bar logo; medium = about 1.5x
 DEFAULT_LOGO_SIZE = "medium"
 LOGO_TYPES = ("image/png", "image/jpeg", "image/gif", "image/webp")
-
-
-# Changing branding needs a password. Only a salted scrypt hash is kept here, never the password.
-# To change it without a code change, set VULNSCOPE_BRANDING_PASSWORD_HASH to the output of
-# ``python -m vulnflow branding-password``.
-DEFAULT_PASSWORD_HASH = "scrypt$32768$8$1$giTbtcFVkasfMqt9FFT/JQ==$5PQe1jnnsHarAyuE3z7IU8YdFusUJr8jTlAIkpvmb/I="
-PASSWORD_ENV = "VULNSCOPE_BRANDING_PASSWORD_HASH"
-
-
-def _normalise_password(password: str) -> bytes:
-    """Ignore case and extra spaces so a spoken passphrase is easy to type."""
-    text = unicodedata.normalize("NFC", password or "")
-    return re.sub(r"\s+", " ", text).strip().casefold().encode("utf-8")
-
-
-def hash_password(password: str, n: int = 2 ** 15, r: int = 8, p: int = 1) -> str:
-    salt = os.urandom(16)
-    digest = hashlib.scrypt(_normalise_password(password), salt=salt, n=n, r=r, p=p,
-                            maxmem=128 * 1024 * 1024, dklen=32)
-    return f"scrypt${n}${r}${p}${base64.b64encode(salt).decode()}${base64.b64encode(digest).decode()}"
-
-
-def check_password(password: str) -> bool:
-    """Constant-time check against the configured hash; a malformed hash never matches."""
-    stored = os.environ.get(PASSWORD_ENV, "").strip() or DEFAULT_PASSWORD_HASH
-    try:
-        scheme, n, r, p, salt, expected = stored.split("$")
-        n, r, p = int(n), int(r), int(p)
-        if scheme != "scrypt" or not (2 ** 14 <= n <= 2 ** 20 and 1 <= r <= 16 and 1 <= p <= 4):
-            return False
-        salt, expected = base64.b64decode(salt, validate=True), base64.b64decode(expected, validate=True)
-        if len(password or "") > 1024:
-            return False
-        digest = hashlib.scrypt(_normalise_password(password), salt=salt, n=n, r=r, p=p,
-                                maxmem=128 * 1024 * 1024 * 2, dklen=len(expected))
-    except (ValueError, TypeError):
-        return False
-    return hmac.compare_digest(digest, expected)
 
 
 class BrandingError(UserError):
@@ -196,7 +156,7 @@ def _load_cached(path: str, mtime: float) -> Branding:
 
 
 def load() -> Branding:
-    """The saved branding, or the Múcaro default when none is saved or the file is unusable."""
+    """The saved branding, or the default when none is saved or the file is unusable."""
     path = config_path()
     try:
         mtime = path.stat().st_mtime_ns
@@ -259,7 +219,7 @@ def _default_icon() -> str:
 
 
 def icon_data_uri() -> str:
-    """Tab icon: the analyst's logo when one is set, otherwise the Múcaro icon."""
+    """Tab icon: the analyst's logo when one is set, otherwise the default icon."""
     return load().logo_data_uri() or _default_icon()
 
 

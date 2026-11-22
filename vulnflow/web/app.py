@@ -2,7 +2,7 @@
 
 Everything that used to live in variables captured by one large closure is here, in the open:
 the configuration it was started with, the AI provider chosen on the settings page, the CSRF
-token, the Branding page's unlock state and what was last typed on the upload page.
+token and what was last typed on the upload page.
 """
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from dataclasses import dataclass, field, replace
 
 from ..correlate import Config
 from ..llm import LLMConfig
-from .branding_page import BrandingGate
 
 
 @dataclass
@@ -24,7 +23,6 @@ class App:
     access_token: str | None = None         # remote access: every request must carry it (cookie)
     allowed_hosts: frozenset[str] = frozenset()   # Host headers accepted besides loopback
     csrf: str = field(default_factory=lambda: secrets.token_urlsafe(24))   # guards form posts from other sites
-    branding: BrandingGate = field(default_factory=BrandingGate)
     last_path: str = ""                     # kept on the upload page after an error
     last_report: dict = field(default_factory=dict)
 

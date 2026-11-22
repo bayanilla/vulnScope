@@ -90,7 +90,7 @@ Folder path, Browse, upload, or command line
 | `vulnflow/static/` | Explorer, 3D, Attack paths and Timeline views (three.js bundled) |
 | `vulnflow/llm.py`, `offline_assistant.py` | Provider adapters, grounding, redaction, and the built-in offline assistant |
 | `vulnflow/radar.py` | Optional Cloudflare Radar lookups for one selected indicator |
-| `vulnflow/branding.py` | Analyst name prefix and logo, logo validation, password hash |
+| `vulnflow/branding.py` | Analyst name prefix and logo, logo validation |
 | `vulnflow/web/handler.py`, `routes.py`, `multipart.py` | Loopback HTTP server: Host/Origin/CSRF checks, security headers and streamed uploads in one request handler; a route table sends each path to the page module that serves it |
 | `vulnflow/web/` page modules | `upload.py` (Analyze), `folders.py` (Browse and folder paths), `runs.py` (results pages, Security Assistant, briefs, Radar), `settings.py`, `branding_page.py`, `compare_page.py` |
 | `vulnflow/compare.py` | Compare reports: counts per report and network from saved `results.json` files; looks for IOCs again in saved normalized data with the analysis' matcher |
@@ -248,9 +248,8 @@ the Security Assistant on the built-in offline provider (or a model on your own 
 - `tests/test_security.py` pins these checks: a foreign Host is refused on every state-changing
   route, a cross-site Origin is refused even with a valid token, posts without a token change
   nothing, and the Docker published port is accepted. CI runs them on every pull request.
-- Branding changes need the Branding password. Five wrong attempts start a lockout that doubles with
-  each further miss; an unlock lasts 30 minutes in that browser. Only a salted scrypt hash is kept.
-  Logos are checked by content (PNG, JPEG, GIF, WebP; SVG refused) and embedded as `data:` images,
+- Branding has no password; anyone who can open the upload page can change it (its form needs the
+  page's CSRF token like every other post). Logos are checked by content (PNG, JPEG, GIF, WebP; SVG refused) and embedded as `data:` images,
   so they cannot run code.
 - Run folders and reports are created readable by your account only.
 - A `.gz` input may expand to at most 200 times its size (minimum 256 MB). Set
