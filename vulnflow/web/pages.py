@@ -51,3 +51,33 @@ BUSY = """<div id="busy" role="alertdialog" aria-modal="true" aria-labelledby="b
 def busy_overlay() -> str:
     """The overlay static/busy.js shows while a long form post runs."""
     return BUSY.format(icon=icon_data_uri())
+
+
+MODES = [("analyze", "/", "Analyze network and vulnerabilities"),
+         ("investigate", "/investigate", "Investigate an incident")]
+
+
+def modes(current: str) -> str:
+    """The switch at the top of the upload page between the two ways in: the regular analysis and
+    an incident investigation."""
+    here = ' aria-current="page"'
+    links = "".join(f'<a href="{href}"{here if key == current else ""}>{html.escape(label)}</a>'
+                    for key, href, label in MODES)
+    return f'<nav class="modes" aria-label="What to do">{links}</nav>'
+
+
+PICKER = """<div class="pathrow"><input id="path" type="text" name="path" value="{value}" placeholder="{example}" autocomplete="off" spellcheck="false"{optional}>
+<button type="button" id="browse" class="secondary">Browse&hellip;</button></div>
+<input type="file" id="pick-dir" webkitdirectory directory multiple hidden>
+<div id="pick-msg" class="hint" role="status" aria-live="polite"></div>
+<div id="picker" hidden><div class="pk-head"><button type="button" id="pk-up" class="secondary" title="Parent folder">&uarr; Up</button>
+<code id="pk-where"></code></div><div id="pk-roots"></div><ul id="pk-list"></ul>
+<div class="pk-foot"><span id="pk-info" class="hint"></span><button type="button" id="pk-cancel" class="secondary">Cancel</button>
+<button type="button" id="pk-use">Use this folder</button></div></div>"""
+
+
+def picker(value: str, optional: bool = False) -> str:
+    """The folder path box with its Browse… button and in-page folder list (static/folder_picker.js)."""
+    from . import folders
+    return PICKER.format(value=html.escape(value), example=html.escape(folders.path_example()),
+                         optional=" data-optional=\"1\"" if optional else "")
