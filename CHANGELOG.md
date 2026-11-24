@@ -6,6 +6,11 @@ again to get a release's changes. Moving from PRO, MAX or ULTRA: see [UPGRADE.md
 
 ## Unreleased
 
+- **Saved source articles in reports.** `--article-library DIR` (or `VULNSCOPE_ARTICLE_LIBRARY`)
+  points at a folder of saved article copies with an `article_library.json`. The copies that
+  matched indicators cite are copied into the report folder under `articles/`, and the IOC panel
+  offers "Open saved copy (PDF)" next to the online link, so a report folder carries its sources
+  into an air-gapped network. Served HTML copies open in a no-script sandbox.
 - **One repository.** VulnScope now lives in [bayanilla/vulnScope](https://github.com/bayanilla/vulnScope),
   which replaces vulnScope PRO, VulnScope MAX and VulnScope ULTRA. The ready-made image is
   `ghcr.io/bayanilla/vulnscope` (was `ghcr.io/bayanilla/vulnscope-max`), the image built from

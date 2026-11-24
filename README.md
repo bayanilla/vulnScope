@@ -184,6 +184,7 @@ is drawn from.
 | Target contact | Never scans, probes or resolves anything in your data. Zeek reads captures offline. |
 | Outbound connections | Only four, each tied to a feature: IOC article previews, Cloudflare Radar, a hosted Security Assistant model, and article briefs. See [Methods](METHODS.md#privacy-and-outbound-network-use). |
 | Offline mode | `VULNSCOPE_OFFLINE=1` turns off article previews only. On air-gapped systems, also leave Radar and AI providers unconfigured. |
+| Saved articles | `--article-library DIR` or `VULNSCOPE_ARTICLE_LIBRARY=DIR`: copies saved copies of the articles matched IOCs cite into the report (`articles/`), so source links work with no network. The folder needs an `article_library.json` ({"articles": {url: {"title", "files"}}}). |
 | API keys | Held in memory only, never written to disk, logs or reports. |
 | Retention | Runs stay on disk, readable by your account only, until you delete them. Reports are not encrypted. |
 | Deployment | Local use. A shared server needs `--allow-remote` behind your SSO proxy and its own security review. |
