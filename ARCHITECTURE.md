@@ -46,7 +46,7 @@ flowchart LR
 
     subgraph OUTPUTS["Run folder"]
         DOCS["Executive summary,<br/>technical report"]
-        EXPL["explorer.html<br/>3D, Flat, Attack paths,<br/>Timeline"]
+        EXPL["explorer.html<br/>3D, Flat, Attack paths,<br/>Timeline, Investigate"]
         DATA["results.json, CSV,<br/>normalized inputs"]
     end
 
@@ -108,7 +108,7 @@ Folder path, Browse, upload, or command line
 | `vulnflow/ioc_archive.py`, `article_preview.py`, `article_brief.py` | IOC CSV matching, source previews, optional OpenAI article briefs |
 | `vulnflow/results_schema.py` | The declared shape of `results.json` (published as `docs/results.schema.json`); fresh and reopened reports are checked against it |
 | `vulnflow/report.py`, `diagram.py`, `visual.py`, `explore.py` | Report shape and wording, themes, the hostile activity diagram, Explorer data |
-| `vulnflow/static/` | Explorer, 3D, Attack paths and Timeline views (three.js bundled) |
+| `vulnflow/static/` | Explorer, 3D, Attack paths, Timeline and Investigate views (three.js bundled) |
 | `vulnflow/llm.py`, `offline_assistant.py` | Provider adapters, grounding, redaction, and the built-in offline assistant |
 | `vulnflow/radar.py` | Optional Cloudflare Radar lookups for one selected indicator |
 | `vulnflow/branding.py` | Analyst name prefix and logo, logo validation |
@@ -317,8 +317,8 @@ many networks still load as one page.
 
 - Parsers yield normalized records and never decide scores; correlation consumes only normalized
   records and the scan window.
-- The Explorer, Attack paths and Timeline read one data blob written with the report (gzip in base64
-  inside `explorer.html`, unpacked by the page); presentation limits draw a subset but never change
+- The Explorer, Attack paths, Timeline and Investigate read one data blob written with the report
+  (gzip in base64 inside `explorer.html`, unpacked by the page); presentation limits draw a subset but never change
   counts or scores. A busy host's lists are cut to their top rows in the blob, with every count
   worked out from the full lists first; the full lists go to `normalized/explorer_contacts.parquet`,
   which the upload server sends the page one host at a time (`/runs/<id>/contacts/<token>/<host>`).

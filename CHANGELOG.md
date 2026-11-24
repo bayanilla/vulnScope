@@ -6,6 +6,10 @@ again to get a release's changes. Moving from PRO, MAX or ULTRA: see [UPGRADE.md
 
 ## Unreleased
 
+- **Explorer: new Investigate view** (N key, or **Investigate from here** on a host). An
+  investigation graph that grows outward from one lead: typed entity icons, labelled arrows, and
+  pivots such as "who reached this host" or "hosts with this CVE". It reads only the report's own
+  data and adds nothing to the report's size. See the [Explorer guide](docs/EXPLORER.md).
 - **One repository.** VulnScope now lives in [bayanilla/vulnScope](https://github.com/bayanilla/vulnScope),
   which replaces vulnScope PRO, VulnScope MAX and VulnScope ULTRA. The ready-made image is
   `ghcr.io/bayanilla/vulnscope` (was `ghcr.io/bayanilla/vulnscope-max`), the image built from

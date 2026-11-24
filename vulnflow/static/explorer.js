@@ -1661,6 +1661,7 @@ function renderPanel(id) {
       (F.probed_ranges || []).map(([sn, n]) => `${esc(sn)} (${n})`).join(', ') +
       (F.probed_ranges_total > (F.probed_ranges || []).length ? ` and ${F.probed_ranges_total - F.probed_ranges.length} more range${F.probed_ranges_total - F.probed_ranges.length === 1 ? '' : 's'}` : '') + `.</p>` : '') +
     (state.history.length ? `<p style="margin:10px 0 0"><button id="btn-back">← Back to ${esc(shown(state.history[state.history.length - 1]))}</button></p>` : '') +
+    (document.getElementById('investigate-view') ? `<p style="margin:10px 0 0"><button type="button" id="btn-investigate-host" title="Follow this host's links as an investigation graph (N)">Investigate from here</button></p>` : '') +
     (COMBINED ? sharedSection(id, d) : '') +
     `<p class="direction-note">Recorded direction: source/originator → destination/responder. Ports are source → destination; ? means the log did not provide a port. Logged application labels appear only when supplied.</p>` +
     ipSection('atk', 'North / south: outside addresses') +
@@ -1678,6 +1679,7 @@ function renderPanel(id) {
   p.hidden = false; p.scrollTop = 0;
   renderIpList('atk'); renderIpList('peer');
   const back = $('btn-back'); if (back) back.onclick = () => focus(state.history.pop(), false);
+  const inv = $('btn-investigate-host'); if (inv) inv.onclick = () => { if (window.VFInvestigate) window.VFInvestigate.open('host:' + id); };
 }
 $('panel').addEventListener('click', e => {
   const go = e.target.closest('[data-go]'); if (go) { focus(go.dataset.go); return; }
@@ -1718,17 +1720,19 @@ $('btn-overview').onclick = () => { overview(); };
 $('btn-labels').onclick = toggleLabels;
 $('btn-motion').onclick = toggleMotion;
 $('btn-3d').hidden = !can3d;
-// one switcher for the four views: flat network, 3D network, attack paths (attackpaths.js), timeline (timeline3d.js)
-let otherOpen = false;   // Attack paths or Timeline was showing at the last markSeg
+// one switcher for the five views: flat network, 3D network, attack paths (attackpaths.js), timeline (timeline3d.js),
+// investigate (investigate.js)
+let otherOpen = false;   // Attack paths, Timeline or Investigate was showing at the last markSeg
 function markSeg() {
   const ap = document.getElementById('attack-paths'), paths = !!ap && !ap.hidden;
-  const tv = document.getElementById('timeline-view'), tl = !!tv && !tv.hidden, other = paths || tl;
-  // leaving Attack paths / Timeline back onto the 3D overview (Esc or its 3D button) restarts the Low spin
+  const tv = document.getElementById('timeline-view'), tl = !!tv && !tv.hidden;
+  const iv = document.getElementById('investigate-view'), inv = !!iv && !iv.hidden, other = paths || tl || inv;
+  // leaving Attack paths / Timeline / Investigate back onto the 3D overview (Esc or its 3D button) restarts the Low spin
   if (otherOpen && !other && R3 && state.mode === 'overview') homeView();
   otherOpen = other;
   $('vw-flat').classList.toggle('on', !other && !R3); $('btn-3d').classList.toggle('on', !other && !!R3);
-  $('btn-paths').classList.toggle('on', paths); $('btn-timeline').classList.toggle('on', tl);
-  for (const id of ['vw-flat', 'btn-3d', 'btn-paths', 'btn-timeline']) $(id).setAttribute('aria-current', $(id).classList.contains('on') ? 'true' : 'false');
+  $('btn-paths').classList.toggle('on', paths); $('btn-timeline').classList.toggle('on', tl); $('btn-investigate').classList.toggle('on', inv);
+  for (const id of ['vw-flat', 'btn-3d', 'btn-paths', 'btn-timeline', 'btn-investigate']) $(id).setAttribute('aria-current', $(id).classList.contains('on') ? 'true' : 'false');
   placeViewctl(); updateAbout();
 }
 // "what am I looking at": the ? at the right end of the top buttons opens a short note, worded for the current view, centered under the picture.
@@ -1875,6 +1879,8 @@ if (m && D.focus[decodeURIComponent(m[1])]) {
 const stats = () => Object.assign({hosts: D.nodes.length, mode: state.mode, is3d: !!R3}, R3 && R3.stats ? R3.stats() : {},
   COMBINED ? {islands: islands.filter(Boolean).map(i => ({k: i.k, net: netKey(i.info.network), x: i.x, y: i.y, r: i.r})),
               nets: nets.map(nt => ({name: nt.name, x: nt.x, y: nt.y, r: nt.r, ks: nt.ks}))} : {});
-window.VFExplorer = {focus: id => focus(id), overview: () => overview(), set3d: on => set3d(on, true), is3d: () => !!R3, can3d, markSeg, stats};
+// focused(): the host open in the network view, if any (the Investigate view starts from it)
+window.VFExplorer = {focus: id => focus(id), overview: () => overview(), set3d: on => set3d(on, true), is3d: () => !!R3, can3d, markSeg, stats,
+  focused: () => state.mode === 'focus' ? state.focus : null};
 requestAnimationFrame(frame);
 });

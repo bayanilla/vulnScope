@@ -18,6 +18,14 @@ The view switcher offers:
   remove; nothing on the network changes.
 - **Timeline** (the I key, or `explorer.html#timeline`), a tunnel through time where every flow is a
   chord at the moment it happened, with alerts as rings and IOC lookups as dots.
+- **Investigate** (the N key, **Investigate from here** on a host's panel, or
+  `explorer.html#investigate=10.0.1.10`), an investigation graph that grows outward from one lead.
+  Each entity (host, outside address, service, finding, CVE, IPS alert, IOC domain, source article,
+  subnet) is an icon and each arrow says how two are connected, such as "IPS alert :443" or "tracked
+  as". Click an entity for its properties and the pivots it offers (who reached this host, the hosts
+  with this CVE, where an alert came from); double-click runs its next pivot. Tree, Radial and
+  Organic layouts; type a host, IP, CVE or domain at the top to start a new case. Pivots read only
+  the report's own data; nothing is looked up online.
 
 ## Hosts and peers
 

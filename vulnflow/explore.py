@@ -930,7 +930,7 @@ def write_html(fh, data: dict, ioc_drawer: list | None = None) -> None:
                      if name else "")
     fh.write(HTML_OPEN + "<head><meta charset=\"utf-8\">" + FILE_CSP +
              "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-             f"<title>{escape(name) + ' · ' if name else ''}{EXPLORER_NAME} · {escape(brand.name)}</title><meta name=\"application-name\" content=\"{escape(brand.name)}\"><link rel=\"icon\" href=\"{icon_data_uri()}\"><style>" + _read("analyst_chat.css") + _read("explorer.css") + _read("attackpaths.css") + _read("timeline3d.css") + explorer_background_css() + ioc_archive.CSS + "</style></head><body>"
+             f"<title>{escape(name) + ' · ' if name else ''}{EXPLORER_NAME} · {escape(brand.name)}</title><meta name=\"application-name\" content=\"{escape(brand.name)}\"><link rel=\"icon\" href=\"{icon_data_uri()}\"><style>" + _read("analyst_chat.css") + _read("explorer.css") + _read("attackpaths.css") + _read("timeline3d.css") + _read("investigate.css") + explorer_background_css() + ioc_archive.CSS + "</style></head><body>"
              + _read("explorer.html").replace("<!--BRAND-->", brand_markup, 1).replace("<!--REPORT-->", report_markup, 1))
     fh.write(DATA_TAG)
     write_data(fh, data)
@@ -944,6 +944,7 @@ def write_html(fh, data: dict, ioc_drawer: list | None = None) -> None:
              + "<script>" + _read("explorer.js") + "</script>"
              + "<script>" + _read("attackpaths.js") + "</script>"
              + "<script>" + _read("timeline3d.js") + "</script>"
+             + "<script>" + _read("investigate.js") + "</script>"
              + "<script>" + _read("analyst_chat.js") + "</script>"
              + ioc_archive.drawer_html(data["ioc_matches"] if ioc_drawer is None else ioc_drawer,
                                       data.get("article_briefs")) + "</body></html>\n")
