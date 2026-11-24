@@ -837,6 +837,20 @@ def full_lists(path: str, host: str) -> dict:
     return out
 
 
+SEARCH_QUERY = re.compile(r"[0-9a-f.:]{2,45}|\d{1,3}(\.\d{1,3}){3}/\d{1,2}")
+
+
+def search_contacts(path: str, query: str) -> dict:
+    """Hosts whose full lists hold an address matching ``query`` (see store.contact_search), for the
+    page's host search on reports whose lists were cut. ``query`` must look like an IP or a range."""
+    from .store import contact_search
+    query = query.strip().lower()
+    if not (SEARCH_QUERY.fullmatch(query) and any(c.isdigit() for c in query)):
+        raise ValueError("search for an IP address, the start of one, or a.b.c.d/n")
+    rows, more = contact_search(path, query)
+    return {"query": query, "hosts": [list(r) for r in rows], "more": more}
+
+
 DATA_TAG = '<script id="vf-data" type="application/octet-stream" data-encoding="gzip-base64">'
 _DATA = re.compile(r'<script id="vf-data" type="application/(json|octet-stream)"( data-encoding="gzip-base64")?>(.*?)</script>', re.S)
 MAX_DATA = 2 * 1024 ** 3        # Explorer data larger than this once unpacked is refused (saved pages)

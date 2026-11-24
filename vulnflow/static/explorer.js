@@ -1351,15 +1351,109 @@ function hostOrder() {
 }
 // the host list's groups: one per subnet, or on the all-networks map one per report's network
 const groupOf = id => { const d = nodes.get(id).d; return COMBINED ? 'net:' + (d.net || 0) : d.subnet || 'other'; };
+// The search also finds a host by an address it exchanged traffic with: its outside addresses (N/S) and
+// internal peers (E/W). Only IP-shaped queries look at traffic: a full IPv4 address matches exactly, a
+// partial one from its start, and a.b.c.d/n any address in that range. trafficHit keeps why each host
+// matched, for its row in the list and for its card when it is opened from there.
+const IP_LIKE = /^[0-9a-f.:/]+$/, FULL_V4 = /^\d{1,3}(\.\d{1,3}){3}$/;
+let trafficIdx = null;                   // host -> {atk, peer}: the addresses in its lists, as shown
+const trafficHit = new Map();            // host -> {k: 'atk' | 'peer', ip, more}
+function trafficIndex() {
+  if (!trafficIdx) {
+    trafficIdx = new Map();
+    for (const [id, F] of Object.entries(D.focus))
+      trafficIdx.set(id, {atk: F.attackers.map(a => String(shown(a.ip)).toLowerCase()),
+                          peer: F.peers.map(p => String(shown(p.ip)).toLowerCase())});
+  }
+  return trafficIdx;
+}
+const v4num = ip => ip.split('.').reduce((n, o) => n * 256 + Number(o), 0);
+function ipMatcher(q) {
+  if (!IP_LIKE.test(q) || !/[.:]/.test(q) || !/\d/.test(q)) return null;
+  const cidr = /^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/.exec(q);
+  if (cidr) {
+    if (+cidr[2] > 32) return null;
+    const size = 2 ** (32 - cidr[2]), base = Math.floor(v4num(cidr[1]) / size);
+    return ip => FULL_V4.test(ip) && Math.floor(v4num(ip) / size) === base;
+  }
+  if (q.includes('/')) return null;
+  return FULL_V4.test(q) ? ip => ip === q : ip => ip.startsWith(q);
+}
+function trafficMatch(id, m) {
+  const t = trafficIndex().get(id);
+  for (const k of ['atk', 'peer']) {
+    const hits = t ? t[k].filter(m) : [];
+    if (hits.length) return {k, ip: hits[0], more: hits.length - 1};
+  }
+  return null;
+}
+// open a host's card filtered to the address it was found by, that entry opened
+function showMatch(id) {
+  const hit = trafficHit.get(id);
+  if (!hit || state.focus !== id) return;
+  const box = document.querySelector(`[data-ip-search="${hit.k}"]`);
+  if (!box) return;
+  panelLists[hit.k].query = box.value = hit.ip; panelLists[hit.k].page = 0;
+  renderIpList(hit.k);
+  const e = [...document.querySelectorAll(`[data-ip-results="${hit.k}"] .ip-entry`)]
+    .find(x => String(shown(x.dataset.ip)).toLowerCase() === hit.ip);
+  if (e) { e.open = true; e.classList.add('found'); e.scrollIntoView({block: 'center'}); }
+}
+function openFromList(id) { focus(id); showMatch(id); }
+// Opened through VulnScope, an IP search on a report whose lists were cut also asks VulnScope, which
+// searches every host's full lists; its hosts are added to the ones found in the page.
+let wide = {q: '', st: '', hits: new Map(), offMap: 0, more: false}, wideTimer = 0;
+function searchWide(q) {
+  if (wide.q === q) return;
+  wide = {q, st: 'loading', hits: new Map(), offMap: 0, more: false};
+  clearTimeout(wideTimer);
+  wideTimer = setTimeout(() => {
+    fetch(CONTACTS + 'search/' + encodeURIComponent(q), {credentials: 'include', cache: 'no-store'})
+      .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t.slice(0, 160) || 'HTTP ' + r.status))))
+      .then(res => {
+        if (wide.q !== q || !res || !Array.isArray(res.hosts)) return;
+        res.hosts.forEach(([h, side, ip, n]) => D.focus[h] ? wide.hits.set(h, {k: side === 'a' ? 'atk' : 'peer', ip: String(ip).toLowerCase(), more: n - 1}) : wide.offMap++);
+        wide.more = !!res.more; wide.st = 'done';
+      })
+      .catch(err => { if (wide.q === q) wide.st = 'error: ' + ((err && err.message) || err); })
+      .then(() => { if (wide.q === q && $('search').value.trim().toLowerCase() === q) renderList(); });
+  }, 250);
+}
 function renderList() {
-  const q = $('search').value.trim().toLowerCase();
+  const q = $('search').value.trim().toLowerCase(), m = q ? ipMatcher(q) : null;
+  trafficHit.clear();
   const rows = hostOrder().filter(id => {
     if (iocOnly && !iocCounts[id]) return false;
     if (netFilter && !netFilter.split(',').includes(String(nodes.get(id).d.net ?? 'none'))) return false;
     if (!q) return true;
     const d = nodes.get(id).d, F = D.focus[id];
-    return (shown(id) + ' ' + d.name + ' ' + d.os + ' ' + netTag(netOf(d)) + ' ' + netLabel(d) + ' ' + F.findings.map(f => f.name + ' ' + f.cves.join(' ')).join(' ')).toLowerCase().includes(q);
+    if ((shown(id) + ' ' + d.name + ' ' + d.os + ' ' + netTag(netOf(d)) + ' ' + netLabel(d) + ' ' + F.findings.map(f => f.name + ' ' + f.cves.join(' ')).join(' ')).toLowerCase().includes(q)) return true;
+    if (!m) return false;
+    if (m(String(shown(id)).toLowerCase())) return true;
+    const hit = (wide.q === q && wide.hits.get(id)) || trafficMatch(id, m);   // VulnScope's answer counts every match
+    if (hit) trafficHit.set(id, hit);
+    return !!hit;
   });
+  renderRows(rows, q);
+  // lists cut on busy hosts: an address only in the cut part is found by VulnScope, or not at all from disk
+  if (!m || COMBINED || !Object.values(D.focus).some(F => F.attackers.length < F.attackers_total || F.peers.length < F.peers_total)) return;
+  let note;
+  if (CONTACTS) {
+    searchWide(q);
+    note = wide.st === 'loading' ? 'Searching every host\'s full lists in VulnScope…'
+      : wide.st.startsWith('error: ') ? `VulnScope could not search the full lists: ${esc(wide.st.slice(7))}`
+      : 'Searched every host\'s full lists in VulnScope.' +
+        (wide.offMap ? ` ${wide.offMap.toLocaleString()} more host${wide.offMap === 1 ? '' : 's'} not drawn on this map also match.` : '') +
+        (wide.more ? ' Only the first 5,000 matching hosts were checked; narrow the search to see the rest.' : '');
+  } else {
+    note = `Busy hosts keep only their top${D.lists ? ' ' + D.lists.cap : ''} outside addresses and internal peers in this page, ` +
+      'so a host that saw this address only in the part left out is not listed here. ' +
+      (CONTACTS === null ? 'Open this report in VulnScope (Open report) to search every contact.'
+        : 'This report was saved without full copies of the flows, so the full lists are not available.');
+  }
+  $('hostlist').insertAdjacentHTML('beforeend', `<div class="hnote" role="note">${note}</div>`);
+}
+function renderRows(rows, q) {
   const rowHtml = id => {
     const d = nodes.get(id).d, F = D.focus[id];
     const iocCount = iocCounts[id] || 0;
@@ -1367,7 +1461,9 @@ function renderList() {
     return `<div class="hrow${id === state.focus ? ' on' : ''}" role="listitem" tabindex="0" data-id="${esc(id)}">` +
       (telemetryOnly ? '' : `<span class="pill ${esc(d.pri)}">${esc(d.pri)}</span>`) + `<span class="nm">${esc(d.name ? d.name.split('.')[0] : shown(id))} ${iocHint}` +
       (netOf(d) && netOf(d).cloud ? ` <span class="net-badge${netOf(d).cloud ? ' cloud' : ''}" title="${esc(netOf(d).name)}">${esc(netOf(d).cloud ? netOf(d).type.toUpperCase() : netOf(d).name)}</span>` : '') +
-      `<br><span class="ip">${esc(shown(id))} · ${F.attackers_total} N/S · ${F.peers_total} E/W</span></span>` +
+      `<br><span class="ip">${esc(shown(id))} · ${F.attackers_total} N/S · ${F.peers_total} E/W</span>` +
+      (trafficHit.has(id) ? (h => `<br><span class="via" title="Found by ${h.k === 'atk' ? 'an outside address' : 'an internal peer'} it exchanged traffic with">` +
+        `↔ ${h.k === 'atk' ? 'N/S' : 'E/W'} ${esc(h.ip)}${h.more ? ' +' + h.more : ''}</span>`)(trafficHit.get(id)) : '') + '</span>' +
       (d.ev ? `<span class="tag ${d.ev}">${d.ev === 'likely' ? 'LIKELY' : 'LEAD'}</span>` : '') + '</div>';
   };
   if (!rows.length) { $('hostlist').innerHTML = `<div class="hrow">${iocOnly ? 'No IOC hosts match' : 'No match'}</div>`; return; }
@@ -1499,16 +1595,16 @@ if (COMBINED) {
 }
 $('hostlist').addEventListener('click', e => {
   const g = e.target.closest('.hghead'); if (g) { toggleNet(g.dataset.net); return; }
-  const r = e.target.closest('.hrow[data-id]'); if (r) { focus(r.dataset.id); }
+  const r = e.target.closest('.hrow[data-id]'); if (r) { openFromList(r.dataset.id); }
 });
 $('hostlist').addEventListener('keydown', e => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const g = e.target.closest('.hghead');
   if (g) { e.preventDefault(); const k = g.dataset.net; toggleNet(k); const h = [...document.querySelectorAll('.hghead')].find(x => x.dataset.net === k); if (h) h.focus(); return; }
-  const r = e.target.closest('.hrow[data-id]'); if (r && e.key === 'Enter') { focus(r.dataset.id); }
+  const r = e.target.closest('.hrow[data-id]'); if (r && e.key === 'Enter') { openFromList(r.dataset.id); }
 });
 $('search').addEventListener('input', renderList);
-$('search').addEventListener('keydown', e => { if (e.key === 'Enter') { const r = document.querySelector('.hrow[data-id]'); if (r) focus(r.dataset.id); } });
+$('search').addEventListener('keydown', e => { if (e.key === 'Enter') { const r = document.querySelector('.hrow[data-id]'); if (r) openFromList(r.dataset.id); } });
 
 const panelLists = {
   atk: {query: '', sort: 'priority', expanded: false, page: 0},
@@ -1587,10 +1683,10 @@ function loadFullLists(id) {
     .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t.slice(0, 160) || 'HTTP ' + r.status))))
     .then(full => {
       if (!full || !Array.isArray(full.attackers) || !Array.isArray(full.peers)) throw new Error('unexpected reply');
-      F.attackers = full.attackers; F.peers = full.peers; fullLists[id] = 'done';
+      F.attackers = full.attackers; F.peers = full.peers; fullLists[id] = 'done'; trafficIdx = null;
     })
     .catch(err => { fullLists[id] = 'error: ' + ((err && err.message) || err); })
-    .then(() => { if (state.mode === 'focus' && state.focus === id) refreshFocus(id); });
+    .then(() => { if (state.mode === 'focus' && state.focus === id) { refreshFocus(id); showMatch(id); } });
 }
 // redraw the focused host with its full lists, keeping what the analyst set in the panel
 function refreshFocus(id) {

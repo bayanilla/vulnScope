@@ -349,6 +349,13 @@ class ExploreTests(unittest.TestCase):
         self.assertIn('id="timeline-view"', page)
         self.assertIn("window.VFTimeline", page)
 
+    def test_host_search_also_matches_traffic(self):
+        # the host search finds hosts by the outside addresses and peers in their lists, and asks the
+        # server for the full lists when the page has one
+        page = explore.html(self.data)
+        for needle in ("function trafficMatch", "function ipMatcher", "function showMatch", "CONTACTS + 'search/'"):
+            self.assertIn(needle, page)
+
     def test_html_includes_investigate_view(self):
         # the investigation graph is drawn on a plain canvas from the data already in the page: no graph
         # library, and nothing it draws is fetched from the network

@@ -6,6 +6,10 @@ again to get a release's changes. Moving from PRO, MAX or ULTRA: see [UPGRADE.md
 
 ## Unreleased
 
+- **Explorer: search by traffic.** Typing an IP in **Find host, IP, CVE** now also finds every host
+  that exchanged traffic with it, outside (N/S) or internal (E/W), and `a.b.c.d/n` searches a range.
+  Clicking a result opens the host's card filtered to that address. Opened through VulnScope, the
+  search covers every host's full lists, not only the top 200 kept in the page.
 - **Explorer: new Investigate view** (N key, or **Investigate from here** on a host). An
   investigation graph that grows outward from one lead: typed entity icons, labelled arrows, and
   pivots such as "who reached this host" or "hosts with this CVE". It reads only the report's own

@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import shutil
 import tempfile
 import weakref
@@ -497,6 +498,36 @@ def contact_rows(path: str, host: str) -> list[tuple]:
                            [path, host]).fetchall()
     finally:
         con.close()
+
+def contact_search(path: str, query: str, limit: int = 5000) -> tuple[list[tuple], bool]:
+    """Hosts whose full Explorer lists (contacts file) hold an address matching ``query``: a full IP
+    exactly, a partial one from its start, or a.b.c.d/n any IPv4 address in that range. Each row is
+    (host, side of its first match, that address, number of matches), the host's outside addresses
+    ('a') before its internal peers ('p'). Also says whether more than ``limit`` hosts matched."""
+    cidr = re.fullmatch(r"(\d{1,3}(?:\.\d{1,3}){3})/(\d{1,2})", query)
+    if cidr:
+        octets, bits = [int(o) for o in cidr[1].split(".")], int(cidr[2])
+        if bits > 32 or max(octets) > 255:
+            raise ValueError("not an IPv4 range")
+        size = 2 ** (32 - bits)
+        base = (octets[0] << 24 | octets[1] << 16 | octets[2] << 8 | octets[3]) // size
+        num = " + ".join(f"TRY_CAST(split_part(ip, '.', {i + 1}) AS BIGINT) * {256 ** (3 - i)}" for i in range(4))
+        where, args = f"regexp_full_match(ip, '\\d{{1,3}}(\\.\\d{{1,3}}){{3}}') AND ({num}) // {size} = ?", [base]
+    elif re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", query):
+        where, args = "lower(ip) = ?", [query]
+    else:
+        where, args = "starts_with(lower(ip), ?)", [query]
+    con = db.connect()
+    try:
+        con.execute("SET threads = 2")
+        rows = con.execute(
+            f"SELECT host, first(side ORDER BY side, rank), first(ip ORDER BY side, rank), count(*) "
+            f"FROM read_parquet(?) WHERE {where} GROUP BY host ORDER BY host LIMIT ?",
+            [path, *args, limit + 1]).fetchall()
+    finally:
+        con.close()
+    return rows[:limit], len(rows) > limit
+
 
 # Per (source, destination) rollup columns read into explore._Pair: sessions, completed, blocked,
 # ports tried, ports with completed sessions, bytes, first, last, first completed, last completed.

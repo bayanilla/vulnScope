@@ -36,6 +36,18 @@ lists every recorded IP with session counts and connection tuples. **Focus** piv
 or **← All hosts** goes back. The **?** button explains the current view. Deep links work:
 `explorer.html#host=10.0.1.10`.
 
+**Find host, IP, CVE** (the box above the host list, or `/`) matches a host's name, IP, OS, network,
+findings and CVEs. Type an IP and it also finds every host that exchanged traffic with that address,
+whether it is outside (north/south) or internal (east/west). A full address matches exactly, a partial
+one from its start (`198.51.100.`), and `198.51.100.0/24` matches a range. Hosts found this way show
+the address in cyan under their name (for example `↔ N/S 198.51.100.65 +152`, meaning 152 more matches).
+Clicking one opens its card with the list already filtered to that address.
+
+On busy hosts the page keeps only the top 200 outside addresses and peers per host. Opened through
+VulnScope (a run, or **Open report**), the search also asks VulnScope to search every host's full lists,
+so an address in the part left out is still found. Opened straight from disk, the list says when the
+search may have missed hosts because of that cut.
+
 ## Large runs
 
 On busy networks each host keeps its top 200 outside addresses and internal peers in the page;

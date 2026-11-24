@@ -156,8 +156,10 @@ def explorer_page(req, run_id: str, run_dir: str, marker, target: str, headers):
 
 
 def contacts(req, run_id: str, run_dir: str, marker, rest: str):
-    """GET /runs/<id>/contacts/<token>/<host>: that host's full Explorer lists (JSON)."""
+    """GET /runs/<id>/contacts/<token>/<host>: that host's full Explorer lists (JSON).
+    GET /runs/<id>/contacts/<token>/search/<query>: the hosts whose full lists hold a matching address."""
     token, _, host = rest.partition("/")
+    find = host[len("search/"):] if host.startswith("search/") else None
     if not (hmac.compare_digest(token, contacts_token(req.app, run_id)) and host and len(host) <= 64):
         return req.send_text(404, "Not found")
     headers = {"Cache-Control": "no-store"}
@@ -168,6 +170,14 @@ def contacts(req, run_id: str, run_dir: str, marker, rest: str):
     if not path:
         return req.send(404, "This report has no full host lists (it was saved without full copies of the flows).",
                         "text/plain", headers)
+    if find is not None:
+        try:
+            found = explore.search_contacts(path, find)
+        except ValueError as exc:
+            return req.send(400, str(exc), "text/plain", headers)
+        except Exception as exc:                   # a damaged or unreadable file
+            return req.send(500, f"The full lists could not be searched ({type(exc).__name__}).", "text/plain", headers)
+        return req.send(200, json.dumps(found, separators=(",", ":")), "application/json", headers)
     try:
         lists = explore.full_lists(path, host)
     except Exception as exc:                       # a damaged or unreadable file: say so on the page
