@@ -27,7 +27,8 @@ SECURITY_HEADERS = {
 }
 TYPES = {".html": "text/html; charset=utf-8", ".md": "text/markdown; charset=utf-8",
          ".csv": "text/csv; charset=utf-8", ".json": "application/json",
-         ".jsonl": "application/x-ndjson; charset=utf-8"}
+         ".jsonl": "application/x-ndjson; charset=utf-8", ".pdf": "application/pdf",
+         ".txt": "text/plain; charset=utf-8"}
 
 
 class Handler(BaseHTTPRequestHandler):

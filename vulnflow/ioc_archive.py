@@ -200,7 +200,9 @@ def markdown_section(matches: list[dict]) -> str:
               "|---|---|---|---|---|"]
     for row in matches:
         observed = ", ".join(f"{count} {label}" for label, count in row["observed"].items())
-        articles = "; ".join(row["articles"][:3]) or "—"
+        copies = row.get("article_copies") or {}
+        articles = "; ".join(url + (f" (saved: {copies[url][0]['href']})" if copies.get(url) else "")
+                             for url in row["articles"][:3]) or "—"
         cells = [row["value"], row["type"], ", ".join(row["hosts"]) or "network",
                  observed, articles]
         lines.append("| " + " | ".join(str(c).replace("|", "\\|").replace("\n", " ") for c in cells) + " |")
@@ -383,8 +385,16 @@ SCRIPT = r"""<script>
         unavailable.textContent = 'Short overview unavailable; the source link is still available.';
         li.append(unavailable);
       }
+      const copies = (item.article_copies && item.article_copies[url]) || [];
+      copies.forEach(copy => {
+        const saved = document.createElement('a'); saved.href = copy.href; saved.target = '_blank';
+        saved.rel = 'noopener noreferrer'; saved.className = 'ioc-saved-copy';
+        saved.textContent = 'Open saved copy (' + copy.kind + ')';
+        li.append(saved, document.createTextNode(' '));
+      });
       const link = document.createElement('a'); link.href = url; link.target = '_blank';
-      link.rel = 'noopener noreferrer'; link.textContent = 'Read full article ↗';
+      link.rel = 'noopener noreferrer';
+      link.textContent = copies.length ? 'Online original ↗' : 'Read full article ↗';
       li.append(link); list.append(li);
     });
     if (item.articles.length) body.append(list);

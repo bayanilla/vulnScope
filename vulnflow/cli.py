@@ -208,6 +208,9 @@ def main(argv=None) -> int:
                    help="skip fetching short source previews for matched archive articles")
     a.add_argument("--article-preview-cache", metavar="JSON",
                    help="saved short source overviews keyed by article URL (useful offline)")
+    a.add_argument("--article-library", metavar="DIR",
+                   help="folder of saved article copies (article_library.json); copies the ones matched "
+                        "indicators cite into the report so it reads offline. Default $VULNSCOPE_ARTICLE_LIBRARY")
     a.add_argument("--llm", action="store_true", help="also write a Security Assistant brief")
     common(a)
     report_flags(a)
@@ -258,6 +261,8 @@ def main(argv=None) -> int:
                    help="skip fetching short source previews")
     x.add_argument("--article-preview-cache", metavar="JSON",
                    help="saved short source overviews keyed by article URL")
+    x.add_argument("--article-library", metavar="DIR",
+                   help="folder of saved article copies to put in the report (offline reading)")
     common(x)
     report_flags(x)
 
@@ -401,6 +406,7 @@ def main(argv=None) -> int:
         res, paths = run(files, args.out, _cfg(args), overrides,
                          article_previews=not args.no_article_preview,
                          article_preview_cache=args.article_preview_cache,
+                         article_library=args.article_library,
                          workdir=args.workdir,
                          report={"name": args.name, "description": args.description,
                                  "network": args.network_name})

@@ -8,7 +8,7 @@ import html
 import json
 import os
 
-from .. import explore, saved
+from .. import article_library, explore, saved
 from ..article_brief import generate_article_briefs
 from ..llm import Analyst, LLMConfig, LLMError, load_results, log_qa, write_brief
 from ..radar import RadarError, lookup as radar_lookup
@@ -17,6 +17,8 @@ from .pages import asset, page
 
 # Second CSP for pages of a reopened report (both policies apply). No allow-same-origin: scripts run,
 # but in an opaque origin, so they can't call this server's API or read its other pages.
+ARTICLE_SANDBOX = ("sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; "
+                   "img-src data:; style-src 'unsafe-inline'; font-src data:")
 SAVED_SANDBOX = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals"
 
 CHAT = """<section id="analyst-chat" class="analyst-chat results-assistant-drawer" data-ai-chat data-ask-url="ask"
@@ -118,6 +120,9 @@ def get(req, run_id: str, rest: str):
     # Pages of a reopened report carry text from files outside this server's control: run them
     # in an opaque origin so crafted content can't read or drive the rest of it.
     headers = {"Content-Security-Policy": SAVED_SANDBOX} if marker is not None else None
+    if rest.startswith(article_library.FOLDER + "/") and not target.endswith(".pdf"):
+        # saved third-party pages: no scripts, nothing loaded from anywhere
+        headers = {"Content-Security-Policy": ARTICLE_SANDBOX}
     if rest == "explorer.html":
         return explorer_page(req, run_id, run_dir, marker, target, headers)
     req.send_file(target, headers)

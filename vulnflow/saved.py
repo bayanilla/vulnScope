@@ -150,10 +150,18 @@ def load_folder(folder: str) -> tuple[dict, dict | None]:
     return res, data
 
 
+def _article_copy(name: str) -> bool:
+    """articles/<file>: a saved article copy (article_library.py) the report links to."""
+    from .article_library import FOLDER, KINDS
+    head, _, file = name.partition("/")
+    return (head == FOLDER and file and "/" not in file and not file.startswith(".")
+            and os.path.splitext(file)[1].lower() in KINDS)
+
+
 def source_file(marker: dict | None, name: str) -> str | None:
     """Path of an allow-listed file in a reopened run's original folder, if it is still there."""
     folder = (marker or {}).get("source")
-    if not folder or name not in SOURCE_FILES:
+    if not folder or not (name in SOURCE_FILES or _article_copy(name)):
         return None
     root = os.path.realpath(folder)
     path = os.path.realpath(os.path.join(root, name))

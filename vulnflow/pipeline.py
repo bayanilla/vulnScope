@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 
+from . import article_library as article_lib
 from . import netmap, pcap, resources, runname, scanners
 from .correlate import Config, correlate
 from .errors import UserError
@@ -21,7 +22,8 @@ def run(paths: list[str], outdir: str, cfg: Config | None = None,
         article_previews: bool = True,
         article_preview_cache: str | None = None,
         workdir: str | None = None,
-        report: dict | None = None) -> tuple[dict, dict[str, str]]:
+        report: dict | None = None,
+        article_library: str | None = None) -> tuple[dict, dict[str, str]]:
     """``workdir`` holds the run's Parquet batches and DuckDB file (default: system temp,
     or $VULNSCOPE_WORKDIR); it is deleted when the run finishes.
 
@@ -29,7 +31,10 @@ def run(paths: list[str], outdir: str, cfg: Config | None = None,
     first. ``VULNSCOPE_OFFLINE=1`` turns off every outbound lookup (article previews).
 
     ``report`` is the optional {"name", "description", "network"} the analyst gave the run; it is
-    stored in results.json and shown at the top of the reports and in the Explorer."""
+    stored in results.json and shown at the top of the reports and in the Explorer.
+
+    ``article_library`` (default $VULNSCOPE_ARTICLE_LIBRARY) is a folder of saved article copies
+    (article_library.py): the ones matched indicators cite go into the report folder."""
     cfg = cfg or Config()
     check_internal_nets(cfg.internal_nets)           # a typo here would otherwise fail after loading
     if offline():
@@ -70,7 +75,8 @@ def run(paths: list[str], outdir: str, cfg: Config | None = None,
                 shutil.rmtree(zeek_dir, ignore_errors=True)
         try:
             return _run(ds, archive_paths, outdir, cfg, article_previews, article_preview_cache, networks,
-                        runname.clean(*((report or {}).get(k) for k in ("name", "description", "network"))))
+                        runname.clean(*((report or {}).get(k) for k in ("name", "description", "network"))),
+                        article_library or article_lib.location())
         except Exception as exc:
             friendly = resources.explain(exc, budget)
             if friendly is not None:
@@ -126,7 +132,8 @@ def _is_capture(path: str, overrides: dict[str, str]) -> bool:
     return forced == "pcap" or (forced is None and pcap.is_pcap(path))
 
 
-def _run(ds, archive_paths, outdir, cfg, article_previews, article_preview_cache, networks=(), report=None):
+def _run(ds, archive_paths, outdir, cfg, article_previews, article_preview_cache, networks=(), report=None,
+         article_library=None):
     if not ds.flows and not ds.threats:
         raise UserError("No network telemetry was provided (or none could be parsed). "
                          "Add Zeek conn.log, Palo Alto traffic/threat logs, IDS alerts or a flow CSV.")
@@ -142,6 +149,8 @@ def _run(ds, archive_paths, outdir, cfg, article_previews, article_preview_cache
             from .article_preview import add_previews, read_preview_cache
             cached = read_preview_cache(article_preview_cache) if article_preview_cache else None
             add_previews(res["ioc_matches"], cached)
+        if article_library:
+            article_lib.attach(res["ioc_matches"], article_library, outdir)
         res["ioc_archive"] = {"files": [s.file for s in archive_stats],
                               "indicators": len(archive), "matches": len(res["ioc_matches"])}
     res["config"]["normalized_copies"] = cfg.normalized_copies
