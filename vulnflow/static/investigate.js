@@ -292,21 +292,40 @@ function treeOrder() {
   roots.sort((a, b) => (a === seedId ? -1 : b === seedId ? 1 : 0));
   return {kids, roots};
 }
+// Outside addresses of the start host (who reached it from outside, where it connects out) and what was
+// pivoted to from them open to its LEFT; everything else opens to its right.
+const outsideOfSeed = id => id !== seedId && ents.get(id).parent === seedId && ents.get(id).e.type === 'ip';
 function treeTargets() {
   const {kids, roots} = treeOrder(); let slot = 0;
-  const place = (id, d) => {
-    const n = ents.get(id), ks = kids.get(id).filter(k => visible(ents.get(k)));
-    if (!ks.length) { n.tx = d * COL; n.ty = slot++ * ROW; return n.ty; }
-    const ys = ks.map(k => place(k, d + 1));
-    n.tx = d * COL; n.ty = (ys[0] + ys[ys.length - 1]) / 2; return n.ty;
+  const place = (id, d, dir, out) => {
+    const n = ents.get(id), ks = kids.get(id).filter(k => visible(ents.get(k)) && (id !== seedId || outsideOfSeed(k) === (dir < 0)));
+    if (out) out.push(n);
+    if (!ks.length) { n.tx = dir * d * COL; n.ty = slot++ * ROW; return n.ty; }
+    const ys = ks.map(k => place(k, d + 1, dir, out));
+    n.tx = dir * d * COL; n.ty = (ys[0] + ys[ys.length - 1]) / 2; return n.ty;
   };
-  roots.forEach(r => { place(r, 0); slot += 0.6; });
+  roots.forEach(r => {
+    if (r !== seedId) { place(r, 0, 1); slot += 0.6; return; }
+    const top = slot, seed = ents.get(r), y = place(r, 0, 1), right = slot;
+    const left = kids.get(r).filter(k => visible(ents.get(k)) && outsideOfSeed(k));
+    if (!left.length) { slot += 0.6; return; }
+    slot = top; const moved = [], ys = left.map(k => place(k, 1, -1, moved));
+    const dy = (kids.get(r).some(k => visible(ents.get(k)) && !outsideOfSeed(k)) ? y : (ys[0] + ys[ys.length - 1]) / 2) - (ys[0] + ys[ys.length - 1]) / 2;
+    moved.forEach(n => { n.ty += dy; });
+    seed.tx = 0; seed.ty = dy + (ys[0] + ys[ys.length - 1]) / 2;
+    slot = Math.max(right, slot + dy / ROW) + 0.6;
+  });
 }
 function radialTargets() {
   const {kids, roots} = treeOrder(), leaves = [], depth = new Map(), ang = new Map();
-  const walk = (id, d) => { depth.set(id, d); const ks = kids.get(id); if (!ks.length) leaves.push(id); ks.forEach(k => walk(k, d + 1)); };
-  roots.forEach((r, i) => walk(r, i ? 1 : 0));
-  leaves.forEach((id, i) => ang.set(id, i / Math.max(1, leaves.length) * Math.PI * 2));
+  const lefts = [];   // the start host's outside addresses and what came from them: the left half
+  const walk = (id, d, side) => { depth.set(id, d); const ks = kids.get(id); if (!ks.length) (side ? lefts : leaves).push(id);
+    ks.forEach(k => walk(k, d + 1, side || (id === seedId && outsideOfSeed(k)))); };
+  roots.forEach((r, i) => walk(r, i ? 1 : 0, false));
+  const spread = (list, a0, a1) => list.forEach((id, i) => ang.set(id, a0 + (i + 0.5) / list.length * (a1 - a0)));
+  if (lefts.length && leaves.length) { spread(leaves, -Math.PI / 2, Math.PI / 2); spread(lefts, Math.PI * 1.5, Math.PI / 2); }
+  else spread(lefts.length ? lefts : leaves, 0, Math.PI * 2);
+  leaves.push(...lefts);
   const up = id => { const ks = kids.get(id); if (ks.length) { ks.forEach(up); ang.set(id, (ang.get(ks[0]) + ang.get(ks[ks.length - 1])) / 2); } };
   roots.forEach(up);
   const maxD = Math.max(1, ...depth.values()), R = Math.max(230, leaves.length * 78 / (Math.PI * 2) / maxD);
@@ -356,7 +375,7 @@ function fit(snap, about) {
   // after a pivot on a big case, keep the entity it ran from (and what it opened) on screen
   const a = about && ents.get(about);
   if (a && (y1 - y0 + 2 * my) * s > sh) cam.ty = Math.max(y0 - my + sh / 2 / s, Math.min(y1 + my - sh / 2 / s, a.ty));
-  if (a && (x1 - x0 + 2 * mx) * s > sw) cam.tx = Math.max(x0 - mx + sw / 2 / s, Math.min(x1 + mx - sw / 2 / s, a.tx + sw / 4 / s));
+  if (a && (x1 - x0 + 2 * mx) * s > sw) cam.tx = Math.max(x0 - mx + sw / 2 / s, Math.min(x1 + mx - sw / 2 / s, a.tx + (a.tx < 0 ? -1 : 1) * sw / 4 / s));
   if (snap) { cam.x = cam.tx; cam.y = cam.ty; cam.s = cam.ts; }
 }
 function applyLayout(snap, about) {

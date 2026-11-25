@@ -25,7 +25,9 @@ The view switcher offers:
   as". Click an entity for its properties and the pivots it offers (who reached this host, the hosts
   with this CVE, where an alert came from); double-click runs its next pivot. Pivots are checkboxes:
   unchecking one takes back what it added and whatever was pivoted to from there, while entities a
-  still-checked pivot also reached stay. Tree, Radial and
+  still-checked pivot also reached stay. The start host's outside addresses (who reached it from
+  outside, where it connects out) and what was pivoted to from them open to its left; everything else
+  opens to its right. Tree, Radial and
   Organic layouts; type a host, IP, CVE or domain at the top to start a new case. Pivots read only
   the report's own data; nothing is looked up online.
 
