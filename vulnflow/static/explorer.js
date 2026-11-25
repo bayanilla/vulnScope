@@ -778,19 +778,6 @@ function drawNode(n, T) {
   if (!(x > -80 && y > -80 && x < W + 80 && y < H + 80)) return;
   const sel = state.focus === n.id, hov = state.hover === n, gl = !!R3;
   ctx.globalAlpha = n.a;
-  if (sel) {   // radar rings and sweep on the selected host (3D draws its rings in the scene)
-    for (let i = 0; i < 3 && !gl; i++) {
-      const ph = ((T * 0.6 + i / 3) % 1);
-      ctx.globalAlpha = n.a * (1 - ph) * 0.6; ctx.strokeStyle = n.color; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(x, y, r + ph * 90 * sc, 0, 7); ctx.stroke();
-    }
-    if (state.motion) {
-      const sw = ctx.createConicGradient ? ctx.createConicGradient(T * 1.4, x, y) : null;
-      if (sw) { sw.addColorStop(0, 'rgba(46,230,214,.22)'); sw.addColorStop(0.12, 'rgba(46,230,214,0)'); sw.addColorStop(1, 'rgba(46,230,214,0)');
-        ctx.globalAlpha = n.a * (gl ? 0.7 : 1); ctx.fillStyle = sw; ctx.beginPath(); ctx.arc(x, y, 160 * sc, 0, 7); ctx.fill(); }
-    }
-    ctx.globalAlpha = n.a;
-  }
   ctx.shadowColor = n.color; ctx.shadowBlur = (sel ? 30 : hov ? 22 : 12);
   if (gl) {
     ctx.shadowBlur = 0;
@@ -1053,11 +1040,6 @@ function draw3d(now, dt, k) {
     e.lit = lit;
     L.quad(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], e.small ? 6 : 20, e.w * (lit && hl ? 1.6 : 1), RGB(e.color), e.al, e.dashed);
   });
-  const sel = state.focus && nodes.get(state.focus);
-  if (sel && focusing) for (let i = 0; i < 3; i++) {
-    const ph = (T * 0.45 + i / 3) % 1;
-    L.circle(sel.x, sel.y, sel.z, sel.r + 6 + ph * 140, 64, 1.6, RGB(sel.color), sel.a * (1 - ph) * 0.7, false);
-  }
   L.end();
 
   // node bodies and halos
