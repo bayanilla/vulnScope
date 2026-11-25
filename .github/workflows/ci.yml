@@ -7,7 +7,8 @@
 #   performance   scripts/perf/perf_check.py: a fixed dataset, fails on a big slowdown, memory or page-size growth
 #   explorer      scripts/smoke/explorer_smoke.py: opens each sample's Explorer in headless Chromium, walks
 #                 3D, focus, Flat, Attack paths and Timeline, fails on page errors or hosts/flows not drawn
-#   docker-image  builds the Docker image and analyzes a bundled sample inside it
+#   docker-image  builds the Docker image, analyzes a bundled sample inside it, scans it with Grype
+#                 (warning only) and keeps its SBOM
 #   accuracy      runs the image on Brim's public sample captures and logs and compares every
 #                 number with ground truth computed separately (scripts/accuracy/)
 # Nothing here needs secrets, an API key or a model. The Brim files are downloaded on the CI
@@ -167,6 +168,25 @@ jobs:
           docker run -d --name vs -p 127.0.0.1:8080:8080 vulnscope:ci
           for i in $(seq 30); do curl -fs -o /dev/null http://127.0.0.1:8080/ && exit 0; sleep 2; done
           docker logs vs; exit 1
+      # Warning only here; the Release workflow fails on the same findings before publishing.
+      - uses: anchore/scan-action/download-grype@v6
+        id: grype
+      - name: Known vulnerabilities with a fix (warning only; Release blocks on these)
+        run: |
+          if ! "${{ steps.grype.outputs.cmd }}" vulnscope:ci --only-fixed --fail-on high -o table > grype.txt; then
+            echo "::warning title=Image scan::HIGH or CRITICAL findings with a fix available; the Release workflow would stop on these"
+          fi
+          cat grype.txt
+          { echo "### Image scan (Grype, fixable HIGH/CRITICAL fail a release)"; echo; echo '```'; cat grype.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: anchore/sbom-action/download-syft@v0
+        id: syft
+      - name: SBOM of the image (the same command the Release workflow uses)
+        run: '"${{ steps.syft.outputs.cmd }}" docker:vulnscope:ci -q -o spdx-json=vulnscope-sbom-amd64.spdx.json'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-amd64
+          path: vulnscope-sbom-amd64.spdx.json
+          retention-days: 7
 
   accuracy:
     name: Accuracy on Brim sample data

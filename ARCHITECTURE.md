@@ -215,9 +215,9 @@ Mac, the native Python install is faster.
 ### Air-gapped networks and enclaves
 
 **From a release (nothing to build).** Each GitHub release has the published image saved as a file
-per architecture, with `compose.yaml`, `env.example`, `LOAD.txt` and `SHA256SUMS`. Download the
-image file for the target (`amd64` for Intel/AMD, `arm64` for Apple silicon and ARM servers) and
-the four small files, carry them across, then:
+per architecture, with an SPDX SBOM (package list) per architecture, `compose.yaml`, `env.example`,
+`LOAD.txt` and `SHA256SUMS`. Download the image file for the target (`amd64` for Intel/AMD, `arm64`
+for Apple silicon and ARM servers) and the small files, carry them across, then:
 
 ```sh
 sha256sum -c SHA256SUMS --ignore-missing

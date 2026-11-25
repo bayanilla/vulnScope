@@ -157,13 +157,22 @@ git tag v1.2.0 && git push origin v1.2.0      # or GitHub: Releases > Draft a ne
 
 1. **CI**: the whole `ci.yml` (hygiene, tests, Explorer, Docker image, accuracy) runs on the tagged
    commit. Nothing is published if any job fails.
-2. **Image**: builds linux/amd64 and linux/arm64 (arm64 under QEMU) and pushes
-   `ghcr.io/bayanilla/vulnscope:1.2.0`, `:1.2` and `:latest`. A pre-release tag such as
-   `v1.2.0-rc1` gets only its own tag and never moves `latest`.
+2. **Image**: first scans an amd64 build with [Grype](https://github.com/anchore/grype) and stops
+   if it finds a HIGH or CRITICAL vulnerability that already has a fix (findings without a fix are
+   left out, as the Zeek base image usually has some). Findings also go to the repository's
+   **Security > Code scanning** tab. The CI Docker job runs the same scan on every pull request as a
+   warning only, so a blocked release shows up before you tag. Then it builds linux/amd64 and
+   linux/arm64 (arm64 under QEMU) and pushes `ghcr.io/bayanilla/vulnscope:1.2.0`, `:1.2` and
+   `:latest`, each with an SBOM and build provenance stored next to it, plus a GitHub-signed
+   attestation. A pre-release tag such as `v1.2.0-rc1` gets only its own tag and never moves `latest`.
 3. **Release**: pulls each architecture back from ghcr.io, checks it starts, saves it with
-   `docker save` (about 190 MB each, gzipped) and attaches both files, `compose.yaml` (a copy of
+   `docker save` (about 190 MB each, gzipped) and attaches both files, an SPDX SBOM per
+   architecture (`vulnscope-1.2.0-sbom-amd64.spdx.json`, made with Syft), `compose.yaml` (a copy of
    `compose.release.yaml`), `env.example`, `LOAD.txt` (from `scripts/docker/LOAD-release.txt`) and
    `SHA256SUMS` to the GitHub release, creating the release with generated notes if it does not exist.
+
+Anyone can check that an image came from this repository's Release workflow:
+`gh attestation verify oci://ghcr.io/bayanilla/vulnscope:1.2.0 --owner bayanilla`.
 
 It uses only the workflow's own `GITHUB_TOKEN`; no secrets to set up. **Actions > Release > Run
 workflow** builds both architectures without pushing or releasing anything, as a dry run.
