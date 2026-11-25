@@ -171,6 +171,15 @@ def check(page_path: Path, browser, shots: Path) -> list[str]:
                             f"{t['misplaced']} chord ends with no position")
         page.evaluate("VFTimeline.close()")
 
+    if page.evaluate("!!window.VFInvestigate && !document.getElementById('btn-investigate').hidden"):
+        page.click("#btn-investigate")
+        step("investigate")
+        s = page.evaluate("VFInvestigate.stats()")
+        if not s["entities"] or s["misplaced"]:
+            problems.append(f"investigate: {s['entities']} entities from the lead {s['seed']}, "
+                            f"{s['misplaced']} with no position")
+        page.evaluate("VFInvestigate.close()")
+
     page.evaluate("VFExplorer.set3d(true)")
     step("back-to-3d")
     page.close()

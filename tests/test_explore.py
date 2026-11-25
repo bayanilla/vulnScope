@@ -74,9 +74,9 @@ class ExploreTests(unittest.TestCase):
         self.assertIn("new DecompressionStream('gzip')", page)
         self.assertNotIn("fflate", page)
         starts = [page.index("window.vfWhenReady = ")] + [page.index(f"window.{name} = ") for name in
-                                                          ("VFExplorer", "VFPaths", "VFTimeline")]
+                                                          ("VFExplorer", "VFPaths", "VFTimeline", "VFInvestigate")]
         self.assertEqual(starts, sorted(starts))
-        self.assertEqual(page.count("vfWhenReady(function (D) {   // starts once"), 3)
+        self.assertEqual(page.count("vfWhenReady(function (D) {   // starts once"), 4)
         self.assertNotIn("window.VF_DATA;", page)    # no view reads the data before it is unpacked
 
     def test_ioc_host_hints_count_distinct_matches(self):
@@ -348,6 +348,26 @@ class ExploreTests(unittest.TestCase):
         self.assertIn('id="btn-timeline"', page)
         self.assertIn('id="timeline-view"', page)
         self.assertIn("window.VFTimeline", page)
+
+    def test_host_search_also_matches_traffic(self):
+        # the host search finds hosts by the outside addresses and peers in their lists, and asks the
+        # server for the full lists when the page has one
+        page = explore.html(self.data)
+        for needle in ("function trafficMatch", "function ipMatcher", "function showMatch", "CONTACTS + 'search/'"):
+            self.assertIn(needle, page)
+
+    def test_html_includes_investigate_view(self):
+        # the investigation graph is drawn on a plain canvas from the data already in the page: no graph
+        # library, and nothing it draws is fetched from the network
+        page = explore.html(self.data)
+        self.assertIn('id="btn-investigate"', page)
+        self.assertIn('id="investigate-view"', page)
+        self.assertIn("window.VFInvestigate", page)
+        start = page.index("window.VFInvestigate = ")
+        js = page[page.rindex("<script>", 0, start):start]
+        self.assertNotRegex(js, r"(?i)sigma|graphology|cytoscape")
+        self.assertNotIn("fetch(", js)
+        self.assertNotRegex(js.replace("http://www.w3.org/2000/svg", ""), r"https?://")   # the SVG namespace is a name, not a load
 
 
 if __name__ == "__main__":

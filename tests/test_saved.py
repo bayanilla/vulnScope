@@ -153,6 +153,33 @@ class SavedRunTests(unittest.TestCase):
         page = self.request("GET", self.opened(bare) + "explorer.html")[1]
         self.assertIn('<meta name="vulnscope-contacts" content="">', page)
 
+    def test_reopened_explorer_searches_full_host_lists(self):
+        # The host search asks the server for addresses past the page's cut lists: a full IP matches
+        # exactly, a partial one from its start, a.b.c.d/n by range; anything else is refused.
+        data = explore.read_data(self.explorer.decode())
+        host = next(ip for ip, f in data["focus"].items() if len(f["attackers"]) < f["attackers_total"])
+        here = self.opened(self.out)
+        page = self.request("GET", here + "explorer.html")[1]
+        where = re.search(r'<meta name="vulnscope-contacts" content="(contacts/[0-9a-f]{32}/)">', page)[1]
+        full = json.loads(self.request("GET", here + where + host)[1])
+        hidden = full["attackers"][-1]["ip"]           # in the full list only
+        self.assertNotIn(hidden, [a["ip"] for a in data["focus"][host]["attackers"]])
+
+        def search(q):
+            status, body, resp = self.request("GET", here + where + "search/" + q, headers={"Origin": "null"})
+            self.assertEqual(resp.getheader("Access-Control-Allow-Origin"), "null")
+            return status, body
+        status, body = search(hidden)
+        self.assertEqual(status, 200, body)
+        found = {h: (side, ip) for h, side, ip, _ in json.loads(body)["hosts"]}
+        self.assertEqual(found[host], ("a", hidden))
+        octets = hidden.split(".")
+        for q in (".".join(octets[:3]) + ".", ".".join(octets[:3]) + ".0/24"):
+            self.assertIn(host, {h for h, *_ in json.loads(search(q)[1])["hosts"]}, q)
+        for q in ("abc", "x' OR 1=1", "1.2.3.4/40", "1.2.3.999/8"):
+            self.assertEqual(search(q.replace(" ", "%20"))[0], 400, q)
+        self.assertEqual(self.request("GET", here + "contacts/" + "0" * 32 + "/search/" + hidden)[0], 404)
+
     def test_bad_folders_are_refused_with_a_reason(self):
         res = json.loads(self.results)
 

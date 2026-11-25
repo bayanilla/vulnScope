@@ -146,8 +146,8 @@ and active servers never scanned, are listed as coverage gaps. The reports also 
 sensor looks unreliable (packet loss, or one-direction capture).
 
 **The Explorer** (`explorer.html`, one offline file) shows the same run as a 3D or flat map, an
-Attack paths view of the likeliest ways in, and a Timeline of every flow. Click a host to see who
-it talked to inside and out. Press **?** in any view for help; the
+Attack paths view of the likeliest ways in, a Timeline of every flow, and an Investigate view that
+follows one lead outward entity by entity. Click a host to see who it talked to inside and out. Press **?** in any view for help; the
 [Explorer guide](docs/EXPLORER.md) covers the controls.
 
 ![Explorer overview of the synthetic 250-host example run in 3D, with the host list grouped by subnet](screenshots/explorer_current_overview.jpg)

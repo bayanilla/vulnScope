@@ -50,6 +50,9 @@ font:inherit;font-size:13px;backdrop-filter:blur(8px)}
 .hrow:hover,.hrow.on{background:rgba(46,230,214,.1)}.hrow.on{box-shadow:inset 2px 0 0 var(--cyan)}
 .hrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hrow .ip{color:var(--muted);font-family:var(--mono);font-size:11px}
+.hrow .via{color:var(--cyan);font-family:var(--mono);font-size:11px}
+#hostlist .hnote{padding:8px;font-size:11.5px;line-height:1.45;color:var(--muted);border-top:1px solid var(--line);margin-top:6px}
+.ip-entry.found>summary{box-shadow:inset 2px 0 0 var(--cyan)}
 .pill{display:inline-block;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;color:#05070c;background:var(--none)}
 .pill.P1{background:var(--crit)}.pill.P2{background:var(--high)}.pill.P3{background:var(--med)}.pill.P4{background:var(--none)}
 .tag{display:inline-block;padding:0 6px;border:1px solid currentColor;border-radius:4px;font-size:11px;font-weight:700}

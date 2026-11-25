@@ -40,7 +40,7 @@ const WINS = HRS > 72 ? [6, 12, 24] : HRS > 12 ? [2, 6, 12] : [0.5, 1, 3];
 let WIN = WINS[1];
 root.innerHTML = `<canvas id="tl-canvas" aria-label="Flows over time"></canvas><div id="tl-labels"></div>
 <header class="tl-top">${BRAND_LOGO.startsWith('data:image/') ? `<img class="tl-logo${BRAND_SMALL ? ' logo-small' : ''}" src="${esc(BRAND_LOGO)}" alt="" aria-hidden="true">` : ''}<div class="tl-title"><div class="t">${esc(BRAND)} · Timeline</div><div class="s" id="tl-sub"></div></div>
-  <div class="seg" role="group" aria-label="View"><button type="button" data-view="flat" title="Flat network view (2)">Flat</button><button type="button" data-view="3d" title="3D network view (3)">3D</button><button type="button" data-view="paths" title="Attack paths (P)">Attack paths</button><button type="button" class="on" aria-current="true" title="Timeline (Esc to go back)">Timeline</button></div>
+  <div class="seg" role="group" aria-label="View"><button type="button" data-view="flat" title="Flat network view (2)">Flat</button><button type="button" data-view="3d" title="3D network view (3)">3D</button><button type="button" data-view="paths" title="Attack paths (P)">Attack paths</button><button type="button" class="on" aria-current="true" title="Timeline (Esc to go back)">Timeline</button><button type="button" data-view="investigate" title="Investigate outward from one lead (N)" hidden>Investigate</button></div>
   <span class="tl-qwrap"><button type="button" id="tl-about-toggle" aria-controls="tl-about" aria-expanded="false" aria-label="What am I looking at?" title="What am I looking at? (?)">?</button></span></header>
 <aside class="tl-side"><h3>Time window</h3><div class="tl-winbtns" role="group" aria-label="Window length">${WINS.map(w => `<button type="button" data-w="${w}">${w < 1 ? w * 60 + ' min' : w + ' h'}</button>`).join('')}</div>
   <input id="tl-scrub" type="range" min="0" step="any" aria-label="Window start"><div id="tl-win"></div><div id="tl-sample"></div></aside>
@@ -360,6 +360,7 @@ $('tl-about').addEventListener('mouseleave', () => { clearTimeout(aboutTimer); a
 let isOpen = false;
 function open() {
   if (window.VFPaths) window.VFPaths.close();
+  if (window.VFInvestigate) window.VFInvestigate.close();
   isOpen = true; root.hidden = false; openBtn.setAttribute('aria-expanded', 'true');
   if (!built) { build(); setupSide(); setPreset('angled'); setSpin(true); }
   resize(); last = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); openAbout();
@@ -372,7 +373,7 @@ function close() {
   if (/[?&#]timeline\b/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
   if (window.VFExplorer) window.VFExplorer.markSeg();
 }
-function showView(v) { close(); if (v === 'paths') { if (window.VFPaths) window.VFPaths.open(); } else if (window.VFExplorer) window.VFExplorer.set3d(v === '3d'); }
+function showView(v) { close(); if (v === 'paths') { if (window.VFPaths) window.VFPaths.open(); } else if (v === 'investigate') { if (window.VFInvestigate) window.VFInvestigate.open(); } else if (window.VFExplorer) window.VFExplorer.set3d(v === '3d'); }
 function openHost(ip) { close(); if (window.VFExplorer) window.VFExplorer.focus(ip); }
 openBtn.onclick = () => { if (!isOpen) open(); };
 root.querySelectorAll('.seg [data-view]').forEach(b => { b.onclick = () => showView(b.dataset.view);
@@ -390,6 +391,7 @@ addEventListener('keydown', e => {
   else if (e.key === '2') showView('flat');
   else if (e.key === '3' && window.VFExplorer && window.VFExplorer.can3d) showView('3d');
   else if ((e.key === 'p' || e.key === 'P') && !document.getElementById('btn-paths').hidden) showView('paths');
+  else if ((e.key === 'n' || e.key === 'N') && !document.getElementById('btn-investigate').hidden) showView('investigate');
 }, true);
 if (/[?&#]timeline\b/.test(location.search + location.hash)) open();
 // stats(): read-only counts for the browser smoke test (scripts/smoke): flows in the data, chords drawn, and

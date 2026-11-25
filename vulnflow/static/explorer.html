@@ -13,6 +13,7 @@
     <button id="btn-3d" type="button" title="3D network view (3). Drag to rotate, right-drag or Shift-drag to pan, middle-drag to move up or down" hidden>3D</button>
     <button id="btn-paths" type="button" title="Most likely attack paths (P)" hidden>Attack paths</button>
     <button id="btn-timeline" type="button" title="Flows over time (I)" aria-controls="timeline-view" aria-expanded="false" hidden>Timeline</button>
+    <button id="btn-investigate" type="button" title="Investigate outward from one lead (N)" aria-controls="investigate-view" aria-expanded="false" hidden>Investigate</button>
   </div>
   <button id="btn-labels" aria-pressed="true" title="Show or hide labels (L)">Labels</button>
   <button id="btn-motion" aria-pressed="true" title="Animated traffic (M)">Motion</button>
@@ -29,7 +30,7 @@
   <button id="vc-reset" type="button" title="Reset to the low, turning view (R)">Reset</button>
 </div>
 <aside id="rail">
-  <div class="railtop"><input id="search" type="search" placeholder="Find host, IP, CVE" title="Find a host, IP, or CVE ( / )" aria-label="Find a host" autocomplete="off">
+  <div class="railtop"><input id="search" type="search" placeholder="Find host, IP, CVE" title="Find a host by name, IP, or CVE, or by an outside address (N/S) or internal peer (E/W) it exchanged traffic with; 10.1.2.0/24 finds a range ( / )" aria-label="Find a host" autocomplete="off">
   <button id="group-toggle" type="button" aria-pressed="true" title="Group the host list by subnet (click a subnet to open or fold it)">By subnet</button>
   <button id="ioc-filter" type="button" aria-pressed="false" hidden>IOC hosts <span id="ioc-host-count"></span></button>
   <select id="net-filter" aria-label="Show hosts from one network" title="Show hosts from one network (from the network map)" hidden></select></div>
@@ -54,3 +55,4 @@
 <div id="intro"><div class="mono" id="intro-text"></div></div>
 <section id="attack-paths" aria-label="Attack paths" hidden></section>
 <section id="timeline-view" aria-label="Timeline" hidden></section>
+<section id="investigate-view" aria-label="Investigate" hidden></section>
