@@ -206,7 +206,7 @@ root.innerHTML = `<canvas id="iv-canvas" aria-label="Investigation graph"></canv
   <div class="seg" role="group" aria-label="View"><button type="button" data-view="flat" title="Flat network view (2)">Flat</button><button type="button" data-view="3d" title="3D network view (3)">3D</button><button type="button" data-view="paths" title="Attack paths (P)">Attack paths</button><button type="button" data-view="timeline" title="Flows over time (I)">Timeline</button><button type="button" class="on" aria-current="true" title="Investigate (Esc to go back)">Investigate</button></div>
   <span class="iv-qwrap"><button type="button" id="iv-about-toggle" aria-controls="iv-about" aria-expanded="false" aria-label="What am I looking at?" title="What am I looking at? (?)">?</button></span></header>
 <aside class="iv-palette"><h3>Entities</h3><div id="iv-types"></div>
-  <p class="iv-hint"><b>Click</b> an entity for its details and pivots. <b>Double-click</b> runs its next pivot. Drag an entity to move it. <kbd>Del</kbd> removes it. Click a type above to hide it.</p></aside>
+  <p class="iv-hint"><b>Click</b> an entity for its details and pivots. <b>Double-click</b> runs its next pivot. Drag an entity to move it. <kbd>Del</kbd> removes it. Uncheck a pivot to take back what it added. Click a type above to hide it.</p></aside>
 <aside class="iv-props" id="iv-props" aria-live="polite"></aside>
 <p id="iv-about" hidden>An investigation graph that grows from one lead. Each <b>icon</b> is an entity (host, outside address, service, finding, CVE, IPS alert, IOC domain, article, subnet) and each <b>arrow</b> says how two are connected. Click an entity and run a <b>pivot</b> to follow the trail. Pivots read only this report; nothing is looked up online. Connections are leads, not confirmed compromise.</p>
 <div id="iv-tip" hidden></div>`;
@@ -214,32 +214,71 @@ const $ = id => document.getElementById(id);
 const cv = $('iv-canvas'), ctx = cv.getContext('2d');
 
 // ---------------------------------------------------------------- the case: entities and links
-const ents = new Map();   // id -> {id, e (entity), x, y, tx, ty, r, parent, ran:Set}
+const ents = new Map();   // id -> {id, e (entity), x, y, tx, ty, r, parent, ran: Map pivot -> what it added}
 const links = [];         // {a, b, label, color}
 let seedId = null, selected = null, hover = null, layout = 'tree', edgeLabels = true;
 const hidden = new Set();
 function addEntity(id, parent, at) {
   if (ents.has(id)) return false;
   const e = entity(id);
-  ents.set(id, {id, e, x: at ? at.x : 0, y: at ? at.y : 0, tx: 0, ty: 0, r: 17, parent: parent || null, ran: new Set()});
+  ents.set(id, {id, e, x: at ? at.x : 0, y: at ? at.y : 0, tx: 0, ty: 0, r: 17, parent: parent || null, ran: new Map()});
   return true;
 }
 function link(a, b, label, color) {
-  if (a === b || links.some(l => (l.a === a && l.b === b) || (l.a === b && l.b === a))) return;
-  links.push({a, b, label: (label || '').trim(), color: color || PAL.line});
+  if (a === b || links.some(l => (l.a === a && l.b === b) || (l.a === b && l.b === a))) return null;
+  const l = {a, b, label: (label || '').trim(), color: color || PAL.line};
+  links.push(l);
+  return l;
 }
 function runPivot(id, pk, relayout = true) {
   const pv = pivotsOf(id).find(p => p.key === pk), at = ents.get(id); if (!pv || !at) return 0;
-  let added = 0;
+  if (at.ran.has(pk)) return 0;
+  const made = {ents: [], links: [], hits: new Set(), pairs: []};
   pv.run(keyOf(id)).forEach(r => {
     const parent = r.parent || id, from = ents.get(parent) || at;
-    if (addEntity(r.id, parent, from)) added++;
-    if (r.from === 'it') link(r.id, parent, r.label, r.color); else link(parent, r.id, r.label, r.color);
+    if (addEntity(r.id, parent, from)) made.ents.push(r.id);
+    made.hits.add(r.id);
+    const pair = r.from === 'it' ? [r.id, parent, r.label, r.color] : [parent, r.id, r.label, r.color];
+    made.pairs.push(pair);
+    const l = link(...pair);
+    if (l) made.links.push(l);
   });
-  at.ran.add(pk);
+  at.ran.set(pk, made);
+  const added = made.ents.length;
   if (relayout) { applyLayout(false, id); refreshUI(); }
   return added;
 }
+// Unchecking a pivot takes back what it added: its links, the entities it brought in, and in turn
+// whatever was pivoted to from them. Entities that were there before, or that a pivot still checked
+// also reached, stay, and so do the links a pivot still checked also draws.
+function undoPivot(id, pk, relayout = true) {
+  const at = ents.get(id), made = at && at.ran.get(pk);
+  if (!made) return 0;
+  const keep = new Set();     // reached by a pivot that stays checked on an entity that stays
+  let undone, drop;
+  for (;;) {
+    undone = new Set([made]); drop = new Set();
+    const take = x => { const n = ents.get(x); if (!n || x === seedId || drop.has(x) || keep.has(x)) return;
+      drop.add(x); n.ran.forEach(m => { undone.add(m); m.ents.forEach(take); }); };
+    made.ents.forEach(take);
+    const before = keep.size;
+    ents.forEach(n => { if (!drop.has(n.id)) n.ran.forEach(m => { if (!undone.has(m)) m.hits.forEach(x => keep.add(x)); }); });
+    if (keep.size === before) break;
+  }
+  const kept = () => { const out = []; ents.forEach(n => n.ran.forEach(m => { if (!undone.has(m)) out.push(m); })); return out; };
+  at.ran.delete(pk);
+  for (let i = links.length - 1; i >= 0; i--) {
+    const l = links[i];
+    if (drop.has(l.a) || drop.has(l.b) || [...undone].some(m => m.links.includes(l))) links.splice(i, 1);
+  }
+  drop.forEach(x => ents.delete(x));
+  kept().forEach(m => m.pairs.forEach(p => { if (ents.has(p[0]) && ents.has(p[1])) { const l = link(...p); if (l) m.links.push(l); } }));
+  ents.forEach(n => { if (n.parent && !ents.has(n.parent)) { const l = links.find(l => l.a === n.id || l.b === n.id); n.parent = l ? (l.a === n.id ? l.b : l.a) : null; } });
+  if (selected && !ents.has(selected)) selected = null;
+  if (relayout) { applyLayout(false, id); refreshUI(); }
+  return drop.size;
+}
+function togglePivot(id, pk) { const n = ents.get(id); return n && n.ran.has(pk) ? -undoPivot(id, pk) : runPivot(id, pk); }
 const visible = n => !hidden.has(n.e.type);
 
 // ---------------------------------------------------------------- layouts (world units; y grows down)
@@ -450,7 +489,9 @@ function renderProps() {
   }
   const n = ents.get(selected), e = n.e, T = TYPES[e.type];
   const pv = pivotsOf(selected).map(x => { const c = x.run(keyOf(selected)).length, done = n.ran.has(x.key);
-    return `<button class="iv-pv${done ? ' done' : ''}" type="button" data-pk="${esc(x.key)}"${c ? '' : ' disabled'}><span class="nm">${esc(x.name)}</span><span class="ct">${x.note && c > 8 ? '8 of ' : ''}${c}</span></button>`; }).join('');
+    return `<button class="iv-pv${done ? ' done' : ''}" type="button" role="checkbox" aria-checked="${done}" data-pk="${esc(x.key)}"${c || done ? '' : ' disabled'}` +
+      ` title="${done ? 'Uncheck to take back what this pivot added' : 'Run this pivot'}"><span class="box" aria-hidden="true"></span>` +
+      `<span class="nm">${esc(x.name)}</span><span class="ct">${x.note && c > 8 ? '8 of ' : ''}${c}</span></button>`; }).join('');
   const hostIp = e.type === 'host' && window.VFExplorer && D.focus[e.key] ? e.key : '';
   p.innerHTML = `<div class="iv-ehead"><span class="ico" style="background:${esc(e.color)}"><img alt="" src="${T.icon}"></span><div><div class="ty">${esc(T.name)}</div><h2>${esc(e.full || e.label)}</h2></div></div>` +
     `<h3>Properties</h3><table class="iv-kv">${e.props.map(([k, v, raw]) => `<tr><td>${esc(k)}</td><td>${raw ? v : esc(v)}</td></tr>`).join('')}</table>` +
@@ -458,7 +499,7 @@ function renderProps() {
     (hostIp ? `<button type="button" class="iv-goto" data-host="${esc(hostIp)}">Show this host in the network view</button>` : '');
 }
 $('iv-props').addEventListener('click', ev => {
-  const b = ev.target.closest('.iv-pv'); if (b && selected) { runPivot(selected, b.dataset.pk); renderProps(); return; }
+  const b = ev.target.closest('.iv-pv'); if (b && selected) { togglePivot(selected, b.dataset.pk); renderProps(); return; }
   const g = ev.target.closest('.iv-goto'); if (g) { close(); if (window.VFExplorer) window.VFExplorer.focus(g.dataset.host); }
 });
 function refreshUI() {
@@ -614,5 +655,5 @@ function stats() {
   let misplaced = 0; ents.forEach(n => { if (!Number.isFinite(n.tx) || !Number.isFinite(n.ty)) misplaced++; });
   return {entities: ents.size, links: links.length, misplaced, seed: seedId, ids: [...ents.keys()]};
 }
-window.VFInvestigate = {open, close, isOpen: () => isOpen, runPivot, select, setLayout, stats};
+window.VFInvestigate = {open, close, isOpen: () => isOpen, runPivot, undoPivot, select, setLayout, stats};
 });

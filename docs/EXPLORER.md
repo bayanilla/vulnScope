@@ -23,7 +23,9 @@ The view switcher offers:
   Each entity (host, outside address, service, finding, CVE, IPS alert, IOC domain, source article,
   subnet) is an icon and each arrow says how two are connected, such as "IPS alert :443" or "tracked
   as". Click an entity for its properties and the pivots it offers (who reached this host, the hosts
-  with this CVE, where an alert came from); double-click runs its next pivot. Tree, Radial and
+  with this CVE, where an alert came from); double-click runs its next pivot. Pivots are checkboxes:
+  unchecking one takes back what it added and whatever was pivoted to from there, while entities a
+  still-checked pivot also reached stay. Tree, Radial and
   Organic layouts; type a host, IP, CVE or domain at the top to start a new case. Pivots read only
   the report's own data; nothing is looked up online.
 
