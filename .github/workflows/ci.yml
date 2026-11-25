@@ -173,11 +173,17 @@ jobs:
         id: grype
       - name: Known vulnerabilities with a fix (warning only; Release blocks on these)
         run: |
-          if ! "${{ steps.grype.outputs.cmd }}" vulnscope:ci --only-fixed --fail-on high -o table > grype.txt; then
+          if ! "${{ steps.grype.outputs.cmd }}" vulnscope:ci --only-fixed --fail-on high -o table -o json=grype.json > grype.txt; then
             echo "::warning title=Image scan::HIGH or CRITICAL findings with a fix available; the Release workflow would stop on these"
           fi
           cat grype.txt
-          { echo "### Image scan (Grype, fixable HIGH/CRITICAL fail a release)"; echo; echo '```'; cat grype.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          # Where each blocking finding lives in the image, to tell base-image packages from our own.
+          jq -r '.matches[] | select(.vulnerability.fix.state == "fixed")
+                 | select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical")
+                 | "\(.artifact.name) \(.artifact.version) -> \(.vulnerability.fix.versions | join(",")) \(.artifact.locations[0].path)"' \
+            grype.json | sort -u | tee blocking.txt
+          { echo "### Image scan (Grype): fixable HIGH/CRITICAL, which stop a release"; echo; echo '```';
+            if [ -s blocking.txt ]; then cat blocking.txt; else echo "none"; fi; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: anchore/sbom-action/download-syft@v0
         id: syft
       - name: SBOM of the image (the same command the Release workflow uses)
