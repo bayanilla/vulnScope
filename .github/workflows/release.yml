@@ -3,10 +3,14 @@
 #
 #   ci        the whole CI workflow (tests, Explorer smoke test, Docker build, accuracy) on the tagged commit;
 #             nothing is published unless it passes
-#   image     builds linux/amd64 + linux/arm64 and pushes ghcr.io/<owner>/vulnscope:<version>,
-#             :<major>.<minor> and :latest (pre-releases such as v1.2.0-rc1 get only their own tag)
+#   image     scans the image with Grype first (fails on a HIGH or CRITICAL finding that has a fix;
+#             findings go to the Security tab), then builds linux/amd64 + linux/arm64 and pushes
+#             ghcr.io/<owner>/vulnscope:<version>, :<major>.<minor> and :latest (pre-releases such as
+#             v1.2.0-rc1 get only their own tag), each with an SBOM and build provenance, and a
+#             GitHub-signed attestation (check it: gh attestation verify oci://<image>:<version> --owner <owner>)
 #   release   pulls each architecture back from ghcr.io, saves it with docker save for offline enclaves, and
-#             attaches the two image files, compose.yaml, env.example, LOAD.txt and SHA256SUMS to the release
+#             attaches the two image files, an SPDX SBOM per architecture, compose.yaml, env.example,
+#             LOAD.txt and SHA256SUMS to the release
 #
 # Run it by hand (Actions > Release > Run workflow) to build both architectures without publishing anything.
 name: Release
@@ -39,6 +43,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write         # sign the build attestation (keyless, no secret)
+      attestations: write
+      security-events: write  # Grype findings to the Security tab
     outputs:
       image: ${{ steps.name.outputs.image }}
       version: ${{ steps.name.outputs.version }}
@@ -73,6 +80,30 @@ jobs:
             org.opencontainers.image.authors=bayanilla
             org.opencontainers.image.url=https://github.com/bayanilla/vulnScope
             org.opencontainers.image.documentation=https://github.com/bayanilla/vulnScope#readme
+      # Scan before anything is published. The package list is the same for both architectures, so
+      # the amd64 build (mostly from cache) stands for both.
+      - name: Build linux/amd64 to scan
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          pull: true
+          load: true
+          push: false
+          tags: vulnscope:scan
+          cache-from: type=gha
+      - uses: anchore/scan-action/download-grype@v6
+        id: grype
+      - name: Scan for known vulnerabilities (fails on HIGH or CRITICAL with a fix available)
+        run: |
+          "${{ steps.grype.outputs.cmd }}" vulnscope:scan --only-fixed --fail-on high \
+            -o table -o sarif=grype.sarif
+      - name: Findings to the Security tab
+        if: always() && hashFiles('grype.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: grype.sarif
+          category: release-image
       - uses: docker/login-action@v3
         if: startsWith(github.ref, 'refs/tags/v')
         with:
@@ -80,6 +111,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build (and push on a version tag)
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -88,8 +120,17 @@ jobs:
           push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          sbom: true              # package list stored with the image on ghcr.io
+          provenance: mode=max    # how, where and from which commit it was built
           cache-from: type=gha
           cache-to: type=gha,mode=max,scope=release
+      - name: Signed attestation linking the image to this repository and commit
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ steps.name.outputs.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
 
   release:
     name: Offline image files on the GitHub release
@@ -108,18 +149,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
+      - uses: anchore/sbom-action/download-syft@v0
+        id: syft
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Save each architecture exactly as published
+      - name: Save each architecture exactly as published, with its SBOM
+        env:
+          SYFT: ${{ steps.syft.outputs.cmd }}
         run: |
           mkdir -p assets
           for arch in amd64 arm64; do
             docker pull --platform "linux/$arch" "$IMAGE:$VERSION"
             # Smoke test the arm64 copy too (under QEMU): the files people load must start.
             docker run --rm --platform "linux/$arch" "$IMAGE:$VERSION" zeek --version
+            # The SBOM on ghcr.io cannot be fetched inside an enclave, so ship one as a file too.
+            "$SYFT" "docker:$IMAGE:$VERSION" -q -o "spdx-json=assets/vulnscope-${VERSION}-sbom-${arch}.spdx.json"
             tags="$IMAGE:$VERSION"
             if [ "$PRERELEASE" = false ]; then
               docker tag "$IMAGE:$VERSION" "$IMAGE:latest"; tags="$tags $IMAGE:latest"

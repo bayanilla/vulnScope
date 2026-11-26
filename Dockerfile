@@ -22,6 +22,11 @@ FROM ${ZEEK_IMAGE}
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH=/usr/local/zeek/bin:$PATH
+# Debian security fixes released since the Zeek image was built (the release workflow's Grype scan
+# stops on HIGH or CRITICAL findings that have a fix). Build time only; nothing is fetched at run time.
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends upgrade \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /deps /opt/vulnscope/deps
 RUN python3 -c "import sys; sys.path.insert(0, '/opt/vulnscope/deps'); import duckdb; print('duckdb', duckdb.__version__)" \
  && groupadd --gid 1000 vulnscope \

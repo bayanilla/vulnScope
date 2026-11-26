@@ -17,6 +17,8 @@ Nothing is built on your computer. Put compose.yaml and env.example in a folder 
       sha256sum -c SHA256SUMS --ignore-missing   (macOS: shasum -a 256 -c SHA256SUMS --ignore-missing;
                                                   Windows: Get-FileHash <file> and compare)
       docker load -i vulnscope-@VERSION@-image-amd64.tar.gz
+    vulnscope-@VERSION@-sbom-<arch>.spdx.json lists every package in that image file, for
+    your own vulnerability scanner or approval process.
     In .env also set VULNSCOPE_OFFLINE=1 (skips IOC article previews), keep the Security
     Assistant on the built-in offline provider and leave CLOUDFLARE_RADAR_API_TOKEN unset.
 

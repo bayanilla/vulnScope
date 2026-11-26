@@ -1,0 +1,14 @@
+# Grype settings for the image scan in .github/workflows/ci.yml and release.yml.
+# Every ignore here needs a reason, and should be removed once the base image fixes it.
+ignore:
+  # Debian's node-fastify-busboy (a dependency of Debian's nodejs, which the Zeek base image
+  # ships for its JavaScript plugin). VulnScope runs no Node.js code and never parses multipart
+  # uploads with it; the fixed 3.2.x is not packaged for Debian trixie yet. Added 2026-11-25.
+  - vulnerability: GHSA-xjh9-v7x6-24jw
+    package:
+      name: "@fastify/busboy"
+      location: "/usr/share/nodejs/**"
+  - vulnerability: GHSA-x8mw-p69m-v3mx
+    package:
+      name: "@fastify/busboy"
+      location: "/usr/share/nodejs/**"
